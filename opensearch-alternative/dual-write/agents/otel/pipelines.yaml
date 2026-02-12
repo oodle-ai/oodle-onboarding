@@ -3,6 +3,13 @@ otel-logs-pipeline:
     otel_logs_source:
       ssl: false
 
+  processor:
+    - rename_keys:
+        entries:
+          - from_key: "observedTime"
+            to_key: "@timestamp"
+            overwrite_if_to_key_exists: true
+
   sink:
     - opensearch:
         hosts: ["http://opensearch:9200"]
