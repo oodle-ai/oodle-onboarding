@@ -13,11 +13,19 @@ transforms:
     source: |
       . = parse_json!(.message)
 
+  add_timestamp:
+    type: remap
+    inputs:
+      - parse_json
+    source: |
+      # Add @timestamp field for OpenSearch Dashboards
+      .@timestamp = .timestamp
+
 sinks:
   opensearch:
     type: elasticsearch
     inputs:
-      - parse_json
+      - add_timestamp
     endpoints:
       - http://opensearch:9200
     mode: bulk
