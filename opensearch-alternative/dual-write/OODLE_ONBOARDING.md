@@ -262,33 +262,11 @@ For OTel specifically, additional OpenTelemetry metadata is included:
 - Check OpenSearch is running: `curl http://localhost:9200`
 - Verify the specific agent's local output configuration
 
-## Benefits of Dual-Write
+## Benefits of Dual-Write for migration
 
 1. **Zero Downtime Migration**: Test Oodle integration while keeping existing setup
-2. **Data Validation**: Compare logs between local and cloud to ensure consistency
+2. **Data Validation**: Compare logs between OpenSearch and Oodle to ensure consistency
 3. **Gradual Rollout**: Validate Oodle integration before fully migrating
-4. **Development Flexibility**: Use local OpenSearch for dev, Oodle for production
-
-## Production Considerations
-
-### Option 1: Keep Dual-Write (Recommended for hybrid setups)
-- Development environments → Local OpenSearch
-- Production environments → Oodle
-- Both destinations receive logs for redundancy
-
-### Option 2: Migrate Fully to Oodle
-Once validated, remove local OpenSearch outputs:
-
-**OTel:** Remove `otlp/opensearch` from exporters list
-**Vector:** Remove `opensearch` sink
-**Fluent Bit:** Remove `opensearch` OUTPUT section
-
-### Cost Optimization
-
-Monitor log volume to optimize costs:
-- Use sampling for high-volume applications
-- Filter out debug logs in production
-- Implement log level-based routing
 
 ## Support
 
