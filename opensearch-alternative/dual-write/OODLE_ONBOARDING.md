@@ -1,12 +1,12 @@
 # Oodle Dual-Write Onboarding Guide
 
-This guide documents the changes made to enable dual-write functionality, sending logs to both local OpenSearch and Oodle cloud simultaneously.
+This guide documents the changes made to enable dual-write functionality, sending logs to both local OpenSearch and Oodle simultaneously.
 
 ## Overview
 
 The dual-write setup allows you to:
 - Continue using your local OpenSearch instance for development/testing
-- Simultaneously send logs to Oodle cloud for production observability
+- Simultaneously send logs to Oodle for production observability
 - Switch between agents (Fluent Bit, Vector, OpenTelemetry) seamlessly
 
 ## Architecture
@@ -24,7 +24,7 @@ The dual-write setup allows you to:
                     └───┬──────────┬───┘
                         │          │
             ┌───────────▼──┐   ┌──▼─────────────┐
-            │  OpenSearch  │   │  Oodle Cloud   │
+            │  OpenSearch  │   │     Oodle      │
             │   (Local)    │   │  (Production)  │
             └──────────────┘   └────────────────┘
 ```
@@ -94,7 +94,7 @@ exporters:
     tls:
       insecure: true
 
-  # Oodle cloud (NEW)
+  # Oodle (NEW)
   otlphttp/oodle:
     logs_endpoint: "https://${OODLE_INSTANCE}-logs.collector.oodle.ai/ingest/otel/v1/logs"
     headers:
@@ -127,7 +127,7 @@ sinks:
       index: logs-%Y.%m.%d
     suppress_type_name: true
 
-  # Oodle cloud (NEW)
+  # Oodle (NEW)
   oodle:
     type: http
     inputs: [add_timestamp]
@@ -157,7 +157,7 @@ sinks:
     Suppress_Type_Name  On
     tls                 Off
 
-# Oodle cloud (NEW)
+# Oodle (NEW)
 [OUTPUT]
     Name                http
     Match               *
@@ -273,7 +273,7 @@ For OTel specifically, additional OpenTelemetry metadata is included:
 
 ### Option 1: Keep Dual-Write (Recommended for hybrid setups)
 - Development environments → Local OpenSearch
-- Production environments → Oodle Cloud
+- Production environments → Oodle
 - Both destinations receive logs for redundancy
 
 ### Option 2: Migrate Fully to Oodle

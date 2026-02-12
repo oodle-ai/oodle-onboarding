@@ -37,7 +37,7 @@ sinks:
       enabled: true
     suppress_type_name: true
 
-  # Oodle cloud
+  # Oodle
   oodle:
     type: http
     inputs:
