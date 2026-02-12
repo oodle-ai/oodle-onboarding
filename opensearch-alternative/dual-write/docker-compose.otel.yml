@@ -16,6 +16,7 @@ services:
   data-prepper:
     image: opensearchproject/data-prepper:2.6.2
     container_name: data-prepper
+    platform: linux/amd64
     volumes:
       - ./agents/otel/pipelines.yaml:/usr/share/data-prepper/pipelines/pipelines.yaml
       - ./agents/otel/data-prepper.yaml:/usr/share/data-prepper/config/data-prepper-config.yaml
