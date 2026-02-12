@@ -34,3 +34,4 @@ sinks:
     compression: none
     healthcheck:
       enabled: true
+    suppress_type_name: true

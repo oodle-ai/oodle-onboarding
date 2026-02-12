@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
@@ -13,11 +14,29 @@ import (
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 )
 
+type LogEntry struct {
+	Timestamp string                 `json:"timestamp"`
+	Level     string                 `json:"level"`
+	Message   string                 `json:"message"`
+	Service   string                 `json:"service"`
+	Log       map[string]interface{} `json:"log,omitempty"`
+}
+
 func main() {
+	otelEndpoint := os.Getenv("OTEL_ENDPOINT")
+
+	// Use OTel SDK if endpoint is configured, otherwise write JSON to stdout
+	if otelEndpoint != "" {
+		runWithOTelSDK(otelEndpoint)
+	} else {
+		runWithStdout()
+	}
+}
+
+func runWithOTelSDK(endpoint string) {
 	ctx := context.Background()
 
-	// Initialize OTel logger
-	loggerProvider, err := initOTelLogger(ctx)
+	loggerProvider, err := initOTelLogger(ctx, endpoint)
 	if err != nil {
 		panic(fmt.Sprintf("failed to initialize OTel logger: %v", err))
 	}
@@ -29,7 +48,6 @@ func main() {
 
 	logger := loggerProvider.Logger("demo-app")
 
-	// Emit logs
 	levels := []string{"INFO", "WARN", "ERROR", "DEBUG"}
 	messages := []string{
 		"Processing user request",
@@ -60,12 +78,43 @@ func main() {
 	}
 }
 
-func initOTelLogger(ctx context.Context) (*sdklog.LoggerProvider, error) {
-	endpoint := os.Getenv("OTEL_ENDPOINT")
-	if endpoint == "" {
-		return nil, fmt.Errorf("OTEL_ENDPOINT environment variable is required")
+func runWithStdout() {
+	levels := []string{"INFO", "WARN", "ERROR", "DEBUG"}
+	messages := []string{
+		"Processing user request",
+		"Database query executed",
+		"Cache miss occurred",
+		"API endpoint called",
+		"Background job completed",
 	}
 
+	encoder := json.NewEncoder(os.Stdout)
+
+	for {
+		level := levels[rand.Intn(len(levels))]
+		message := messages[rand.Intn(len(messages))]
+
+		logEntry := LogEntry{
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
+			Level:     level,
+			Message:   message,
+			Service:   "demo-app",
+			Log: map[string]interface{}{
+				"request_id":  generateRequestID(),
+				"duration_ms": rand.Intn(1000),
+				"user_id":     rand.Intn(100),
+			},
+		}
+
+		if err := encoder.Encode(logEntry); err != nil {
+			panic(err)
+		}
+
+		time.Sleep(time.Duration(2+rand.Intn(3)) * time.Second)
+	}
+}
+
+func initOTelLogger(ctx context.Context, endpoint string) (*sdklog.LoggerProvider, error) {
 	exporter, err := otlploghttp.New(ctx,
 		otlploghttp.WithEndpoint(endpoint),
 		otlploghttp.WithInsecure(),
