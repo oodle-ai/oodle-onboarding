@@ -4,7 +4,7 @@ High-performance observability data pipeline.
 
 ## Configuration
 
-**vector.toml** contains:
+**vector.yaml** contains:
 - **Source**: Reads logs from Docker containers via socket
 - **Transform**: Parses JSON from log messages
 - **Sink**: Sends to OpenSearch with daily indices

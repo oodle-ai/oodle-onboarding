@@ -65,7 +65,7 @@ make clean          # Stop and remove volumes
 ### Vector
 - **Approach**: Reads Docker container logs via socket
 - **Use case**: High-performance data transformation
-- **Config**: `agents/vector/vector.toml`
+- **Config**: `agents/vector/vector.yaml`
 - **Best for**: Complex log transformations and routing
 
 ### OpenTelemetry Collector
