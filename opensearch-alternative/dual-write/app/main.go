@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"math/rand"
+	"net"
 	"os"
 	"time"
 )
@@ -25,7 +27,25 @@ func main() {
 		"Background job completed",
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
+	// Check if OTEL_ENDPOINT is set
+	otelEndpoint := os.Getenv("OTEL_ENDPOINT")
+	var writer io.Writer = os.Stdout
+
+	if otelEndpoint != "" {
+		// Connect to OTel collector via TCP
+		conn, err := net.Dial("tcp", otelEndpoint)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			if err := conn.Close(); err != nil {
+				panic(err)
+			}
+		}()
+		writer = conn
+	}
+
+	encoder := json.NewEncoder(writer)
 
 	for {
 		level := levels[rand.Intn(len(levels))]

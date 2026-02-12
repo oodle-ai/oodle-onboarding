@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    container_name: otel-collector
+    volumes:
+      - ./agents/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "54525:54525"
+    depends_on:
+      - opensearch
+    networks:
+      - opensearch-net
+
+  demo-app:
+    environment:
+      - OTEL_ENDPOINT=otel-collector:54525
+    depends_on:
+      - otel-collector

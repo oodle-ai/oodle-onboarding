@@ -1,0 +1,26 @@
+receivers:
+  tcplog:
+    listen_address: "0.0.0.0:54525"
+    operators:
+      - type: json_parser
+        parse_from: body
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+exporters:
+  opensearch:
+    endpoints: ["http://opensearch:9200"]
+    logs_index: logs
+    tls:
+      insecure: true
+    timeout: 30s
+
+service:
+  pipelines:
+    logs:
+      receivers: [tcplog]
+      processors: [batch]
+      exporters: [opensearch]

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:2.2
+    container_name: fluent-bit
+    volumes:
+      - ./agents/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./agents/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf
+    ports:
+      - "24224:24224"
+    depends_on:
+      - opensearch
+    networks:
+      - opensearch-net
+
+  demo-app:
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        tag: demo-app
+    depends_on:
+      - fluent-bit

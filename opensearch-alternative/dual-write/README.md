@@ -1,48 +1,78 @@
 # OpenSearch Dual Write Setup
 
-A complete logging stack with a Go application emitting structured logs to OpenSearch.
+A complete logging stack with a Go application emitting structured logs to OpenSearch using different log collection agents.
 
 ## Components
 
 - **demo-app**: Go application that emits structured JSON logs
-- **fluent-bit**: Log collector that forwards logs to OpenSearch
 - **opensearch**: Search and analytics engine for storing logs
 - **opensearch-dashboards**: Web UI for visualizing logs
+- **Agent** (choose one):
+  - **fluent-bit**: Lightweight log forwarder and processor
+  - **vector**: High-performance observability data pipeline
+  - **otel-collector**: OpenTelemetry Collector for logs, metrics, and traces
 
 ## Quick Start
 
-Using Makefile:
+View available options:
 ```bash
-make up       # Start all services in background
-make logs     # View all logs
-make logs-app # View only app logs
-make down     # Stop all services
-make clean    # Stop and remove volumes
-make restart  # Restart all services
+make help
 ```
 
-Using docker-compose directly:
+Start with Fluent Bit (default):
 ```bash
-# Start all services
-docker-compose up --build
+make up
+# or explicitly
+make up AGENT=fluent-bit
+```
 
-# Start in detached mode
-docker-compose up --build -d
+Start with Vector:
+```bash
+make up AGENT=vector
+```
 
-# View logs
-docker-compose logs -f demo-app
+Start with OpenTelemetry Collector:
+```bash
+make up AGENT=otel
+```
 
-# Stop all services
-docker-compose down
+View logs:
+```bash
+make logs           # All services
+make logs-app       # Application only
+make logs-agent     # Current agent only
+```
 
-# Remove volumes (clean state)
-docker-compose down -v
+Stop services:
+```bash
+make down           # Stop all
+make clean          # Stop and remove volumes
 ```
 
 ## Access Points
 
 - **OpenSearch API**: http://localhost:9200
 - **OpenSearch Dashboards**: http://localhost:5601
+
+## Agent Comparison
+
+### Fluent Bit
+- **Approach**: Docker fluentd logging driver
+- **Use case**: Lightweight, low memory footprint
+- **Config**: `agents/fluent-bit/fluent-bit.conf`
+- **Best for**: Simple log forwarding with minimal overhead
+
+### Vector
+- **Approach**: Reads Docker container logs via socket
+- **Use case**: High-performance data transformation
+- **Config**: `agents/vector/vector.toml`
+- **Best for**: Complex log transformations and routing
+
+### OpenTelemetry Collector
+- **Approach**: TCP receiver for direct log shipping
+- **Use case**: Unified observability (logs, metrics, traces)
+- **Config**: `agents/otel/otel-collector-config.yaml`
+- **Best for**: Full observability stack with OTel ecosystem
 
 ## Log Structure
 
@@ -71,11 +101,34 @@ The demo app emits JSON logs with the following structure:
 
 ## Architecture
 
+### Fluent Bit Flow
 ```
-demo-app → stdout → fluent-bit → opensearch → opensearch-dashboards
+demo-app → fluentd driver → fluent-bit → opensearch → dashboards
 ```
 
-- Demo app writes JSON logs to stdout
-- Docker logging driver forwards to Fluent Bit
-- Fluent Bit parses and sends to OpenSearch
-- OpenSearch Dashboards provides visualization
+### Vector Flow
+```
+demo-app → docker logs → vector → opensearch → dashboards
+```
+
+### OpenTelemetry Flow
+```
+demo-app → TCP → otel-collector → opensearch → dashboards
+```
+
+## Switching Agents
+
+To switch between agents:
+
+```bash
+# Stop current setup
+make down
+
+# Start with different agent
+make up AGENT=vector
+```
+
+Or use restart:
+```bash
+make restart AGENT=otel
+```

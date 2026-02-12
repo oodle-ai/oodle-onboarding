@@ -29,31 +29,11 @@ services:
     networks:
       - opensearch-net
 
-  fluent-bit:
-    image: fluent/fluent-bit:2.2
-    container_name: fluent-bit
-    volumes:
-      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
-      - ./fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf
-    ports:
-      - "24224:24224"
-    depends_on:
-      - opensearch
-    networks:
-      - opensearch-net
-
   demo-app:
     build:
       context: ./app
       dockerfile: Dockerfile
     container_name: demo-app
-    logging:
-      driver: fluentd
-      options:
-        fluentd-address: localhost:24224
-        tag: demo-app
-    depends_on:
-      - fluent-bit
     networks:
       - opensearch-net
 
