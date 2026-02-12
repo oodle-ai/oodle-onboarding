@@ -2,7 +2,17 @@
 
 # Install pre-commit hooks
 setup-hooks:
-	@command -v pre-commit >/dev/null 2>&1 || { echo "Installing pre-commit..."; pip install pre-commit; }
+	@command -v pre-commit >/dev/null 2>&1 || { \
+		echo "Installing pre-commit..."; \
+		if command -v brew >/dev/null 2>&1; then \
+			brew install pre-commit; \
+		elif command -v python3 >/dev/null 2>&1; then \
+			python3 -m pip install pre-commit; \
+		else \
+			echo "Error: Neither brew nor python3 found. Please install pre-commit manually."; \
+			exit 1; \
+		fi; \
+	}
 	pre-commit install
 	@echo "Pre-commit hooks installed successfully"
 

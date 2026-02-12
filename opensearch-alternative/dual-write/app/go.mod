@@ -1,3 +1,3 @@
 module github.com/oodle/onboarding/opensearch-demo
 
-go 1.25
+go 1.24

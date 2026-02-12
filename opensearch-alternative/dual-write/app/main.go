@@ -43,7 +43,9 @@ func main() {
 			},
 		}
 
-		encoder.Encode(logEntry)
+		if err := encoder.Encode(logEntry); err != nil {
+			panic(err)
+		}
 
 		// Sleep for 2-5 seconds between logs
 		time.Sleep(time.Duration(2+rand.Intn(3)) * time.Second)
