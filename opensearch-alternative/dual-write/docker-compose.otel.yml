@@ -2,13 +2,26 @@ version: '3.8'
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.116.0
+    image: otel/opentelemetry-collector-contrib:0.91.0
     container_name: otel-collector
     volumes:
-      - ./agents/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    command: ["--config=/etc/otel-collector-config.yaml"]
+      - ./agents/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "54525:54525"
+    depends_on:
+      - data-prepper
+    networks:
+      - opensearch-net
+
+  data-prepper:
+    image: opensearchproject/data-prepper:2.6.2
+    container_name: data-prepper
+    volumes:
+      - ./agents/otel/pipelines.yaml:/usr/share/data-prepper/pipelines/pipelines.yaml
+      - ./agents/otel/data-prepper.yaml:/usr/share/data-prepper/config/data-prepper-config.yaml
+    ports:
+      - "21890:21890"
+      - "21892:21892"
     depends_on:
       - opensearch
     networks:

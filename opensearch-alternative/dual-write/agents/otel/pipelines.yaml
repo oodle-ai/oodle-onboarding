@@ -1,0 +1,10 @@
+otel-logs-pipeline:
+  source:
+    otel_logs_source:
+      ssl: false
+
+  sink:
+    - opensearch:
+        hosts: ["http://opensearch:9200"]
+        index: "logs"
+        index_type: custom

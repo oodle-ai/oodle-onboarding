@@ -11,16 +11,14 @@ processors:
     send_batch_size: 1024
 
 exporters:
-  opensearch:
-    endpoints: ["http://opensearch:9200"]
-    logs_index: logs
+  otlp:
+    endpoint: data-prepper:21892
     tls:
       insecure: true
-    timeout: 30s
 
 service:
   pipelines:
     logs:
       receivers: [tcplog]
       processors: [batch]
-      exporters: [opensearch]
+      exporters: [otlp]
