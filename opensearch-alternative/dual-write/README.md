@@ -2,6 +2,8 @@
 
 A complete logging stack with a Go application emitting structured logs to OpenSearch using different log collection agents.
 
+**NEW**: Now supports dual-write to Oodle cloud! See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for setup instructions.
+
 ## Components
 
 - **demo-app**: Go application that emits structured JSON logs

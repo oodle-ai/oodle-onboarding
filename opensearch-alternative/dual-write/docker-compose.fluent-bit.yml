@@ -9,6 +9,9 @@ services:
       - ./agents/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf
     ports:
       - "24224:24224"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
     depends_on:
       - opensearch
     networks:

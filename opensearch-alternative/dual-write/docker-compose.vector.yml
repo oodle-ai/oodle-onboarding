@@ -8,6 +8,9 @@ services:
       - ./agents/vector/vector.yaml:/etc/vector/vector.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["--config", "/etc/vector/vector.yaml"]
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
     depends_on:
       - opensearch
       - demo-app
