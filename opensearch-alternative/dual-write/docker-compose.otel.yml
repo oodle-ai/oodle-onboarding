@@ -7,7 +7,8 @@ services:
     volumes:
       - ./agents/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
-      - "54525:54525"
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
     depends_on:
       - data-prepper
     networks:
@@ -30,6 +31,7 @@ services:
 
   demo-app:
     environment:
-      - OTEL_ENDPOINT=otel-collector:54525
+      - OTEL_ENDPOINT=otel-collector:4318
+      - USE_OTEL_SDK=true
     depends_on:
       - otel-collector

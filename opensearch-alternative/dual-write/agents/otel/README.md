@@ -1,22 +1,23 @@
 # OpenTelemetry Collector with Data Prepper
 
-Vendor-agnostic telemetry collection and processing using OpenTelemetry Collector and OpenSearch Data Prepper.
+Production-grade telemetry collection using OpenTelemetry SDK instrumentation, OTel Collector, and OpenSearch Data Prepper.
 
 ## Architecture
 
 ```
-demo-app → OTel Collector (TCP:54525) → Data Prepper (OTLP:21892) → OpenSearch
+demo-app (OTel SDK) → OTel Collector (OTLP:4318) → Data Prepper (OTLP:21892) → OpenSearch
 ```
 
 ## Configuration Files
 
 **otel-collector-config.yaml**:
-- **Receiver**: tcplog receiver (port 54525) with JSON parser
+- **Receiver**: OTLP receiver (HTTP: 4318, gRPC: 4317)
 - **Processor**: Batch processor for efficiency
 - **Exporter**: OTLP exporter sending to Data Prepper
 
 **pipelines.yaml** (Data Prepper):
 - **Source**: otel_logs_source (receives OTLP logs on port 21892)
+- **Processor**: rename_keys (copies observedTime to @timestamp for Dashboards)
 - **Sink**: OpenSearch sink (writes to `logs` index)
 
 **data-prepper.yaml**:
@@ -24,24 +25,42 @@ demo-app → OTel Collector (TCP:54525) → Data Prepper (OTLP:21892) → OpenSe
 
 ## How It Works
 
-1. Demo app sends JSON logs via TCP to OTel Collector (port 54525)
-2. OTel Collector parses JSON and batches logs
-3. OTel Collector exports via OTLP to Data Prepper (port 21892)
-4. Data Prepper receives OTLP logs and writes to OpenSearch
+1. Demo app uses OpenTelemetry Go SDK to emit structured logs
+2. SDK exports logs via OTLP HTTP to OTel Collector (port 4318)
+3. OTel Collector batches logs and forwards via OTLP to Data Prepper (port 21892)
+4. Data Prepper processes logs (adds @timestamp) and writes to OpenSearch
 
-## Why Data Prepper?
+## Why This Approach?
 
-Data Prepper acts as an intermediary because:
-- OTel's native Elasticsearch exporter doesn't support OpenSearch
-- Data Prepper has native OpenSearch support and optimizations
-- Provides additional transformation capabilities if needed
+**OpenTelemetry SDK**:
+- Industry-standard instrumentation
+- Automatic context propagation (traces, spans)
+- Rich metadata (SDK version, language, etc.)
+- Reliable connection handling with retries
+
+**Data Prepper**:
+- Native OpenSearch support (OTel's Elasticsearch exporter doesn't work with OpenSearch)
+- Optimized for OpenSearch ingestion
+- Powerful data transformation capabilities
+
+## Log Structure
+
+Logs in OpenSearch include:
+- `@timestamp`: Timestamp for Dashboards time queries
+- `body`: The log message
+- `severityText`: Log level (INFO, DEBUG, WARN, ERROR)
+- `log.attributes.*`: Custom attributes (service, request_id, duration_ms, user_id)
+- `resource.attributes.*`: SDK metadata (language, SDK version)
+- `instrumentationScope.name`: Logger name
 
 ## Features
 
-- Part of OpenTelemetry standard
-- Supports logs, metrics, and traces
-- Extensive ecosystem of receivers and exporters
-- Vendor-neutral collection with OpenSearch-optimized ingestion
+- ✅ Production-ready OpenTelemetry SDK instrumentation
+- ✅ OTLP protocol (HTTP and gRPC)
+- ✅ Reliable connection handling with automatic retries
+- ✅ Rich structured logging with custom attributes
+- ✅ Full OpenTelemetry ecosystem compatibility
+- ✅ OpenSearch Dashboards compatible (@timestamp field)
 
 ## Resource Usage
 
@@ -50,10 +69,11 @@ Data Prepper acts as an intermediary because:
 - CPU: Moderate
 - Best for: Full observability stack with OpenTelemetry instrumentation
 
-## Known Limitations
+## Production Recommendations
 
-The demo-app uses a persistent TCP connection which can occasionally break, causing log flow to stop until the app restarts. In production:
-- Use proper OTLP instrumentation libraries instead of raw TCP
-- Enable TLS for secure transmission
-- Add additional processors for enrichment and filtering
-- Configure retry and backoff strategies
+- Enable TLS for all connections
+- Configure resource attributes (service.name, deployment.environment)
+- Add processors for sensitive data filtering
+- Use sampling strategies for high-volume applications
+- Configure proper retry and backoff policies
+- Set up health checks and monitoring for the pipeline

@@ -1,9 +1,10 @@
 receivers:
-  tcplog:
-    listen_address: "0.0.0.0:54525"
-    operators:
-      - type: json_parser
-        parse_from: body
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:4318"
+      grpc:
+        endpoint: "0.0.0.0:4317"
 
 processors:
   batch:
@@ -19,6 +20,6 @@ exporters:
 service:
   pipelines:
     logs:
-      receivers: [tcplog]
+      receivers: [otlp]
       processors: [batch]
       exporters: [otlp]
