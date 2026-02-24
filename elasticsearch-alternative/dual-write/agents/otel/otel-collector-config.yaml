@@ -22,9 +22,16 @@ exporters:
     retry:
       enabled: true
 
+  # Oodle
+  otlphttp/oodle:
+    logs_endpoint: "https://${OODLE_INSTANCE}-logs.collector.oodle.ai/ingest/otel/v1/logs"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+
 service:
   pipelines:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [elasticsearch]
+      exporters: [elasticsearch, otlphttp/oodle]

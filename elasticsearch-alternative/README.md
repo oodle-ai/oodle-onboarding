@@ -10,6 +10,6 @@ Local Elasticsearch stack that mirrors a typical production setup, ready for dua
 - Go application emitting structured logs
 - Multiple log collection agents (Fluent Bit, Vector, OTel Collector)
 - Local Elasticsearch + Kibana for comparison
-- Oodle dual-write support (coming soon)
+- Oodle dual-write to validate migration
 
 **Use case**: Run Elasticsearch locally, enable dual-write to Oodle, and verify logs arrive correctly before cutting over.

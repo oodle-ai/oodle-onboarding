@@ -2,6 +2,8 @@
 
 This setup demonstrates how to migrate away from Elasticsearch to Oodle. It spins up a local Elasticsearch stack with a demo application, so you can see how existing log pipelines can be redirected to Oodle with minimal configuration changes.
 
+See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for dual-write setup instructions.
+
 ## Components
 
 - **demo-app**: Go application that emits structured JSON logs
@@ -103,19 +105,19 @@ The demo app emits JSON logs with the following structure:
 ### Fluent Bit Flow
 ```
 demo-app -> fluentd driver -> fluent-bit -> elasticsearch
-                                         -> oodle (dual-write, coming soon)
+                                         -> oodle (dual-write)
 ```
 
 ### Vector Flow
 ```
 demo-app -> docker logs -> vector -> elasticsearch
-                                  -> oodle (dual-write, coming soon)
+                                  -> oodle (dual-write)
 ```
 
 ### OpenTelemetry Flow
 ```
 demo-app -> OTel SDK -> otel-collector -> elasticsearch
-                                       -> oodle (dual-write, coming soon)
+                                       -> oodle (dual-write)
 ```
 
 ## Switching Agents

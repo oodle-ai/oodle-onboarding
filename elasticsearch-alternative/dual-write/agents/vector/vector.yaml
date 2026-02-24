@@ -35,3 +35,19 @@ sinks:
     compression: none
     healthcheck:
       enabled: true
+
+  # Oodle
+  oodle:
+    type: http
+    inputs:
+      - add_timestamp
+    uri: "https://${OODLE_INSTANCE}-logs.collector.oodle.ai/ingest/v1/logs"
+    encoding:
+      codec: json
+    compression: gzip
+    request:
+      headers:
+        X-OODLE-INSTANCE: "${OODLE_INSTANCE}"
+        X-API-KEY: "${OODLE_API_KEY}"
+      retry_attempts: 3
+      timeout_secs: 60
