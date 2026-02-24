@@ -1,0 +1,37 @@
+sources:
+  docker_logs:
+    type: docker_logs
+    docker_host: unix:///var/run/docker.sock
+    include_containers:
+      - demo-app
+
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      . = parse_json!(.message)
+
+  add_timestamp:
+    type: remap
+    inputs:
+      - parse_json
+    source: |
+      # Add @timestamp field for Kibana
+      .@timestamp = .timestamp
+
+sinks:
+  # Elasticsearch local
+  elasticsearch:
+    type: elasticsearch
+    inputs:
+      - add_timestamp
+    endpoints:
+      - http://elasticsearch:9200
+    mode: bulk
+    bulk:
+      index: logs-%Y.%m.%d
+    compression: none
+    healthcheck:
+      enabled: true

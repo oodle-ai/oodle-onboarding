@@ -15,6 +15,9 @@ This repository serves as:
 ### [opensearch-alternative](./opensearch-alternative)
 Log aggregation and search with OpenSearch, including Fluent Bit log collection and OpenSearch Dashboards.
 
+### [elasticsearch-alternative](./elasticsearch-alternative)
+Log aggregation and search with Elasticsearch, including multiple log collection agents (Fluent Bit, Vector, OTel Collector) and Kibana.
+
 ## Structure
 
 Each top-level folder represents a specific integration or vendor alternative:
