@@ -1,18 +1,18 @@
-# OpenSearch Dual Write Setup
+# Migrating from OpenSearch
 
-A complete logging stack with a Go application emitting structured logs to OpenSearch using different log collection agents.
+This setup demonstrates how to migrate away from OpenSearch to Oodle. It spins up a local OpenSearch stack with a demo application, so you can see how existing log pipelines can be redirected to Oodle with minimal configuration changes.
 
-**NEW**: Now supports dual-write to Oodle! See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for setup instructions.
+See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for dual-write setup instructions.
 
 ## Components
 
 - **demo-app**: Go application that emits structured JSON logs
-- **opensearch**: Search and analytics engine for storing logs
-- **opensearch-dashboards**: Web UI for visualizing logs
+- **opensearch**: Local OpenSearch instance (the system you're migrating away from)
+- **opensearch-dashboards**: Web UI for verifying logs land correctly
 - **Agent** (choose one):
   - **fluent-bit**: Lightweight log forwarder and processor
   - **vector**: High-performance observability data pipeline
-  - **otel-collector**: OpenTelemetry Collector for logs, metrics, and traces
+  - **otel-collector**: OpenTelemetry Collector with Data Prepper
 
 ## Quick Start
 
@@ -58,23 +58,22 @@ make clean          # Stop and remove volumes
 
 ## Agent Comparison
 
+Each agent shows a different migration path from OpenSearch to Oodle. Pick the one that matches your existing pipeline.
+
 ### Fluent Bit
 - **Approach**: Docker fluentd logging driver
-- **Use case**: Lightweight, low memory footprint
 - **Config**: `agents/fluent-bit/fluent-bit.conf`
-- **Best for**: Simple log forwarding with minimal overhead
+- **Migration**: Add an Oodle HTTP output alongside the existing OpenSearch output
 
 ### Vector
 - **Approach**: Reads Docker container logs via socket
-- **Use case**: High-performance data transformation
 - **Config**: `agents/vector/vector.yaml`
-- **Best for**: Complex log transformations and routing
+- **Migration**: Add an Oodle HTTP sink alongside the existing Elasticsearch sink
 
 ### OpenTelemetry Collector
-- **Approach**: TCP receiver for direct log shipping
-- **Use case**: Unified observability (logs, metrics, traces)
+- **Approach**: OTel SDK instrumentation with Data Prepper
 - **Config**: `agents/otel/otel-collector-config.yaml`
-- **Best for**: Full observability stack with OTel ecosystem
+- **Migration**: Add an Oodle OTLP exporter alongside the existing Data Prepper exporter
 
 ## Log Structure
 
@@ -97,7 +96,7 @@ The demo app emits JSON logs with the following structure:
 ## Viewing Logs in OpenSearch Dashboards
 
 1. Open http://localhost:5601
-2. Go to "Management" → "Index Patterns"
+2. Go to "Management" -> "Index Patterns"
 3. Create an index pattern with `logs*`
 4. Go to "Discover" to view and search logs
 
@@ -105,17 +104,20 @@ The demo app emits JSON logs with the following structure:
 
 ### Fluent Bit Flow
 ```
-demo-app → fluentd driver → fluent-bit → opensearch → dashboards
+demo-app -> fluentd driver -> fluent-bit -> opensearch
+                                         -> oodle (dual-write)
 ```
 
 ### Vector Flow
 ```
-demo-app → docker logs → vector → opensearch → dashboards
+demo-app -> docker logs -> vector -> opensearch
+                                  -> oodle (dual-write)
 ```
 
 ### OpenTelemetry Flow
 ```
-demo-app → TCP → otel-collector → opensearch → dashboards
+demo-app -> OTel SDK -> otel-collector -> data-prepper -> opensearch
+                                       -> oodle (dual-write)
 ```
 
 ## Switching Agents

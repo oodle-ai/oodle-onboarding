@@ -1,30 +1,15 @@
-# OpenSearch Alternative
+# Migrating from OpenSearch
 
-Demonstrations of integrating applications with OpenSearch for log aggregation, search, and analytics.
+Demonstrates how to migrate from OpenSearch to Oodle using different log collection agents.
 
 ## Available Setups
 
 ### [dual-write](./dual-write)
 
-Complete logging stack with:
+Local OpenSearch stack that mirrors a typical production setup, with dual-write to Oodle:
 - Go application emitting structured logs
-- Fluent Bit for log collection
-- OpenSearch cluster
-- OpenSearch Dashboards for visualization
+- Multiple log collection agents (Fluent Bit, Vector, OTel Collector)
+- Local OpenSearch + Dashboards for comparison
+- Oodle dual-write to validate migration
 
-**Use case**: Local development environment for testing log ingestion and search.
-
-## What is OpenSearch?
-
-OpenSearch is an open-source search and analytics suite derived from Elasticsearch. It provides:
-- Full-text search
-- Log analytics
-- Real-time application monitoring
-- Security analytics
-
-## When to Use This Alternative
-
-- Need open-source alternative to Elasticsearch
-- Require log aggregation and analysis
-- Want built-in visualization (Dashboards)
-- Need scalable search capabilities
+**Use case**: Run OpenSearch locally, enable dual-write to Oodle, and verify logs arrive correctly before cutting over.

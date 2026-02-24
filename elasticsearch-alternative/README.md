@@ -1,30 +1,15 @@
-# Elasticsearch Alternative
+# Migrating from Elasticsearch
 
-Demonstrations of integrating applications with Elasticsearch for log aggregation, search, and analytics.
+Demonstrates how to migrate from Elasticsearch to Oodle using different log collection agents.
 
 ## Available Setups
 
 ### [dual-write](./dual-write)
 
-Complete logging stack with:
+Local Elasticsearch stack that mirrors a typical production setup, ready for dual-write to Oodle:
 - Go application emitting structured logs
 - Multiple log collection agents (Fluent Bit, Vector, OTel Collector)
-- Elasticsearch cluster
-- Kibana for visualization
+- Local Elasticsearch + Kibana for comparison
+- Oodle dual-write support (coming soon)
 
-**Use case**: Local development environment for testing log ingestion and search.
-
-## What is Elasticsearch?
-
-Elasticsearch is a distributed search and analytics engine. It provides:
-- Full-text search
-- Log analytics
-- Real-time application monitoring
-- APM and observability
-
-## When to Use This Alternative
-
-- Need a mature search and analytics engine
-- Require log aggregation and analysis
-- Want Kibana for visualization and dashboards
-- Need the Elastic ecosystem (Beats, Logstash, APM)
+**Use case**: Run Elasticsearch locally, enable dual-write to Oodle, and verify logs arrive correctly before cutting over.

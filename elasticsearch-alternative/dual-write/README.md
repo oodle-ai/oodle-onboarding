@@ -1,16 +1,16 @@
-# Elasticsearch Dual Write Setup
+# Migrating from Elasticsearch
 
-A complete logging stack with a Go application emitting structured logs to Elasticsearch using different log collection agents.
+This setup demonstrates how to migrate away from Elasticsearch to Oodle. It spins up a local Elasticsearch stack with a demo application, so you can see how existing log pipelines can be redirected to Oodle with minimal configuration changes.
 
 ## Components
 
 - **demo-app**: Go application that emits structured JSON logs
-- **elasticsearch**: Search and analytics engine for storing logs
-- **kibana**: Web UI for visualizing logs
+- **elasticsearch**: Local Elasticsearch instance (the system you're migrating away from)
+- **kibana**: Web UI for verifying logs land correctly
 - **Agent** (choose one):
   - **fluent-bit**: Lightweight log forwarder and processor
   - **vector**: High-performance observability data pipeline
-  - **otel-collector**: OpenTelemetry Collector for logs, metrics, and traces
+  - **otel-collector**: OpenTelemetry Collector with direct Elasticsearch export
 
 ## Quick Start
 
@@ -56,23 +56,22 @@ make clean          # Stop and remove volumes
 
 ## Agent Comparison
 
+Each agent shows a different migration path from Elasticsearch to Oodle. Pick the one that matches your existing pipeline.
+
 ### Fluent Bit
 - **Approach**: Docker fluentd logging driver
-- **Use case**: Lightweight, low memory footprint
 - **Config**: `agents/fluent-bit/fluent-bit.conf`
-- **Best for**: Simple log forwarding with minimal overhead
+- **Migration**: Add an Oodle HTTP output alongside the existing Elasticsearch output
 
 ### Vector
 - **Approach**: Reads Docker container logs via socket
-- **Use case**: High-performance data transformation
 - **Config**: `agents/vector/vector.yaml`
-- **Best for**: Complex log transformations and routing
+- **Migration**: Add an Oodle HTTP sink alongside the existing Elasticsearch sink
 
 ### OpenTelemetry Collector
 - **Approach**: OTel SDK instrumentation with direct Elasticsearch export
-- **Use case**: Unified observability (logs, metrics, traces)
 - **Config**: `agents/otel/otel-collector-config.yaml`
-- **Best for**: Full observability stack with OTel ecosystem
+- **Migration**: Add an Oodle OTLP exporter alongside the existing Elasticsearch exporter
 
 ## Log Structure
 
@@ -103,17 +102,20 @@ The demo app emits JSON logs with the following structure:
 
 ### Fluent Bit Flow
 ```
-demo-app -> fluentd driver -> fluent-bit -> elasticsearch -> kibana
+demo-app -> fluentd driver -> fluent-bit -> elasticsearch
+                                         -> oodle (dual-write, coming soon)
 ```
 
 ### Vector Flow
 ```
-demo-app -> docker logs -> vector -> elasticsearch -> kibana
+demo-app -> docker logs -> vector -> elasticsearch
+                                  -> oodle (dual-write, coming soon)
 ```
 
 ### OpenTelemetry Flow
 ```
-demo-app -> OTel SDK -> otel-collector -> elasticsearch -> kibana
+demo-app -> OTel SDK -> otel-collector -> elasticsearch
+                                       -> oodle (dual-write, coming soon)
 ```
 
 ## Switching Agents
