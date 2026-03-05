@@ -137,12 +137,6 @@ demo-app -> GELF driver -> logstash -> elasticsearch
                                     -> oodle (dual-write)
 ```
 
-### Logstash Flow
-```
-demo-app -> GELF driver -> logstash -> elasticsearch
-                                    -> oodle (dual-write)
-```
-
 ## Switching Agents
 
 To switch between agents:

@@ -19,9 +19,9 @@ The dual-write setup allows you to:
                              │
                     ┌────────▼─────────┐
                     │  Log Collection  │
-                    │  Agent (Fluent  │
-                    │  Bit / Vector / │
-                    │  OTel/Logstash) │
+                    │ Agent (Fluent Bit│
+                    │ / Vector / OTel /│
+                    │    Logstash)     │
                     └───┬──────────┬───┘
                         │          │
             ┌───────────▼──┐   ┌──▼─────────────┐
