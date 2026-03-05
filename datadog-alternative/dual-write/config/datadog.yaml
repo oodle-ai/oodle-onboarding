@@ -1,0 +1,15 @@
+# Datadog Agent configuration for dual-write to both Datadog and Oodle.
+#
+# This file configures the Datadog Agent to send metrics to both Datadog
+# (primary endpoint) and Oodle (additional endpoint) simultaneously.
+#
+# Replace the placeholder values below with your actual Oodle credentials
+# from the Oodle UI: Settings -> Integrations -> Datadog.
+
+# Dual-write: send metrics to Oodle as an additional endpoint
+additional_endpoints:
+  "https://your-oodle-endpoint":
+    - your-oodle-api-key
+
+# Enable DogStatsD to accept metrics from other containers
+dogstatsd_non_local_traffic: true

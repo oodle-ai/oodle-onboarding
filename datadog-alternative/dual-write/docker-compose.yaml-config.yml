@@ -1,0 +1,6 @@
+version: '3.8'
+
+services:
+  datadog-agent:
+    volumes:
+      - ./config/datadog.yaml:/etc/datadog-agent/datadog.yaml:ro
