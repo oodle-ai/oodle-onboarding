@@ -29,7 +29,7 @@ All services --> OTel Collector (OTLP :4317/:4318) --> Oodle (traces)
 |---------|----------|------|------|-----------------|
 | frontend-api | Go | 8080 | API Gateway | OTel SDK (otelhttp) |
 | java-service | Java | 8081 | Order Service | OTel Java Agent (auto) |
-| python-service | Python | 8082 | Inventory Service | opentelemetry-instrument (auto) |
+| python-service | Python | 8082 | Inventory Service | OTel SDK + FlaskInstrumentor |
 | go-service | Go | 8083 | Billing Service | OTel SDK (otelhttp) |
 | load-generator | Python | - | Traffic Generator | N/A |
 | otel-collector | - | 4317/4318 | Trace Collection | - |
@@ -121,7 +121,7 @@ Order processing service instrumented automatically via the OTel Java Agent.
 - `GET /health` — Health check
 
 ### python-service (Python Flask)
-Inventory and pricing service instrumented automatically via `opentelemetry-instrument`.
+Inventory and pricing service instrumented via OTel SDK with `FlaskInstrumentor` and custom spans.
 - `GET /check-inventory?item=<item>` — Simulates inventory database lookup
 - `GET /get-pricing?item=<item>` — Simulates pricing calculation
 - `GET /health` — Health check

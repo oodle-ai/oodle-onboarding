@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
@@ -9,14 +7,10 @@ services:
     ports:
       - "4317:4317"
       - "4318:4318"
+      - "13133:13133"
     environment:
       - OODLE_INSTANCE=${OODLE_INSTANCE}
       - OODLE_API_KEY=${OODLE_API_KEY}
-    healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:13133/ || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     networks:
       - tracing-net
 
@@ -33,19 +27,10 @@ services:
       - JAVA_SERVICE_URL=http://java-service:8081
       - GO_SERVICE_URL=http://go-service:8083
     depends_on:
-      otel-collector:
-        condition: service_healthy
-      java-service:
-        condition: service_started
-      python-service:
-        condition: service_started
-      go-service:
-        condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - otel-collector
+      - java-service
+      - python-service
+      - go-service
     networks:
       - tracing-net
 
@@ -57,17 +42,16 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_SERVICE_NAME=java-service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
       - PYTHON_SERVICE_URL=http://python-service:8082
     depends_on:
-      otel-collector:
-        condition: service_healthy
-      python-service:
-        condition: service_started
+      - otel-collector
+      - python-service
     networks:
       - tracing-net
 
@@ -79,15 +63,15 @@ services:
     ports:
       - "8082:8082"
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
       - OTEL_SERVICE_NAME=python-service
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
       - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=false
     depends_on:
-      otel-collector:
-        condition: service_healthy
+      - otel-collector
     networks:
       - tracing-net
 
@@ -103,10 +87,8 @@ services:
       - OTEL_SERVICE_NAME=go-service
       - PYTHON_SERVICE_URL=http://python-service:8082
     depends_on:
-      otel-collector:
-        condition: service_healthy
-      python-service:
-        condition: service_started
+      - otel-collector
+      - python-service
     networks:
       - tracing-net
 
@@ -119,8 +101,7 @@ services:
       - FRONTEND_URL=http://frontend-api:8080
       - REQUEST_INTERVAL=3
     depends_on:
-      frontend-api:
-        condition: service_healthy
+      - frontend-api
     restart: on-failure
     networks:
       - tracing-net

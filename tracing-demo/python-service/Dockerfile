@@ -7,4 +7,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 
-CMD ["opentelemetry-instrument", "gunicorn", "--bind", "0.0.0.0:8082", "--workers", "2", "app:app"]
+EXPOSE 8082
+CMD ["python", "-u", "app.py"]
