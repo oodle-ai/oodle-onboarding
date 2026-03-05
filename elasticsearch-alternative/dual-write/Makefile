@@ -4,9 +4,9 @@
 AGENT ?= fluent-bit
 
 # Validate agent choice
-VALID_AGENTS := fluent-bit vector otel
+VALID_AGENTS := fluent-bit vector otel logstash
 ifeq ($(filter $(AGENT),$(VALID_AGENTS)),)
-    $(error Invalid AGENT. Choose from: fluent-bit, vector, otel)
+    $(error Invalid AGENT. Choose from: fluent-bit, vector, otel, logstash)
 endif
 
 # Compose files
@@ -17,7 +17,7 @@ COMPOSE_FILES := $(BASE_COMPOSE) $(AGENT_COMPOSE)
 help:
 	@echo "Elasticsearch Dual-Write Setup"
 	@echo ""
-	@echo "Available agents: fluent-bit, vector, otel"
+	@echo "Available agents: fluent-bit, vector, otel, logstash"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make up AGENT=<agent>        - Start with specified agent (default: fluent-bit)"
@@ -32,6 +32,7 @@ help:
 	@echo "  make up                       - Start with Fluent Bit (default)"
 	@echo "  make up AGENT=vector          - Start with Vector"
 	@echo "  make up AGENT=otel            - Start with OpenTelemetry"
+	@echo "  make up AGENT=logstash        - Start with Logstash"
 
 up:
 	@echo "Starting with $(AGENT)..."
@@ -43,6 +44,7 @@ down:
 		-f docker-compose.fluent-bit.yml \
 		-f docker-compose.vector.yml \
 		-f docker-compose.otel.yml \
+		-f docker-compose.logstash.yml \
 		down 2>/dev/null || true
 
 logs:
@@ -58,6 +60,8 @@ logs-agent:
 		docker-compose $(COMPOSE_FILES) logs -f vector; \
 	elif [ "$(AGENT)" = "otel" ]; then \
 		docker-compose $(COMPOSE_FILES) logs -f otel-collector; \
+	elif [ "$(AGENT)" = "logstash" ]; then \
+		docker-compose $(COMPOSE_FILES) logs -f logstash; \
 	fi
 
 clean:
@@ -66,6 +70,7 @@ clean:
 		-f docker-compose.fluent-bit.yml \
 		-f docker-compose.vector.yml \
 		-f docker-compose.otel.yml \
+		-f docker-compose.logstash.yml \
 		down -v 2>/dev/null || true
 
 restart: down up

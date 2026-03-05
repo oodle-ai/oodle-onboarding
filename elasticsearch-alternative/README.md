@@ -8,7 +8,7 @@ Demonstrates how to migrate from Elasticsearch to Oodle using different log coll
 
 Local Elasticsearch stack that mirrors a typical production setup, ready for dual-write to Oodle:
 - Go application emitting structured logs
-- Multiple log collection agents (Fluent Bit, Vector, OTel Collector)
+- Multiple log collection agents (Fluent Bit, Vector, OTel Collector, Logstash)
 - Local Elasticsearch + Kibana for comparison
 - Oodle dual-write to validate migration
 
