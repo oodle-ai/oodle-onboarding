@@ -7,7 +7,7 @@ This guide documents the changes made to enable dual-write functionality, sendin
 The dual-write setup allows you to:
 - Continue using your local Elasticsearch instance for development/testing
 - Simultaneously send logs to Oodle for production observability
-- Switch between agents (Fluent Bit, Vector, OpenTelemetry) seamlessly
+- Switch between agents (Fluent Bit, Vector, OpenTelemetry, Logstash) seamlessly
 
 ## Architecture
 
@@ -19,8 +19,9 @@ The dual-write setup allows you to:
                              │
                     ┌────────▼─────────┐
                     │  Log Collection  │
-                    │ Agent (Fluent Bit│
-                    │ / Vector / OTel) │
+                    │  Agent (Fluent  │
+                    │  Bit / Vector / │
+                    │  OTel/Logstash) │
                     └───┬──────────┬───┘
                         │          │
             ┌───────────▼──┐   ┌──▼─────────────┐
@@ -65,6 +66,9 @@ make up AGENT=vector
 
 # Or with OpenTelemetry
 make up AGENT=otel
+
+# Or with Logstash
+make up AGENT=logstash
 ```
 
 ### Step 3: Verify Dual-Write
@@ -172,7 +176,30 @@ sinks:
     TLS                 On
 ```
 
-### 4. Docker Compose Files
+### 4. Logstash (`agents/logstash/pipeline.conf`)
+
+**Added Oodle HTTP output:**
+```ruby
+output {
+  elasticsearch {
+    hosts => ["http://elasticsearch:9200"]
+    index => "logs"
+  }
+
+  http {
+    url => "https://${OODLE_INSTANCE}-logs.collector.oodle.ai/ingest/v1/logs"
+    http_method => "post"
+    format => "json"
+    http_compression => true
+    headers => {
+      "X-OODLE-INSTANCE" => "${OODLE_INSTANCE}"
+      "X-API-KEY" => "${OODLE_API_KEY}"
+    }
+  }
+}
+```
+
+### 6. Docker Compose Files
 
 **Added environment variables to each agent service:**
 
@@ -195,6 +222,14 @@ vector:
 `docker-compose.fluent-bit.yml`:
 ```yaml
 fluent-bit:
+  environment:
+    - OODLE_INSTANCE=${OODLE_INSTANCE}
+    - OODLE_API_KEY=${OODLE_API_KEY}
+```
+
+`docker-compose.logstash.yml`:
+```yaml
+logstash:
   environment:
     - OODLE_INSTANCE=${OODLE_INSTANCE}
     - OODLE_API_KEY=${OODLE_API_KEY}

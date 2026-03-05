@@ -13,6 +13,7 @@ See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for dual-write setup instructio
   - **fluent-bit**: Lightweight log forwarder and processor
   - **vector**: High-performance observability data pipeline
   - **otel-collector**: OpenTelemetry Collector with direct Elasticsearch export
+  - **logstash**: Classic ELK stack log processing pipeline
 
 ## Quick Start
 
@@ -36,6 +37,11 @@ make up AGENT=vector
 Start with OpenTelemetry Collector:
 ```bash
 make up AGENT=otel
+```
+
+Start with Logstash:
+```bash
+make up AGENT=logstash
 ```
 
 View logs:
@@ -74,6 +80,11 @@ Each agent shows a different migration path from Elasticsearch to Oodle. Pick th
 - **Approach**: OTel SDK instrumentation with direct Elasticsearch export
 - **Config**: `agents/otel/otel-collector-config.yaml`
 - **Migration**: Add an Oodle OTLP exporter alongside the existing Elasticsearch exporter
+
+### Logstash
+- **Approach**: Docker GELF logging driver with Logstash pipeline
+- **Config**: `agents/logstash/pipeline.conf`
+- **Migration**: Add an Oodle HTTP output alongside the existing Elasticsearch output
 
 ## Log Structure
 
@@ -118,6 +129,18 @@ demo-app -> docker logs -> vector -> elasticsearch
 ```
 demo-app -> OTel SDK -> otel-collector -> elasticsearch
                                        -> oodle (dual-write)
+```
+
+### Logstash Flow
+```
+demo-app -> GELF driver -> logstash -> elasticsearch
+                                    -> oodle (dual-write)
+```
+
+### Logstash Flow
+```
+demo-app -> GELF driver -> logstash -> elasticsearch
+                                    -> oodle (dual-write)
 ```
 
 ## Switching Agents
