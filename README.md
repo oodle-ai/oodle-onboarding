@@ -21,9 +21,6 @@ Log aggregation and search with Elasticsearch, including multiple log collection
 ### [datadog-alternative](./datadog-alternative)
 Metrics collection with Datadog Agent, including a DogStatsD demo app and dual-shipping to Oodle via environment variable or YAML configuration.
 
-### [datadog-alternative](./datadog-alternative)
-Metrics collection with Datadog Agent using dual-write to Oodle, demonstrating how to stream metrics to both Datadog and Oodle simultaneously.
-
 ## Structure
 
 Each top-level folder represents a specific integration or vendor alternative:

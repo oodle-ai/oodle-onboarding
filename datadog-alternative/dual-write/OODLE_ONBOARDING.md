@@ -10,26 +10,7 @@ The dual-write setup allows you to:
 - Choose between environment variable or YAML configuration methods
 - Validate metrics arrive correctly in Oodle before cutting over
 
-## Architecture
-
-```
-                    ┌─────────────────┐
-                    │    Demo App     │
-                    │  (Go + DogStatsD│
-                    │     Client)     │
-                    └────────┬────────┘
-                             │ UDP :8125
-                    ┌────────▼─────────┐
-                    │  Datadog Agent   │
-                    │  (dual-shipping) │
-                    └───┬──────────┬───┘
-                        │          │
-            ┌───────────▼──┐   ┌──▼─────────────┐
-            │   Datadog    │   │     Oodle      │
-            │  (Primary)   │   │ (Additional    │
-            │              │   │  Endpoint)     │
-            └──────────────┘   └────────────────┘
-```
+See [README.md](./README.md) for architecture diagrams, metrics details, and quick-start commands.
 
 ## Prerequisites
 
@@ -84,6 +65,8 @@ This sets `DD_ADDITIONAL_ENDPOINTS` on the Datadog Agent container, which tells 
        - your-oodle-api-key
    ```
 
+   Note: For this method, the Oodle credentials are configured directly in the YAML file rather than through `.env` variables.
+
 2. Start with the YAML config method:
    ```bash
    make up METHOD=yaml-config
@@ -126,7 +109,7 @@ This sets `DD_ADDITIONAL_ENDPOINTS` on the Datadog Agent container, which tells 
 services:
   datadog-agent:
     environment:
-      - DD_ADDITIONAL_ENDPOINTS={"${OODLE_ENDPOINT}": ["${OODLE_API_KEY}"]}
+      DD_ADDITIONAL_ENDPOINTS: '{"${OODLE_ENDPOINT}": ["${OODLE_API_KEY}"]}'
 ```
 
 This uses the Datadog Agent's native `DD_ADDITIONAL_ENDPOINTS` environment variable. The agent parses this JSON and sends all metric payloads to the specified additional endpoints alongside the primary Datadog endpoint.
@@ -173,26 +156,11 @@ services:
       - DOGSTATSD_ADDR=datadog-agent:8125
 ```
 
-## Metrics Format
-
-The demo app emits the following DogStatsD metrics:
-
-| Metric | Type | Tags | Description |
-|--------|------|------|-------------|
-| `demo.http.requests.total` | Counter | endpoint, method, status_code | HTTP request count |
-| `demo.http.request.duration_ms` | Histogram | endpoint, method, status_code | Request latency |
-| `demo.http.active_connections` | Gauge | -- | Active connection count |
-| `demo.system.cpu_usage_percent` | Gauge | -- | Simulated CPU usage |
-| `demo.system.memory_usage_mb` | Gauge | -- | Simulated memory usage |
-| `demo.http.request.payload_bytes` | Distribution | endpoint, method, status_code | Payload sizes |
-
-All metrics include global tags: `service:demo-app`, `env:dev`.
-
 ## Troubleshooting
 
 ### Metrics not appearing in Oodle
 
-1. **Verify environment variables are set:**
+1. **Verify environment variables are set (env method):**
    ```bash
    docker-compose -f docker-compose.base.yml -f docker-compose.env.yml config | grep -A2 DD_ADDITIONAL
    ```
