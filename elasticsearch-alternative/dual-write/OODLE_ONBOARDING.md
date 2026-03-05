@@ -199,7 +199,7 @@ output {
 }
 ```
 
-### 6. Docker Compose Files
+### 5. Docker Compose Files
 
 **Added environment variables to each agent service:**
 
@@ -277,6 +277,9 @@ For OTel specifically, additional OpenTelemetry metadata is included:
 
    # For Fluent Bit
    docker-compose -f docker-compose.base.yml -f docker-compose.fluent-bit.yml logs fluent-bit
+
+   # For Logstash
+   docker-compose -f docker-compose.base.yml -f docker-compose.logstash.yml logs logstash
    ```
 
 3. **Verify Oodle endpoint is reachable:**
@@ -301,3 +304,4 @@ For OTel specifically, additional OpenTelemetry metadata is included:
 - [Oodle OpenTelemetry Integration](https://docs.oodle.ai/integrations/logs/otel)
 - [Oodle Vector Integration](https://docs.oodle.ai/integrations/logs/vector)
 - [Oodle Fluent Bit Integration](https://docs.oodle.ai/integrations/logs/fluentbit)
+- [Oodle Logstash Integration](https://docs.oodle.ai/integrations/logs/logstash)
