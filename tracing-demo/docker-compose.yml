@@ -1,0 +1,111 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - tracing-net
+
+  frontend-api:
+    build:
+      context: ./frontend-api
+      dockerfile: Dockerfile
+    container_name: frontend-api
+    ports:
+      - "8080:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_SERVICE_NAME=frontend-api
+      - JAVA_SERVICE_URL=http://java-service:8081
+      - GO_SERVICE_URL=http://go-service:8083
+    depends_on:
+      - otel-collector
+      - java-service
+      - python-service
+      - go-service
+    networks:
+      - tracing-net
+
+  java-service:
+    build:
+      context: ./java-service
+      dockerfile: Dockerfile
+    container_name: java-service
+    ports:
+      - "8081:8081"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=java-service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - PYTHON_SERVICE_URL=http://python-service:8082
+    depends_on:
+      - otel-collector
+      - python-service
+    networks:
+      - tracing-net
+
+  python-service:
+    build:
+      context: ./python-service
+      dockerfile: Dockerfile
+    container_name: python-service
+    ports:
+      - "8082:8082"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=python-service
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=false
+    depends_on:
+      - otel-collector
+    networks:
+      - tracing-net
+
+  go-service:
+    build:
+      context: ./go-service
+      dockerfile: Dockerfile
+    container_name: go-service
+    ports:
+      - "8083:8083"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_SERVICE_NAME=go-service
+      - PYTHON_SERVICE_URL=http://python-service:8082
+    depends_on:
+      - otel-collector
+      - python-service
+    networks:
+      - tracing-net
+
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: load-generator
+    environment:
+      - FRONTEND_URL=http://frontend-api:8080
+      - REQUEST_INTERVAL=3
+    depends_on:
+      - frontend-api
+    restart: on-failure
+    networks:
+      - tracing-net
+
+networks:
+  tracing-net:
+    driver: bridge

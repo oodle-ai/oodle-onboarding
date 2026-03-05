@@ -18,6 +18,9 @@ Log aggregation and search with OpenSearch, including Fluent Bit log collection 
 ### [elasticsearch-alternative](./elasticsearch-alternative)
 Log aggregation and search with Elasticsearch, including multiple log collection agents (Fluent Bit, Vector, OTel Collector) and Kibana.
 
+### [tracing-demo](./tracing-demo)
+End-to-end distributed tracing across multi-language microservices (Go, Java, Python) using OpenTelemetry, with traces sent to Oodle.
+
 ## Structure
 
 Each top-level folder represents a specific integration or vendor alternative:
