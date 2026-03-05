@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: datadog-agent
+    ports:
+      - "8125:8125/udp"  # DogStatsD
+      - "8126:8126"      # APM
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE:-datadoghq.com}
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+    networks:
+      - datadog-net
+
+  demo-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: demo-app
+    environment:
+      - DOGSTATSD_ADDR=datadog-agent:8125
+    depends_on:
+      - datadog-agent
+    networks:
+      - datadog-net
+
+networks:
+  datadog-net:
+    driver: bridge
