@@ -58,7 +58,11 @@ def chat():
     message = body.get("message", "Say hello!")
     model = body.get("model", "gemini-2.0-flash")
 
-    reply = run_chat(message, model)
+    try:
+        reply = run_chat(message, model)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
     return jsonify({"reply": reply, "model": model})
 
 
@@ -73,7 +77,11 @@ def summarize():
     if not text:
         return jsonify({"error": "text is required"}), 400
 
-    summary = run_summarize(text)
+    try:
+        summary = run_summarize(text)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
     return jsonify({"summary": summary})
 
 
