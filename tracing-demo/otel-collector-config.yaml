@@ -18,7 +18,7 @@ processors:
 exporters:
   # Oodle
   otlphttp/oodle:
-    traces_endpoint: "https://${OODLE_INSTANCE}.collector.oodle.ai/v1/otlp/traces"
+    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
     headers:
       "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
       "X-API-KEY": "${OODLE_API_KEY}"
