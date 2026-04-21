@@ -68,7 +68,7 @@ Send a chat message to Gemini.
 ```bash
 curl -s -X POST http://localhost:8090/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message": "What is OpenTelemetry?", "model": "gemini-2.0-flash"}' | python3 -m json.tool
+  -d '{"message": "What is OpenTelemetry?", "model": "gemini-flash-latest"}' | python3 -m json.tool
 ```
 
 ### POST /summarize

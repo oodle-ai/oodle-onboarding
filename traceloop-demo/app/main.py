@@ -21,7 +21,7 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 Traceloop.init(app_name="traceloop-demo")
 
 
-DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
+DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
 
 @workflow(name="chat")
@@ -55,7 +55,7 @@ def health():
 def chat():
     """Send a chat message to Gemini.
 
-    Request body: {"message": "Hello!", "model": "gemini-2.0-flash"}
+    Request body: {"message": "Hello!", "model": "gemini-flash-latest"}
     """
     body = request.get_json(force=True)
     message = body.get("message", "Say hello!")

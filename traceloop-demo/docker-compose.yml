@@ -22,7 +22,7 @@ services:
       - "8090:8090"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash-lite}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
       - TRACELOOP_BASE_URL=http://otel-collector:4318
       - PORT=8090
     depends_on:

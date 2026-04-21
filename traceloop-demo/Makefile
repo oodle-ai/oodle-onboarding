@@ -42,7 +42,7 @@ test-chat:
 	@echo "Sending test chat request..."
 	curl -s -X POST http://localhost:8090/chat \
 		-H 'Content-Type: application/json' \
-		-d '{"message": "What is OpenTelemetry in one sentence?", "model": "gemini-2.0-flash-lite"}' | python3 -m json.tool
+		-d '{"message": "What is OpenTelemetry in one sentence?", "model": "gemini-flash-latest"}' | python3 -m json.tool
 
 test-summarize:
 	@echo "Sending test summarize request..."
