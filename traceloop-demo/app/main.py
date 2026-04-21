@@ -21,6 +21,9 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 Traceloop.init(app_name="traceloop-demo")
 
 
+DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash-lite")
+
+
 @workflow(name="chat")
 def run_chat(user_message: str, model: str) -> str:
     """Run a simple chat completion and return the response."""
@@ -36,7 +39,7 @@ def run_chat(user_message: str, model: str) -> str:
 def run_summarize(text: str) -> str:
     """Summarize the given text."""
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=DEFAULT_MODEL,
         contents=text,
         config={"system_instruction": "Summarize the following text in 1-2 sentences."},
     )
@@ -56,7 +59,7 @@ def chat():
     """
     body = request.get_json(force=True)
     message = body.get("message", "Say hello!")
-    model = body.get("model", "gemini-2.0-flash")
+    model = body.get("model", DEFAULT_MODEL)
 
     try:
         reply = run_chat(message, model)
