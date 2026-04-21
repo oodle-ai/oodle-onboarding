@@ -1,0 +1,35 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: traceloop-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4319:4318"
+      - "13134:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - traceloop-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: traceloop-demo-app
+    ports:
+      - "8090:8090"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
+      - TRACELOOP_BASE_URL=http://otel-collector:4318
+      - PORT=8090
+    depends_on:
+      - otel-collector
+    networks:
+      - traceloop-net
+
+networks:
+  traceloop-net:
+    driver: bridge

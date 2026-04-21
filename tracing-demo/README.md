@@ -153,7 +153,7 @@ Automatic traffic generator that continuously sends requests to the frontend-api
 
 3. **Verify the Oodle endpoint is reachable:**
    ```bash
-   curl -v "https://${OODLE_INSTANCE}.collector.oodle.ai/v1/otlp/traces"
+   curl -v "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai/v1/traces"
    ```
 
 ### A service is not starting

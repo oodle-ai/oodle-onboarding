@@ -21,6 +21,9 @@ Log aggregation and search with Elasticsearch, including multiple log collection
 ### [tracing-demo](./tracing-demo)
 End-to-end distributed tracing across multi-language microservices (Go, Java, Python) using OpenTelemetry, with traces sent to Oodle.
 
+### [traceloop-demo](./traceloop-demo)
+LLM observability using [Traceloop's OpenLLMetry](https://github.com/traceloop/openllmetry) SDK to auto-instrument Google Gemini calls and export traces to Oodle.
+
 ## Structure
 
 Each top-level folder represents a specific integration or vendor alternative:
