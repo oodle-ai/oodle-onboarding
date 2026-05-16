@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-api
+  labels:
+    app: frontend-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-api
+  template:
+    metadata:
+      labels:
+        app: frontend-api
+    spec:
+      containers:
+        - name: frontend-api
+          image: tracing-demo/frontend-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JAVA_SERVICE_URL
+              value: "http://java-service:8081"
+            - name: GO_SERVICE_URL
+              value: "http://go-service:8083"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

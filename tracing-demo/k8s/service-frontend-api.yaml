@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-api
+  labels:
+    app: frontend-api
+spec:
+  selector:
+    app: frontend-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

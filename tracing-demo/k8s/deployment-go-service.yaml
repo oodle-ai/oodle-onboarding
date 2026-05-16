@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-service
+  labels:
+    app: go-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-service
+  template:
+    metadata:
+      labels:
+        app: go-service
+    spec:
+      containers:
+        - name: go-service
+          image: tracing-demo/go-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+            - name: PYTHON_SERVICE_URL
+              value: "http://python-service:8082"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8083
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

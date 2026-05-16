@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-service
+  labels:
+    app: java-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-service
+  template:
+    metadata:
+      labels:
+        app: java-service
+    spec:
+      containers:
+        - name: java-service
+          image: tracing-demo/java-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PYTHON_SERVICE_URL
+              value: "http://python-service:8082"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "200m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"

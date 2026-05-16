@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-generator
+  labels:
+    app: load-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-generator
+  template:
+    metadata:
+      labels:
+        app: load-generator
+    spec:
+      containers:
+        - name: load-generator
+          image: tracing-demo/load-generator:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: FRONTEND_URL
+              value: "http://frontend-api:8080"
+            - name: REQUEST_INTERVAL
+              value: "3"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "25m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
