@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.17.0
+    container_name: logstash
+    volumes:
+      - ./agents/logstash/pipeline.conf:/usr/share/logstash/pipeline/pipeline.conf:ro
+    ports:
+      - "12201:12201/udp"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - XPACK_MONITORING_ENABLED=false
+      - LOG_LEVEL=info
+    depends_on:
+      - elasticsearch
+    networks:
+      - elastic-net
+
+  demo-app:
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://localhost:12201"
+        tag: demo-app
+    depends_on:
+      - logstash
