@@ -13,6 +13,7 @@ See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for dual-write setup instructio
   - **fluent-bit**: Lightweight log forwarder and processor
   - **vector**: High-performance observability data pipeline
   - **otel-collector**: OpenTelemetry Collector with direct Elasticsearch export
+  - **filebeat + logstash**: Classic Elastic stack pipeline
 
 ## Quick Start
 
@@ -36,6 +37,11 @@ make up AGENT=vector
 Start with OpenTelemetry Collector:
 ```bash
 make up AGENT=otel
+```
+
+Start with Filebeat + Logstash:
+```bash
+make up AGENT=logstash
 ```
 
 View logs:
@@ -74,6 +80,11 @@ Each agent shows a different migration path from Elasticsearch to Oodle. Pick th
 - **Approach**: OTel SDK instrumentation with direct Elasticsearch export
 - **Config**: `agents/otel/otel-collector-config.yaml`
 - **Migration**: Add an Oodle OTLP exporter alongside the existing Elasticsearch exporter
+
+### Filebeat + Logstash
+- **Approach**: Filebeat collects Docker container logs and ships to Logstash via Beats protocol
+- **Config**: `agents/filebeat/filebeat.yml`, `agents/logstash/pipeline/logstash.conf`
+- **Migration**: Add an Oodle HTTP output in the Logstash pipeline alongside the existing Elasticsearch output
 
 ## Log Structure
 
@@ -118,6 +129,12 @@ demo-app -> docker logs -> vector -> elasticsearch
 ```
 demo-app -> OTel SDK -> otel-collector -> elasticsearch
                                        -> oodle (dual-write)
+```
+
+### Filebeat + Logstash Flow
+```
+demo-app -> docker logs -> filebeat -> logstash -> elasticsearch
+                                                -> oodle (dual-write)
 ```
 
 ## Switching Agents
