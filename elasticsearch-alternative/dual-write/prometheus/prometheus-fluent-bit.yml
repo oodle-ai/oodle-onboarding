@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  external_labels:
+    agent: fluent-bit
+    env: demo
+
+remote_write:
+  - url: "OODLE_REMOTE_WRITE_URL"
+    name: oodle-remote-write
+    headers:
+      X-API-KEY: "OODLE_API_KEY_VALUE"
+
+scrape_configs:
+  - job_name: fluent-bit
+    metrics_path: /api/v1/metrics/prometheus
+    static_configs:
+      - targets: ["fluent-bit:2020"]

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    entrypoint:
+      - sh
+      - -c
+      - |
+        sed \
+          -e "s|OODLE_REMOTE_WRITE_URL|https://$$OODLE_COLLECTOR_DOMAIN/v1/prometheus/$$OODLE_INSTANCE/write|g" \
+          -e "s|OODLE_API_KEY_VALUE|$$OODLE_API_KEY|g" \
+          /etc/prometheus/prometheus.yml.tmpl > /tmp/prometheus.yml &&
+        exec /bin/prometheus \
+          --config.file=/tmp/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --storage.tsdb.retention.time=1h \
+          --web.listen-address=0.0.0.0:9090
+    volumes:
+      - ./prometheus/prometheus-${AGENT:-fluent-bit}.yml:/etc/prometheus/prometheus.yml.tmpl:ro
+      - prometheus-data:/prometheus
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_COLLECTOR_DOMAIN=${OODLE_COLLECTOR_DOMAIN}
+    ports:
+      - "9090:9090"
+    networks:
+      - elastic-net
+
+volumes:
+  prometheus-data:
+
+networks:
+  elastic-net:
