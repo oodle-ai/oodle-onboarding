@@ -9,6 +9,7 @@ services:
     ports:
       - "4317:4317"  # OTLP gRPC
       - "4318:4318"  # OTLP HTTP
+      - "8888:8888"  # Prometheus metrics
     environment:
       - OODLE_INSTANCE=${OODLE_INSTANCE}
       - OODLE_API_KEY=${OODLE_API_KEY}

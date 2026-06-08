@@ -15,3 +15,7 @@ output.logstash:
   hosts: ["logstash:5044"]
 
 logging.level: info
+
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5066

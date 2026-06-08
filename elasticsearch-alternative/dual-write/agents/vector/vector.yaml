@@ -5,6 +5,9 @@ sources:
     include_containers:
       - demo-app
 
+  internal_metrics:
+    type: internal_metrics
+
 transforms:
   parse_json:
     type: remap
@@ -35,6 +38,12 @@ sinks:
     compression: none
     healthcheck:
       enabled: true
+
+  prometheus_exporter:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: "0.0.0.0:9598"
 
   # Oodle
   oodle:

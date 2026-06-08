@@ -9,6 +9,7 @@ services:
       - ./agents/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml
     ports:
       - "5044:5044"
+      - "9600:9600"
     environment:
       - OODLE_INSTANCE=${OODLE_INSTANCE}
       - OODLE_API_KEY=${OODLE_API_KEY}
@@ -30,5 +31,29 @@ services:
     depends_on:
       - logstash
       - demo-app
+    networks:
+      - elastic-net
+
+  logstash-exporter:
+    image: kuskoman/logstash-exporter:v1.8.3
+    container_name: logstash-exporter
+    environment:
+      - LOGSTASH_URL=http://logstash:9600
+    ports:
+      - "9198:9198"
+    depends_on:
+      - logstash
+    networks:
+      - elastic-net
+
+  beat-exporter:
+    image: trustpilot/beat-exporter:0.4.0
+    container_name: beat-exporter
+    command:
+      - -beat.uri=http://filebeat:5066
+    ports:
+      - "9479:9479"
+    depends_on:
+      - filebeat
     networks:
       - elastic-net

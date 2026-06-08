@@ -30,6 +30,9 @@ exporters:
       "X-API-KEY": "${OODLE_API_KEY}"
 
 service:
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8888
   pipelines:
     logs:
       receivers: [otlp]

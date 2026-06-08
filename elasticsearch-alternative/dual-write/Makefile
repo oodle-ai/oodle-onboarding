@@ -6,13 +6,22 @@ AGENT ?= fluent-bit
 # Validate agent choice
 VALID_AGENTS := fluent-bit vector otel logstash
 ifeq ($(filter $(AGENT),$(VALID_AGENTS)),)
-    $(error Invalid AGENT. Choose from: fluent-bit, vector, otel)
+    $(error Invalid AGENT. Choose from: fluent-bit, vector, otel, logstash)
 endif
 
 # Compose files
 BASE_COMPOSE := -f docker-compose.base.yml
 AGENT_COMPOSE := -f docker-compose.$(AGENT).yml
-COMPOSE_FILES := $(BASE_COMPOSE) $(AGENT_COMPOSE)
+PROMETHEUS_COMPOSE := -f docker-compose.prometheus.yml
+COMPOSE_FILES := $(BASE_COMPOSE) $(AGENT_COMPOSE) $(PROMETHEUS_COMPOSE)
+
+# All compose files (for down/clean across all agents)
+ALL_COMPOSE := -f docker-compose.base.yml \
+	-f docker-compose.fluent-bit.yml \
+	-f docker-compose.vector.yml \
+	-f docker-compose.otel.yml \
+	-f docker-compose.logstash.yml \
+	-f docker-compose.prometheus.yml
 
 help:
 	@echo "Elasticsearch Dual-Write Setup"
@@ -25,6 +34,7 @@ help:
 	@echo "  make logs                     - View all logs"
 	@echo "  make logs-app                 - View only app logs"
 	@echo "  make logs-agent               - View only agent logs"
+	@echo "  make logs-prometheus           - View Prometheus logs"
 	@echo "  make clean                    - Stop and remove volumes"
 	@echo "  make restart AGENT=<agent>    - Restart with specified agent"
 	@echo ""
@@ -36,16 +46,11 @@ help:
 
 up:
 	@echo "Starting with $(AGENT)..."
-	docker-compose $(COMPOSE_FILES) up --build -d
+	AGENT=$(AGENT) docker-compose $(COMPOSE_FILES) up --build -d
 
 down:
 	@echo "Stopping all services..."
-	docker-compose -f docker-compose.base.yml \
-		-f docker-compose.fluent-bit.yml \
-		-f docker-compose.vector.yml \
-		-f docker-compose.otel.yml \
-		-f docker-compose.logstash.yml \
-		down 2>/dev/null || true
+	docker-compose $(ALL_COMPOSE) down 2>/dev/null || true
 
 logs:
 	docker-compose $(COMPOSE_FILES) logs -f
@@ -64,13 +69,11 @@ logs-agent:
 		docker-compose $(COMPOSE_FILES) logs -f logstash filebeat; \
 	fi
 
+logs-prometheus:
+	docker-compose $(COMPOSE_FILES) logs -f prometheus
+
 clean:
 	@echo "Cleaning up..."
-	docker-compose -f docker-compose.base.yml \
-		-f docker-compose.fluent-bit.yml \
-		-f docker-compose.vector.yml \
-		-f docker-compose.otel.yml \
-		-f docker-compose.logstash.yml \
-		down -v 2>/dev/null || true
+	docker-compose $(ALL_COMPOSE) down -v 2>/dev/null || true
 
 restart: down up
