@@ -1,0 +1,65 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: oodle
+  namespace: otel-demo
+spec:
+  mode: deployment
+  env:
+    - name: OODLE_INSTANCE
+      valueFrom:
+        secretKeyRef:
+          name: oodle-credentials
+          key: instance
+    - name: OODLE_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: oodle-credentials
+          key: api-key
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 5s
+        send_batch_size: 512
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 75
+        spike_limit_percentage: 15
+
+    exporters:
+      otlphttp/oodle:
+        endpoint: "https://${env:OODLE_INSTANCE}-otlp.collector.oodle.ai"
+        headers:
+          "X-OODLE-INSTANCE": "${env:OODLE_INSTANCE}"
+          "X-API-KEY": "${env:OODLE_API_KEY}"
+        timeout: 120s
+        retry_on_failure:
+          enabled: true
+          initial_interval: 2s
+          max_elapsed_time: 12m
+          max_interval: 45s
+      debug:
+        verbosity: basic
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlphttp/oodle, debug]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlphttp/oodle, debug]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlphttp/oodle, debug]
