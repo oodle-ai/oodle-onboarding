@@ -1,0 +1,144 @@
+# Oodle Onboarding Examples
+
+> Working examples showing how to integrate with [Oodle](https://oodle.ai), an observability platform for logs, metrics, and traces. Each example is self-contained with Docker Compose or Kubernetes manifests.
+
+Every example follows the same pattern: `cp .env.example .env`, fill in credentials, `make up`.
+
+## Choosing an Example
+
+Pick by your current stack and what you want to send:
+
+| Migrating from | Signal | Approach | Path |
+|----------------|--------|----------|------|
+| Elasticsearch | Logs | Dual-write (keep ES + add Oodle) | [elasticsearch-alternative/dual-write](elasticsearch-alternative/dual-write/README.md) |
+| Elasticsearch | Logs | Single-write baseline (ES only) | [elasticsearch-alternative/single-write](elasticsearch-alternative/single-write/README.md) |
+| OpenSearch | Logs | Dual-write (keep OS + add Oodle) | [opensearch-alternative/dual-write](opensearch-alternative/dual-write/README.md) |
+| Datadog | Metrics, traces, logs | Dual-write (keep DD + add Oodle) | [datadog/dual-write](datadog/dual-write/README.md) |
+| Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
+| None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
+| None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
+| None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
+
+## Log Collection Agents
+
+The Elasticsearch and OpenSearch migration examples support multiple agents. Pick the one matching your existing pipeline:
+
+- **Fluent Bit** -- Lightweight forwarder. Add an Oodle HTTP output alongside the existing output.
+- **Vector** -- High-performance pipeline. Add an Oodle HTTP sink alongside the existing sink.
+- **OTel Collector** -- OpenTelemetry native. Add an Oodle OTLP exporter alongside the existing exporter.
+- **Filebeat + Logstash** -- Classic Elastic stack. Add an Oodle HTTP output in the Logstash pipeline. (Elasticsearch only)
+
+Switch agents with `make up AGENT=fluent-bit|vector|otel|logstash`.
+
+## Detailed Example Descriptions
+
+### elasticsearch-alternative/dual-write
+
+Migrate from Elasticsearch to Oodle. Runs a local ES stack (Elasticsearch + Kibana) with a Go demo app emitting structured JSON logs. A log collection agent (Fluent Bit, Vector, OTel Collector, or Filebeat+Logstash) writes to both Elasticsearch and Oodle simultaneously.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Logs
+- Agents: Fluent Bit, Vector, OTel Collector, Filebeat+Logstash
+- Config files: `agents/fluent-bit/fluent-bit.conf`, `agents/vector/vector.yaml`, `agents/otel/otel-collector-config.yaml`, `agents/filebeat/filebeat.yml`, `agents/logstash/pipeline/logstash.conf`
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](elasticsearch-alternative/dual-write/OODLE_ONBOARDING.md)
+
+### elasticsearch-alternative/single-write
+
+Baseline Elasticsearch-only setup (no Oodle). Use as a starting point before enabling dual-write.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Logs
+- Agents: Fluent Bit, Vector, OTel Collector
+
+### opensearch-alternative/dual-write
+
+Migrate from OpenSearch to Oodle. Runs a local OpenSearch stack (OpenSearch + Dashboards) with a Go demo app. A log collection agent writes to both OpenSearch and Oodle simultaneously.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Logs
+- Agents: Fluent Bit, Vector, OTel Collector (via Data Prepper)
+- Config files: `agents/fluent-bit/fluent-bit.conf`, `agents/vector/vector.yaml`, `agents/otel/otel-collector-config.yaml`
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](opensearch-alternative/dual-write/OODLE_ONBOARDING.md)
+
+### datadog/dual-write
+
+Dual-ship from Datadog Agent to both Datadog and Oodle. Uses Datadog's native `DD_ADDITIONAL_ENDPOINTS` support -- no application code changes. A Go demo app sends custom metrics (DogStatsD), APM traces, and structured logs through the Datadog Agent.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Metrics, traces, logs (all three)
+- Agent: Datadog Agent with dual-shipping config
+- Requires: Datadog API key + Oodle credentials
+
+### datadog/single-write
+
+Baseline Datadog-only setup (no Oodle). Same Go demo app sending metrics, traces, and logs through the Datadog Agent.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Metrics, traces, logs
+- Agent: Datadog Agent
+- Requires: Datadog API key
+
+### tracing-demo
+
+End-to-end distributed tracing across four microservices in three languages, with automatic load generation.
+
+- Languages: Go (frontend-api, billing-service), Java Spring Boot (order-service), Python Flask (inventory-service)
+- Infra: Docker Compose
+- Signals: Traces
+- Instrumentation: OTel SDK (Go, Python), OTel Java Agent (auto-instrumentation)
+- Collector: OTel Collector exporting to Oodle via OTLP
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](tracing-demo/OODLE_ONBOARDING.md)
+
+### traceloop-demo
+
+LLM observability using Traceloop's OpenLLMetry SDK. A Python Flask app calls Google Gemini and exports traces (including token usage, latency, request/response content) to Oodle via OTel Collector.
+
+- Languages: Python
+- Infra: Docker Compose
+- Signals: Traces (LLM-specific)
+- Instrumentation: Traceloop SDK (auto-instruments Gemini calls)
+- Collector: OTel Collector exporting to Oodle via OTLP
+- Requires: Google Gemini API key + Oodle credentials
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](traceloop-demo/OODLE_ONBOARDING.md)
+
+### k8s-otel-operator
+
+Zero-code distributed tracing on Kubernetes using the OpenTelemetry Operator. The operator injects instrumentation automatically via pod annotations -- no OTel SDK imports in application code.
+
+- Languages: Node.js (frontend), Python (order-service), Java (payment-service)
+- Infra: Kubernetes (minikube), OTel Operator, cert-manager
+- Signals: Traces, metrics, logs
+- Instrumentation: OTel Operator auto-injection (inject-nodejs, inject-python, inject-java annotations)
+- Collector: Operator-managed OTel Collector exporting to Oodle via OTLP
+
+## Oodle Configuration
+
+All examples need two environment variables:
+
+```
+OODLE_INSTANCE=your-instance-id
+OODLE_API_KEY=your-api-key
+```
+
+Get these from the Oodle UI: Settings > API Keys.
+
+### Oodle Ingest Endpoints
+
+| Signal | Protocol | Endpoint Pattern |
+|--------|----------|-----------------|
+| Logs | HTTP/JSON | `https://{INSTANCE}-logs.collector.oodle.ai/ingest/v1/logs` |
+| Logs | OTLP/HTTP | `https://{INSTANCE}-logs.collector.oodle.ai/ingest/otel/v1/logs` |
+| Traces | OTLP/HTTP | `https://{INSTANCE}-otlp.collector.oodle.ai/v1/traces` |
+| Metrics (Datadog) | Datadog API | `https://{COLLECTOR}/v1/datadog/{INSTANCE}` |
+
+### Authentication Headers
+
+```
+X-OODLE-INSTANCE: {OODLE_INSTANCE}
+X-API-KEY: {OODLE_API_KEY}
+```

@@ -1,41 +1,36 @@
 # oodle-onboarding
 
-Demo repository showcasing working examples of various integrations supported by the Oodle platform.
-
-## Purpose
-
-This repository serves as:
-- Demonstration ground for Oodle platform integrations
-- Working examples for different vendor alternatives
-- Reference implementations across multiple languages/environments
-- Onboarding resource for new integrations
+Working examples showing how to integrate with the [Oodle](https://oodle.ai) observability platform for logs, metrics, and traces.
 
 ## Available Integrations
 
-### [opensearch-alternative](./opensearch-alternative)
-Log aggregation and search with OpenSearch, including Fluent Bit log collection and OpenSearch Dashboards.
-
-### [elasticsearch-alternative](./elasticsearch-alternative)
-Log aggregation and search with Elasticsearch, including multiple log collection agents (Fluent Bit, Vector, OTel Collector) and Kibana.
-
-### [tracing-demo](./tracing-demo)
-End-to-end distributed tracing across multi-language microservices (Go, Java, Python) using OpenTelemetry, with traces sent to Oodle.
-
-### [traceloop-demo](./traceloop-demo)
-LLM observability using [Traceloop's OpenLLMetry](https://github.com/traceloop/openllmetry) SDK to auto-instrument Google Gemini calls and export traces to Oodle.
-
-## Structure
-
-Each top-level folder represents a specific integration or vendor alternative:
-- Self-contained examples (no shared dependencies)
-- Multiple implementation approaches (docker-compose, kubernetes, language-specific, etc.)
-- Complete setup with documentation
+| Integration | Signal | Description |
+|------------|--------|-------------|
+| [elasticsearch-alternative/dual-write](./elasticsearch-alternative/dual-write) | Logs | Migrate from Elasticsearch — dual-write to ES + Oodle via Fluent Bit, Vector, OTel Collector, or Filebeat+Logstash |
+| [elasticsearch-alternative/single-write](./elasticsearch-alternative/single-write) | Logs | Baseline Elasticsearch-only setup (no Oodle) |
+| [opensearch-alternative/dual-write](./opensearch-alternative/dual-write) | Logs | Migrate from OpenSearch — dual-write to OS + Oodle via Fluent Bit, Vector, or OTel Collector |
+| [datadog/dual-write](./datadog/dual-write) | Metrics, traces, logs | Dual-ship from Datadog Agent to both Datadog and Oodle using native `DD_ADDITIONAL_ENDPOINTS` |
+| [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
+| [tracing-demo](./tracing-demo) | Traces | End-to-end distributed tracing across Go, Java, and Python microservices with OpenTelemetry |
+| [traceloop-demo](./traceloop-demo) | Traces | LLM observability using Traceloop's OpenLLMetry SDK with Google Gemini |
+| [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
 
 ## Getting Started
 
-1. Navigate to the integration you want to explore
-2. Follow the README in that folder
-3. Each setup is self-contained and can be run independently
+Every example follows the same pattern:
+
+```bash
+cd <integration-directory>
+cp .env.example .env
+# Edit .env with your Oodle credentials (and any vendor-specific keys)
+make up
+```
+
+Each setup is self-contained — no shared dependencies between integrations.
+
+## For AI Agents
+
+See [`llms.txt`](./llms.txt) for a machine-readable index of all examples with metadata (languages, signals, config file paths, agent options, and Oodle endpoint reference).
 
 ## Development
 
@@ -61,12 +56,12 @@ make fmt     # Format all Go code
 make check   # Run all pre-commit checks
 ```
 
-Pre-commit hooks will automatically run on `git commit` to ensure code quality.
-
 ## Adding New Integrations
 
-When adding a new integration:
-1. Create a top-level folder named `{vendor/tool}-alternative`
-2. Organize by setup type (e.g., `docker-compose/`, `kubernetes/`, language folders)
+1. Create a top-level folder named after the vendor/tool
+2. Organize by setup type (e.g., `single-write/`, `dual-write/`, or by language)
 3. Include a README explaining what the integration demonstrates
-4. Keep each setup completely self-contained
+4. Include a `.env.example` with required variables
+5. Include a `Makefile` with `up`, `down`, `clean`, `logs`, and `help` targets
+6. Keep each setup completely self-contained
+7. Update this README table and `llms.txt` with the new integration
