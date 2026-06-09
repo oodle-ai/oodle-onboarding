@@ -1,0 +1,57 @@
+name: datadog-dual-write
+
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: datadog-agent
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE:-datadoghq.com}
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - DD_PROCESS_AGENT_ENABLED=true
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_CONTAINER_EXCLUDE=name:datadog-agent
+      - DD_LOG_LEVEL=info
+      # --- Oodle Dual-Write: Metrics ---
+      - DD_ADDITIONAL_ENDPOINTS={"https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog/${OODLE_INSTANCE_ID}":["${OODLE_API_KEY}"]}
+      # --- Oodle Dual-Write: Logs ---
+      - DD_LOGS_CONFIG_FORCE_USE_HTTP=true
+      - DD_LOGS_CONFIG_ADDITIONAL_ENDPOINTS=[{"api_key":"${OODLE_API_KEY}","Host":"${OODLE_LOGS_COLLECTOR_DOMAIN}","Port":443,"is_reliable":false}]
+      # --- Oodle Dual-Write: Traces ---
+      - DD_APM_ADDITIONAL_ENDPOINTS={"https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog_traces/${OODLE_INSTANCE_ID}":["${OODLE_API_KEY}"]}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+      - "8126:8126"   # APM
+      - "8125:8125/udp" # DogStatsD
+    networks:
+      - datadog-net
+
+  demo-app:
+    build:
+      context: ../single-write/app
+      dockerfile: Dockerfile
+    container_name: datadog-demo-app
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"go","service":"datadog-demo"}]'
+    ports:
+      - "8080:8080"
+    environment:
+      - DD_AGENT_HOST=datadog-agent
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE=datadog-demo
+      - DD_ENV=demo
+      - DD_VERSION=1.0.0
+    depends_on:
+      - datadog-agent
+    networks:
+      - datadog-net
+
+networks:
+  datadog-net:
+    driver: bridge
