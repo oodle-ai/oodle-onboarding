@@ -17,6 +17,7 @@ Pick by your current stack and what you want to send:
 | Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
 | None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
+| None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 
 ## Log Collection Agents
@@ -105,6 +106,18 @@ LLM observability using Traceloop's OpenLLMetry SDK. A Python Flask app calls Go
 - Collector: OTel Collector exporting to Oodle via OTLP
 - Requires: Google Gemini API key + Oodle credentials
 - Oodle onboarding guide: [OODLE_ONBOARDING.md](traceloop-demo/OODLE_ONBOARDING.md)
+
+### llmops-otel-demo
+
+LLM observability using the official OpenTelemetry GenAI instrumentation package. A Python Flask app calls Google Gemini and exports traces, logs (prompt/response content), and metrics to Oodle via OTel Collector. Unlike traceloop-demo, this uses only first-party OTel packages with standard GenAI semantic conventions (`gen_ai.*`).
+
+- Languages: Python
+- Infra: Docker Compose
+- Signals: Traces, logs (LLM-specific)
+- Instrumentation: opentelemetry-instrumentation-google-genai (official OTel, auto-instruments Gemini calls)
+- Collector: OTel Collector exporting to Oodle via OTLP
+- Requires: Google Gemini API key + Oodle credentials
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](llmops-otel-demo/OODLE_ONBOARDING.md)
 
 ### k8s-otel-operator
 
