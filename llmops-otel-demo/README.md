@@ -92,7 +92,7 @@ curl -s http://localhost:8090/health
 ## Viewing Traces in Oodle
 
 1. Log in to your Oodle instance
-2. Navigate to the **Traces** section
+2. Navigate to **GenAI > Trace** (`/genai/trace`)
 3. Filter by service name `llmops-otel-demo`
 4. Click on a trace to see the full span waterfall including Gemini call details
 

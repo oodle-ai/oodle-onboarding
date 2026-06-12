@@ -28,7 +28,7 @@ The `-otlp` subdomain supports standard OTLP paths (`/v1/traces`, `/v1/logs`, `/
 
 ## What You'll See in Oodle
 
-After sending requests, navigate to **Traces** in your Oodle dashboard. You should see:
+After sending requests, navigate to **GenAI > Trace** (`/genai/trace`) in your Oodle dashboard. You should see:
 
 - **GenAI spans** following official OTel `gen_ai.*` semantic conventions
 - **Token usage** (prompt tokens, completion tokens, total tokens)
