@@ -42,13 +42,13 @@ test-chat:
 	@echo "Sending test chat request..."
 	curl -s -X POST http://localhost:8090/chat \
 		-H 'Content-Type: application/json' \
-		-d '{"message": "What is OpenTelemetry in one sentence?"}' | python3 -m json.tool
+		-d '{"message": "What is OpenTelemetry in one sentence?", "user": "alice"}' | python3 -m json.tool
 
 test-summarize:
 	@echo "Sending test summarize request..."
 	curl -s -X POST http://localhost:8090/summarize \
 		-H 'Content-Type: application/json' \
-		-d '{"text": "OpenTelemetry is a collection of APIs, SDKs, and tools used to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software performance and behavior. It is a CNCF project that provides a single set of APIs and libraries that standardize how you collect and transfer telemetry data. OpenTelemetry supports multiple programming languages and integrates with popular observability backends."}' | python3 -m json.tool
+		-d '{"text": "OpenTelemetry is a collection of APIs, SDKs, and tools used to instrument, generate, collect, and export telemetry data (metrics, logs, and traces) to help you analyze your software performance and behavior. It is a CNCF project that provides a single set of APIs and libraries that standardize how you collect and transfer telemetry data. OpenTelemetry supports multiple programming languages and integrates with popular observability backends.", "user": "bob"}' | python3 -m json.tool
 
 status:
 	docker-compose ps
