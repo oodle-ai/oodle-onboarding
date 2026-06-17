@@ -12,7 +12,7 @@ See [OODLE_ONBOARDING.md](./OODLE_ONBOARDING.md) for Oodle-specific integration 
 User Request
      |
      v
-Flask App (:8090) — instrumented with OTel GenAI SDK
+Flask App (:8090) — OTel GenAI + Flask instrumentation, structured JSON logs
      |
      +---> Google Gemini API (chat completions)
      |
@@ -65,12 +65,12 @@ make help
 ## API Endpoints
 
 ### POST /chat
-Send a chat message to Gemini.
+Send a chat message to Gemini. Include `user` for per-user trace/log filtering.
 
 ```bash
 curl -s -X POST http://localhost:8090/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message": "What is OpenTelemetry?"}' | python3 -m json.tool
+  -d '{"message": "What is OpenTelemetry?", "user": "alice"}' | python3 -m json.tool
 ```
 
 ### POST /summarize
@@ -79,7 +79,7 @@ Summarize a block of text.
 ```bash
 curl -s -X POST http://localhost:8090/summarize \
   -H 'Content-Type: application/json' \
-  -d '{"text": "Long text to summarize..."}' | python3 -m json.tool
+  -d '{"text": "Long text to summarize...", "user": "alice"}' | python3 -m json.tool
 ```
 
 ### GET /health
@@ -97,10 +97,13 @@ curl -s http://localhost:8090/health
 4. Click on a trace to see the full span waterfall including Gemini call details
 
 You should see:
+- **HTTP parent spans** from Flask instrumentation wrapping GenAI child spans
 - **GenAI spans** with `gen_ai.*` semantic convention attributes
 - **Token usage** (prompt tokens, completion tokens, total tokens)
 - **Model information** (model name, parameters)
 - **Prompt/response content** as span attributes (`gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`)
+- **User attribute** on HTTP spans — filter by `user` to see per-user traces
+- **Structured JSON logs** correlated to traces via `trace_id` and `span_id`
 - **Latency breakdown** across the full request lifecycle
 
 ## How This Differs from traceloop-demo
