@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   logstash:
-    image: docker.elastic.co/logstash/logstash:8.17.0
+    image: docker.elastic.co/logstash/logstash:6.8.23
     container_name: logstash
     volumes:
       - ./agents/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
@@ -20,7 +20,7 @@ services:
       - elastic-net
 
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.17.0
+    image: docker.elastic.co/beats/filebeat:6.8.23
     container_name: filebeat
     user: root
     command: ["filebeat", "-e", "--strict.perms=false"]
