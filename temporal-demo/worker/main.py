@@ -12,6 +12,7 @@ from temporalio.common import RetryPolicy
 # Pass non-deterministic imports through the workflow sandbox
 with workflow.unsafe.imports_passed_through():
     import asyncio
+    import contextvars
     import json
     import logging
     import os
@@ -25,12 +26,14 @@ with workflow.unsafe.imports_passed_through():
     from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
     from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
     from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from temporalio.client import Client
     from temporalio.contrib.opentelemetry import TracingInterceptor
     from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
     from temporalio.worker import Worker
+
+_current_customer = contextvars.ContextVar("current_customer", default=None)
 
 OTEL_ENDPOINT_GRPC = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
 OTEL_ENDPOINT_HTTP = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT_HTTP", "http://otel-collector:4318")
@@ -63,10 +66,26 @@ ITEM_PRICES = {
 }
 
 
+class CustomerSpanProcessor(SpanProcessor):
+    """Injects the current customer into every span, including auto-instrumented ones."""
+
+    def on_start(self, span, parent_context=None):
+        customer = _current_customer.get()
+        if customer:
+            span.set_attribute("customer", customer)
+
+
+def _set_customer(customer: str):
+    _current_customer.set(customer)
+    otel_trace.get_current_span().set_attribute("customer", customer)
+
+
 @activity.defn
 async def validate_order(order: OrderInput) -> dict:
+    _set_customer(order.customer)
     logger = logging.getLogger("activities")
-    logger.info("Validating order %s: %dx %s for %s", order.order_id, order.quantity, order.item, order.customer)
+    logger.info("Validating order %s: %dx %s for %s", order.order_id, order.quantity, order.item, order.customer,
+                extra={"customer": order.customer})
 
     await asyncio.sleep(random.uniform(0.05, 0.2))
 
@@ -77,14 +96,17 @@ async def validate_order(order: OrderInput) -> dict:
 
     price = ITEM_PRICES[order.item]
     total = price * order.quantity
-    logger.info("Order %s validated: $%.2f", order.order_id, total)
+    logger.info("Order %s validated: $%.2f", order.order_id, total,
+                extra={"customer": order.customer})
     return {"valid": True, "unit_price": price, "total": total}
 
 
 @activity.defn
 async def process_payment(order_id: str, amount: float, customer: str) -> dict:
+    _set_customer(customer)
     logger = logging.getLogger("activities")
-    logger.info("Processing payment for order %s: $%.2f from %s", order_id, amount, customer)
+    logger.info("Processing payment for order %s: $%.2f from %s", order_id, amount, customer,
+                extra={"customer": customer})
 
     await asyncio.sleep(random.uniform(0.1, 0.5))
 
@@ -92,30 +114,37 @@ async def process_payment(order_id: str, amount: float, customer: str) -> dict:
         raise RuntimeError(f"Payment gateway timeout for order {order_id}")
 
     txn_id = f"txn-{random.randint(100000, 999999)}"
-    logger.info("Payment processed for order %s: txn=%s", order_id, txn_id)
+    logger.info("Payment processed for order %s: txn=%s", order_id, txn_id,
+                extra={"customer": customer})
     return {"transaction_id": txn_id, "status": "charged"}
 
 
 @activity.defn
-async def ship_order(order_id: str, item: str, quantity: int) -> dict:
+async def ship_order(order_id: str, item: str, quantity: int, customer: str) -> dict:
+    _set_customer(customer)
     logger = logging.getLogger("activities")
-    logger.info("Shipping order %s: %dx %s", order_id, quantity, item)
+    logger.info("Shipping order %s: %dx %s", order_id, quantity, item,
+                extra={"customer": customer})
 
     await asyncio.sleep(random.uniform(0.1, 0.3))
 
     tracking_id = f"TRACK-{random.randint(100000, 999999)}"
-    logger.info("Order %s shipped: tracking=%s", order_id, tracking_id)
+    logger.info("Order %s shipped: tracking=%s", order_id, tracking_id,
+                extra={"customer": customer})
     return {"tracking_id": tracking_id, "status": "shipped"}
 
 
 @activity.defn
 async def send_notification(order_id: str, customer: str, tracking_id: str) -> dict:
+    _set_customer(customer)
     logger = logging.getLogger("activities")
-    logger.info("Sending notification for order %s to %s: tracking=%s", order_id, customer, tracking_id)
+    logger.info("Sending notification for order %s to %s: tracking=%s", order_id, customer, tracking_id,
+                extra={"customer": customer})
 
     await asyncio.sleep(random.uniform(0.02, 0.1))
 
-    logger.info("Notification sent for order %s", order_id)
+    logger.info("Notification sent for order %s", order_id,
+                extra={"customer": customer})
     return {"notified": True}
 
 
@@ -141,7 +170,7 @@ class OrderProcessingWorkflow:
 
         shipment = await workflow.execute_activity(
             ship_order,
-            args=[order.order_id, order.item, order.quantity],
+            args=[order.order_id, order.item, order.quantity, order.customer],
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
@@ -177,6 +206,9 @@ class JsonLogFormatter(logging.Formatter):
         if ctx.is_valid:
             entry["trace_id"] = format(ctx.trace_id, "032x")
             entry["span_id"] = format(ctx.span_id, "016x")
+        customer = getattr(record, "customer", None) or _current_customer.get()
+        if customer:
+            entry["customer"] = customer
         return json.dumps(entry, default=str)
 
 
@@ -184,6 +216,7 @@ def setup_opentelemetry() -> Runtime:
     resource = Resource.create({"service.name": SERVICE_NAME})
 
     tracer_provider = TracerProvider(resource=resource)
+    tracer_provider.add_span_processor(CustomerSpanProcessor())
     tracer_provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint=OTEL_ENDPOINT_GRPC, insecure=True))
     )
