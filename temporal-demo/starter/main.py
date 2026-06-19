@@ -5,6 +5,7 @@ of metrics, traces, and logs for observability.
 """
 
 import asyncio
+import contextvars
 import logging
 import os
 import random
@@ -13,11 +14,13 @@ import uuid
 from opentelemetry import trace as otel_trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from temporalio.client import Client
 from temporalio.contrib.opentelemetry import TracingInterceptor
 from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
+
+_current_customer = contextvars.ContextVar("current_customer", default=None)
 
 OTEL_ENDPOINT_GRPC = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
 SERVICE_NAME = "temporal-starter"
@@ -30,10 +33,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+class CustomerSpanProcessor(SpanProcessor):
+    def on_start(self, span, parent_context=None):
+        customer = _current_customer.get()
+        if customer:
+            span.set_attribute("customer", customer)
+
+
 def setup_opentelemetry() -> Runtime:
     resource = Resource.create({"service.name": SERVICE_NAME})
 
     tracer_provider = TracerProvider(resource=resource)
+    tracer_provider.add_span_processor(CustomerSpanProcessor())
     tracer_provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint=OTEL_ENDPOINT_GRPC, insecure=True))
     )
@@ -75,6 +86,7 @@ async def main():
         }
 
         try:
+            _current_customer.set(customer)
             result = await client.execute_workflow(
                 "OrderProcessingWorkflow",
                 order,

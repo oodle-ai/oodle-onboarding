@@ -29,7 +29,10 @@ with workflow.unsafe.imports_passed_through():
     from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from temporalio.client import Client
-    from temporalio.contrib.opentelemetry import TracingInterceptor
+    from temporalio.contrib.opentelemetry import (
+        TracingInterceptor,
+        TracingWorkflowInboundInterceptor,
+    )
     from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
     from temporalio.worker import Worker
 
@@ -78,6 +81,36 @@ class CustomerSpanProcessor(SpanProcessor):
 def _set_customer(customer: str):
     _current_customer.set(customer)
     otel_trace.get_current_span().set_attribute("customer", customer)
+
+
+class CustomerTracingWorkflow(TracingWorkflowInboundInterceptor):
+    """Injects customer into all workflow-side spans (RunWorkflow, StartActivity, CompleteWorkflow)."""
+
+    def __init__(self, next):
+        super().__init__(next)
+        self._customer = None
+
+    async def execute_workflow(self, input):
+        if input.args:
+            arg = input.args[0]
+            self._customer = getattr(arg, "customer", None)
+            if isinstance(arg, dict):
+                self._customer = arg.get("customer")
+        return await super().execute_workflow(input)
+
+    def _completed_span(self, span_name, *, additional_attributes=None, **kwargs):
+        if self._customer:
+            additional_attributes = dict(additional_attributes or {})
+            additional_attributes["customer"] = self._customer
+        return super()._completed_span(
+            span_name, additional_attributes=additional_attributes, **kwargs
+        )
+
+
+class CustomerTracingInterceptor(TracingInterceptor):
+    def workflow_interceptor_class(self, input):
+        super().workflow_interceptor_class(input)
+        return CustomerTracingWorkflow
 
 
 @activity.defn
@@ -254,7 +287,7 @@ async def main():
 
     client = await Client.connect(
         temporal_host,
-        interceptors=[TracingInterceptor()],
+        interceptors=[CustomerTracingInterceptor()],
         runtime=runtime,
     )
 
