@@ -1,0 +1,95 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: temporal-postgresql
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=temporal
+      - POSTGRES_DB=temporal
+    ports:
+      - "5432:5432"
+    networks:
+      - temporal-net
+
+  temporal:
+    image: temporalio/auto-setup:1.26.2
+    container_name: temporal-server
+    depends_on:
+      - postgresql
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgresql
+      - PROMETHEUS_ENDPOINT=0.0.0.0:8000
+    ports:
+      - "7233:7233"
+      - "8000:8000"
+    networks:
+      - temporal-net
+
+  temporal-ui:
+    image: temporalio/ui:2.35.0
+    container_name: temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    networks:
+      - temporal-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: temporal-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    depends_on:
+      - temporal
+    networks:
+      - temporal-net
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: temporal-worker
+    restart: on-failure
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT_HTTP=http://otel-collector:4318
+    depends_on:
+      - temporal
+      - otel-collector
+    networks:
+      - temporal-net
+
+  starter:
+    build:
+      context: ./starter
+      dockerfile: Dockerfile
+    container_name: temporal-starter
+    restart: on-failure
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - WORKFLOW_INTERVAL_SECONDS=${WORKFLOW_INTERVAL_SECONDS:-5}
+    depends_on:
+      - worker
+    networks:
+      - temporal-net
+
+networks:
+  temporal-net:
+    driver: bridge
