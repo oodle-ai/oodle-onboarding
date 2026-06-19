@@ -1,0 +1,51 @@
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+
+  # Scrape Temporal server's Prometheus metrics endpoint
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "temporal-server"
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["temporal:8000"]
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  otlphttp/oodle:
+    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/oodle, debug]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [batch]
+      exporters: [otlphttp/oodle, debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/oodle, debug]

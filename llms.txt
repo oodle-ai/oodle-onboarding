@@ -19,6 +19,7 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
 | None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
+| None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
 
 ## Log Collection Agents
 
@@ -128,6 +129,18 @@ Zero-code distributed tracing on Kubernetes using the OpenTelemetry Operator. Th
 - Signals: Traces, metrics, logs
 - Instrumentation: OTel Operator auto-injection (inject-nodejs, inject-python, inject-java annotations)
 - Collector: Operator-managed OTel Collector exporting to Oodle via OTLP
+
+### temporal-demo
+
+Self-hosted Temporal with an order processing workflow in Python, fully instrumented with OpenTelemetry. Exports metrics, traces, and logs to Oodle via an OTel Collector. Includes official Temporal Grafana dashboards for both server and SDK metrics.
+
+- Languages: Python
+- Infra: Docker Compose (Temporal server + PostgreSQL + Temporal UI)
+- Signals: Metrics, traces, logs (all three)
+- Instrumentation: temporalio[opentelemetry] TracingInterceptor + OpenTelemetryConfig for SDK metrics + OTel LoggerProvider for logs
+- Collector: OTel Collector with otlp + prometheus receivers, exporting to Oodle via OTLP
+- Dashboards: temporal-server.json (server metrics), temporal-sdk.json (SDK metrics) — from github.com/temporalio/dashboards
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](temporal-demo/OODLE_ONBOARDING.md)
 
 ## Oodle Configuration
 

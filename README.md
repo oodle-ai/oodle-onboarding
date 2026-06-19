@@ -15,6 +15,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [traceloop-demo](./traceloop-demo) | Traces | LLM observability using Traceloop's OpenLLMetry SDK with Google Gemini |
 | [llmops-otel-demo](./llmops-otel-demo) | Traces | LLM observability using official OpenTelemetry GenAI instrumentation with Google Gemini |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
+| [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
 
 ## Getting Started
 
