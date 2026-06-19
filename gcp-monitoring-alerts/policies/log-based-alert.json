@@ -1,0 +1,22 @@
+{
+  "displayName": "oodle-test-error-logs",
+  "documentation": {
+    "content": "Error logs detected in the project",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "Error log entries",
+      "conditionMatchedLog": {
+        "filter": "severity >= ERROR"
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true,
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "300s"
+    }
+  }
+}

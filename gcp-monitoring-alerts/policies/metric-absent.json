@@ -1,0 +1,24 @@
+{
+  "displayName": "oodle-test-cpu-absent",
+  "documentation": {
+    "content": "CPU utilization metric has been absent for 10 minutes",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "CPU utilization absent",
+      "conditionAbsent": {
+        "filter": "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.type=\"gce_instance\"",
+        "duration": "600s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_MEAN"
+          }
+        ]
+      }
+    }
+  ],
+  "combiner": "OR",
+  "enabled": true
+}
