@@ -10,16 +10,16 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Use the account's default VPC + subnets to keep the demo minimal.
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
+# Deploy into the provided VPC. If subnet_ids is empty, use all subnets in it.
+data "aws_subnets" "selected" {
   filter {
     name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+    values = [var.vpc_id]
   }
+}
+
+locals {
+  subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : data.aws_subnets.selected.ids
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -30,7 +30,7 @@ resource "aws_ecs_cluster" "main" {
 resource "aws_security_group" "task" {
   name_prefix = "${var.name_prefix}-"
   description = "Egress for Datadog Fargate demo tasks"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = var.vpc_id
 
   egress {
     from_port   = 0
@@ -105,7 +105,7 @@ resource "aws_ecs_service" "demo" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = data.aws_subnets.default.ids
+    subnets          = local.subnet_ids
     security_groups  = [aws_security_group.task.id]
     assign_public_ip = true
   }

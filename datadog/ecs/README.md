@@ -27,7 +27,9 @@ The two flavors are independent — run either or both.
 
 - **Datadog site:** US5 (`us5.datadoghq.com`). Override `dd_site` (and `dd_api_url`
   in `aws-integration/`) for other sites.
-- **Networking:** uses the account's **default VPC** to stay minimal.
+- **Networking:** deploys into the VPC you supply via `vpc_id` (e.g.
+  `export TF_VAR_vpc_id=vpc-...`); subnets default to all subnets in that VPC and
+  must have outbound internet. Applies to `fargate/` and `ec2/`.
 - **Region:** `us-east-1` (override `aws_region`).
 
 ## Prerequisites

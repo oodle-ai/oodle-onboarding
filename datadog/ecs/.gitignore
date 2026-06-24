@@ -8,3 +8,6 @@ terraform.tfvars
 *.auto.tfvars
 override.tf
 override.tf.json
+
+# editor
+*.swp
