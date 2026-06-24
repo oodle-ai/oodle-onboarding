@@ -20,6 +20,28 @@ data "aws_subnets" "selected" {
 
 locals {
   subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : data.aws_subnets.selected.ids
+
+  # Oodle dual-write: extra Datadog Agent env vars that fan metrics, logs, and
+  # traces out to Oodle's collectors alongside Datadog. See the datadog setup
+  # spec: `oodle integrations get-setup-spec datadog`.
+  oodle_dual_write_env = var.oodle_dual_write ? [
+    {
+      name  = "DD_ADDITIONAL_ENDPOINTS"
+      value = jsonencode({ "https://${var.oodle_collector_domain}/v1/datadog/${var.oodle_instance_id}" = [var.oodle_api_key] })
+    },
+    {
+      name  = "DD_LOGS_CONFIG_ADDITIONAL_ENDPOINTS"
+      value = jsonencode([{ api_key = var.oodle_api_key, Host = var.oodle_logs_collector_domain, Port = 443, is_reliable = false }])
+    },
+    {
+      name  = "DD_LOGS_CONFIG_FORCE_USE_HTTP"
+      value = "true"
+    },
+    {
+      name  = "DD_APM_ADDITIONAL_ENDPOINTS"
+      value = jsonencode({ "https://${var.oodle_collector_domain}/v1/datadog_traces/${var.oodle_instance_id}" = [var.oodle_api_key] })
+    },
+  ] : []
 }
 
 resource "aws_ecs_cluster" "main" {
@@ -71,6 +93,9 @@ module "datadog_ecs_fargate_task" {
   dd_log_collection = {
     enabled = true
   }
+
+  # Dual-write to Oodle (empty unless oodle_dual_write = true).
+  dd_environment = local.oodle_dual_write_env
 
   # Task definition
   family                   = "${var.name_prefix}-task"
