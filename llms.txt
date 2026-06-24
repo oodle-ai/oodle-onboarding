@@ -15,6 +15,7 @@ Pick by your current stack and what you want to send:
 | OpenSearch | Logs | Dual-write (keep OS + add Oodle) | [opensearch-alternative/dual-write](opensearch-alternative/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Dual-write (keep DD + add Oodle) | [datadog/dual-write](datadog/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
+| Datadog (AWS ECS) | Metrics, traces, logs | Single ECS task on Datadog — Fargate + EC2 (Terraform) | [datadog/ecs](datadog/ecs/README.md) |
 | None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
 | None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
@@ -84,6 +85,17 @@ Baseline Datadog-only setup (no Oodle). Same Go demo app sending metrics, traces
 - Signals: Metrics, traces, logs
 - Agent: Datadog Agent
 - Requires: Datadog API key
+
+### datadog/ecs
+
+Datadog-only demos (no Oodle) running a single instrumented ECS task on AWS, in both launch types, using the official [`terraform-aws-ecs-datadog`](https://github.com/DataDog/terraform-aws-ecs-datadog) module. Each task runs Datadog's prebuilt demo apps (`apps-dogstatsd`, `apps-tracegen`) so metrics, traces, and logs flow with no application code. A separate `aws-integration/` directory wires the account-level AWS↔Datadog integration (IAM role + `datadog_integration_aws_account`). Defaults to the US5 site.
+
+- Languages: none (prebuilt Datadog demo images)
+- Infra: Terraform (AWS ECS, default VPC)
+- Signals: Metrics, traces, logs
+- Subdirectories: `fargate/` (Agent injected as a sidecar), `ec2/` (Agent as a daemon over a Unix socket), `aws-integration/` (account-level AWS integration)
+- Requires: Datadog API key (+ Application key for the integration step), AWS credentials
+- Usage: `terraform init && terraform apply` per directory (not `make up`)
 
 ### tracing-demo
 

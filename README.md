@@ -11,6 +11,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [opensearch-alternative/dual-write](./opensearch-alternative/dual-write) | Logs | Migrate from OpenSearch — dual-write to OS + Oodle via Fluent Bit, Vector, or OTel Collector |
 | [datadog/dual-write](./datadog/dual-write) | Metrics, traces, logs | Dual-ship from Datadog Agent to both Datadog and Oodle using native `DD_ADDITIONAL_ENDPOINTS` |
 | [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
+| [datadog/ecs](./datadog/ecs) | Metrics, traces, logs | Terraform demos running a single Datadog-instrumented ECS task — Fargate and EC2 flavors — via the `terraform-aws-ecs-datadog` module, plus the account-level AWS integration |
 | [tracing-demo](./tracing-demo) | Traces | End-to-end distributed tracing across Go, Java, and Python microservices with OpenTelemetry |
 | [traceloop-demo](./traceloop-demo) | Traces | LLM observability using Traceloop's OpenLLMetry SDK with Google Gemini |
 | [llmops-otel-demo](./llmops-otel-demo) | Traces | LLM observability using official OpenTelemetry GenAI instrumentation with Google Gemini |
