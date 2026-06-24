@@ -21,7 +21,8 @@ alongside two of Datadog's demo apps:
 
 ## Prerequisites
 
-- AWS credentials, and a **default VPC** in the target region (the demo uses it).
+- AWS credentials and a **VPC** to deploy into (set `vpc_id`). Subnets need
+  outbound internet (public, or private + NAT) to pull images and reach Datadog.
 - A Datadog **API key**.
 - (Recommended) Apply [`../aws-integration`](../aws-integration) once so AWS
   infrastructure metrics show up in Datadog too.
@@ -30,9 +31,10 @@ alongside two of Datadog's demo apps:
 
 ```bash
 export TF_VAR_dd_api_key=...      # Datadog API key
+export TF_VAR_vpc_id=vpc-...      # VPC to deploy into
 
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars (aws_region, dd_site if not US5)
+# Edit terraform.tfvars (aws_region, dd_site if not US5, optional subnet_ids)
 
 terraform init
 terraform apply

@@ -1,6 +1,12 @@
 # Copy to terraform.tfvars and fill in.
 aws_region = "us-east-1"
 
+# VPC to deploy into (required). Provide here or via TF_VAR_vpc_id.
+# vpc_id = "vpc-0123456789abcdef0"
+# Optionally pin specific subnets (must have outbound internet). Defaults to all
+# subnets in the VPC if omitted:
+# subnet_ids = ["subnet-aaa", "subnet-bbb"]
+
 # Datadog site. Defaults to US5; override if your org is on another site:
 # dd_site = "datadoghq.com"
 

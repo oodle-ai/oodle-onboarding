@@ -74,7 +74,7 @@ resource "aws_iam_policy" "datadog" {
 }
 
 resource "aws_iam_role" "datadog" {
-  name               = "DatadogIntegrationRole"
+  name               = "DatadogIntegrationRole-ECS-Test"
   description        = "Role for the Datadog AWS integration"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }

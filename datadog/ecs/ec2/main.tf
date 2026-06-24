@@ -11,15 +11,16 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
+# Deploy into the provided VPC. If subnet_ids is empty, use all subnets in it.
+data "aws_subnets" "selected" {
   filter {
     name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+    values = [var.vpc_id]
   }
+}
+
+locals {
+  subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : data.aws_subnets.selected.ids
 }
 
 # Latest ECS-optimized Amazon Linux 2 AMI.
@@ -61,7 +62,7 @@ resource "aws_iam_instance_profile" "instance" {
 resource "aws_security_group" "instance" {
   name_prefix = "${var.name_prefix}-"
   description = "Egress for Datadog ECS EC2 demo instances"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = var.vpc_id
 
   egress {
     from_port   = 0
@@ -92,7 +93,7 @@ resource "aws_launch_template" "instance" {
 
 resource "aws_autoscaling_group" "instance" {
   name_prefix         = "${var.name_prefix}-"
-  vpc_zone_identifier = data.aws_subnets.default.ids
+  vpc_zone_identifier = local.subnet_ids
   min_size            = 1
   max_size            = 1
   desired_capacity    = 1
