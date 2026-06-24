@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in.
+aws_region     = "us-east-1"
+aws_account_id = "123456789012"
+
+# Defaults target Datadog US5. Override for a different site, e.g.:
+# dd_site    = "datadoghq.com"
+# dd_api_url = "https://api.datadoghq.com"
+
+# The Datadog provider also needs these in the environment (not in tfvars):
+#   export DD_API_KEY=...
+#   export DD_APP_KEY=...

@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in.
+aws_region = "us-east-1"
+
+# Datadog site. Defaults to US5; override if your org is on another site:
+# dd_site = "datadoghq.com"
+
+# Optional: change the EC2 instance backing the cluster.
+# instance_type = "t3.medium"
+
+# Provide the API key via the environment instead of committing it:
+#   export TF_VAR_dd_api_key=...
