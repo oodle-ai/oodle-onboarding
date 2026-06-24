@@ -46,6 +46,38 @@ Within a couple of minutes the task starts and telemetry appears in Datadog:
 - **Metrics**: <https://us5.datadoghq.com/metric/explorer> — search `custom.metric`
 - **Infrastructure / Containers**: filter by `team:demo`
 
+## Dual-write to Oodle (optional)
+
+The injected Datadog Agent can ship the same metrics, logs, and traces to
+[Oodle](https://oodle.ai) at the same time, using Datadog's native
+`DD_ADDITIONAL_ENDPOINTS` / `DD_LOGS_CONFIG_ADDITIONAL_ENDPOINTS` /
+`DD_APM_ADDITIONAL_ENDPOINTS` support — no app changes. Set `oodle_dual_write =
+true` and supply your instance's collector domains + an ingestion API key.
+
+Discover the values with the Oodle CLI:
+
+```bash
+oodle integrations list -o json   # collectorDomain, logsCollectorDomain, instance ID
+oodle api-keys list -o json       # ingestion API key
+```
+
+Then:
+
+```bash
+export TF_VAR_dd_api_key=...
+export TF_VAR_vpc_id=vpc-...
+export TF_VAR_oodle_api_key=...   # Oodle ingestion key
+
+terraform apply \
+  -var="oodle_dual_write=true" \
+  -var="oodle_instance_id=inst-xxxxxxxx" \
+  -var="oodle_collector_domain=inst-xxxxxxxx.collector.oodle.ai" \
+  -var="oodle_logs_collector_domain=inst-xxxxxxxx-logs.collector.oodle.ai"
+```
+
+The same telemetry then appears in both Datadog and your Oodle instance. Check
+the Oodle side with `oodle integrations list` (or the Oodle UI).
+
 ## Cleanup
 
 ```bash
