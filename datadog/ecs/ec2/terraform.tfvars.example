@@ -15,3 +15,14 @@ aws_region = "us-east-1"
 
 # Provide the API key via the environment instead of committing it:
 #   export TF_VAR_dd_api_key=...
+
+# --- Oodle dual-write (optional) ---
+# Also forward Agent metrics/logs/traces to Oodle. Get these from:
+#   oodle integrations list -o json   (collector domains + instance ID)
+#   oodle api-keys list -o json       (ingestion API key)
+# oodle_dual_write            = true
+# oodle_instance_id           = "inst-xxxxxxxx"
+# oodle_collector_domain      = "inst-xxxxxxxx.collector.oodle.ai"
+# oodle_logs_collector_domain = "inst-xxxxxxxx-logs.collector.oodle.ai"
+# Provide the Oodle API key via the environment:
+#   export TF_VAR_oodle_api_key=...
