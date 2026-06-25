@@ -44,3 +44,38 @@ variable "instance_type" {
   type        = string
   default     = "t3.medium"
 }
+
+################################################################################
+# Oodle dual-write (optional) — also ship Agent telemetry to Oodle.
+################################################################################
+
+variable "oodle_dual_write" {
+  description = "When true, the Datadog Agent also forwards metrics, logs, and traces to Oodle."
+  type        = bool
+  default     = false
+}
+
+variable "oodle_instance_id" {
+  description = "Oodle instance ID (e.g. inst-...). Required when oodle_dual_write = true."
+  type        = string
+  default     = ""
+}
+
+variable "oodle_collector_domain" {
+  description = "Oodle metrics/traces collector domain. Required when oodle_dual_write = true."
+  type        = string
+  default     = ""
+}
+
+variable "oodle_logs_collector_domain" {
+  description = "Oodle logs collector domain. Required when oodle_dual_write = true."
+  type        = string
+  default     = ""
+}
+
+variable "oodle_api_key" {
+  description = "Oodle ingestion API key. Pass via TF_VAR_oodle_api_key. Required when oodle_dual_write = true."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
