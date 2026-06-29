@@ -22,27 +22,29 @@ data "aws_subnets" "selected" {
 locals {
   subnet_ids = length(var.subnet_ids) > 0 ? var.subnet_ids : data.aws_subnets.selected.ids
 
-  # Oodle dual-write: extra Datadog Agent env vars that fan metrics, logs, and
-  # traces out to Oodle's collectors alongside Datadog. See the datadog setup
-  # spec: `oodle integrations get-setup-spec datadog`.
-  oodle_dual_write_env = var.oodle_dual_write ? [
+  # Oodle single-write: override the Datadog Agent's PRIMARY metrics, logs, and
+  # traces endpoints so telemetry ships only to Oodle's collectors (not Datadog).
+  # The Agent authenticates with the Oodle API key, set as dd_api_key on the
+  # module below. See the datadog setup spec: `oodle integrations get-setup-spec
+  # datadog` (Single-shipping / Oodle only).
+  oodle_env = [
     {
-      name  = "DD_ADDITIONAL_ENDPOINTS"
-      value = jsonencode({ "https://${var.oodle_collector_domain}/v1/datadog/${var.oodle_instance_id}" = [var.oodle_api_key] })
+      name  = "DD_DD_URL"
+      value = "https://${var.oodle_collector_domain}/v1/datadog/${var.oodle_instance_id}"
     },
     {
-      name  = "DD_LOGS_CONFIG_ADDITIONAL_ENDPOINTS"
-      value = jsonencode([{ api_key = var.oodle_api_key, Host = var.oodle_logs_collector_domain, Port = 443, is_reliable = false }])
+      name  = "DD_APM_DD_URL"
+      value = "https://${var.oodle_collector_domain}/v1/datadog_traces/${var.oodle_instance_id}"
+    },
+    {
+      name  = "DD_LOGS_CONFIG_LOGS_DD_URL"
+      value = "${var.oodle_logs_collector_domain}:443"
     },
     {
       name  = "DD_LOGS_CONFIG_FORCE_USE_HTTP"
       value = "true"
     },
-    {
-      name  = "DD_APM_ADDITIONAL_ENDPOINTS"
-      value = jsonencode({ "https://${var.oodle_collector_domain}/v1/datadog_traces/${var.oodle_instance_id}" = [var.oodle_api_key] })
-    },
-  ] : []
+  ]
 }
 
 # Latest ECS-optimized Amazon Linux 2 AMI.
@@ -141,8 +143,9 @@ module "datadog_agent" {
   # only), so pin to the tag that introduced it.
   source = "git::https://github.com/DataDog/terraform-aws-ecs-datadog.git//modules/ecs_ec2?ref=v1.1.0-beta"
 
-  dd_api_key = var.dd_api_key
-  dd_site    = var.dd_site
+  # The Agent ships only to Oodle (see local.oodle_env below), so it
+  # authenticates with the Oodle API key — no Datadog key needed.
+  dd_api_key = var.oodle_api_key
   dd_tags    = "team:demo, owner:oodle-onboarding"
 
   dd_dogstatsd = {
@@ -156,12 +159,14 @@ module "datadog_agent" {
     enabled               = true
     container_collect_all = true
   }
+  # Orchestrator Explorer ships to Datadog's process intake (site-based, not
+  # redirected by DD_DD_URL), so it can't reach Oodle — leave it off.
   dd_orchestrator_explorer = {
-    enabled = true
+    enabled = false
   }
 
-  # Dual-write to Oodle (empty unless oodle_dual_write = true).
-  dd_environment = local.oodle_dual_write_env
+  # Ship Agent telemetry to Oodle only.
+  dd_environment = local.oodle_env
 
   family       = "${var.name_prefix}-agent"
   network_mode = "bridge"
