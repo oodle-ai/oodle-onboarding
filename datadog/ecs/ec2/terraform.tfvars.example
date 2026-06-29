@@ -7,22 +7,15 @@ aws_region = "us-east-1"
 # subnets in the VPC if omitted:
 # subnet_ids = ["subnet-aaa", "subnet-bbb"]
 
-# Datadog site. Defaults to US5; override if your org is on another site:
-# dd_site = "datadoghq.com"
-
 # Optional: change the EC2 instance backing the cluster.
 # instance_type = "t3.medium"
 
-# Provide the API key via the environment instead of committing it:
-#   export TF_VAR_dd_api_key=...
-
-# --- Oodle dual-write (optional) ---
-# Also forward Agent metrics/logs/traces to Oodle. Get these from:
+# --- Oodle (required) ---
+# The Datadog Agent ships metrics/logs/traces only to Oodle. Get these from:
 #   oodle integrations list -o json   (collector domains + instance ID)
 #   oodle api-keys list -o json       (ingestion API key)
-# oodle_dual_write            = true
-# oodle_instance_id           = "inst-xxxxxxxx"
-# oodle_collector_domain      = "inst-xxxxxxxx.collector.oodle.ai"
-# oodle_logs_collector_domain = "inst-xxxxxxxx-logs.collector.oodle.ai"
-# Provide the Oodle API key via the environment:
+oodle_instance_id           = "inst-xxxxxxxx"
+oodle_collector_domain      = "inst-xxxxxxxx.collector.oodle.ai"
+oodle_logs_collector_domain = "inst-xxxxxxxx-logs.collector.oodle.ai"
+# Provide the Oodle API key via the environment instead of committing it:
 #   export TF_VAR_oodle_api_key=...

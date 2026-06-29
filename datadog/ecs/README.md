@@ -1,32 +1,24 @@
-# Datadog on Amazon ECS
+# Oodle on Amazon ECS
 
-Minimal Terraform demos that run a **single ECS task** instrumented with Datadog,
-using the official
+Minimal Terraform demos that run a **single ECS task** instrumented with the
+Datadog Agent, using the official
 [`terraform-aws-ecs-datadog`](https://github.com/DataDog/terraform-aws-ecs-datadog)
-module — in both ECS launch types.
+module — in both ECS launch types. The Agent ships telemetry **only to Oodle**
+(not Datadog): its primary metrics, logs, and traces endpoints are overridden to
+point at your Oodle collectors, and it authenticates with your Oodle API key.
 
 | Directory | What it does |
 |-----------|--------------|
-| [`aws-integration/`](./aws-integration) | Account-level AWS↔Datadog integration (IAM role + `datadog_integration_aws_account`). Apply **once per AWS account**. |
 | [`fargate/`](./fargate) | Single **Fargate** task; the module injects the Datadog Agent as a sidecar. |
 | [`ec2/`](./ec2) | **EC2** launch type; the Agent runs as a daemon and apps reach it over a Unix socket. |
 
 Each task runs Datadog's prebuilt demo apps (`apps-dogstatsd`, `apps-tracegen`),
 so metrics, traces, and logs flow with no application code to build.
 
-## Apply order
-
-1. **`aws-integration/`** (recommended, once per account) — gives Datadog the
-   CloudWatch + ECS metrics and resource metadata. Needs `DD_API_KEY` + `DD_APP_KEY`.
-2. **`fargate/`** and/or **`ec2/`** — the actual ECS workloads. Each needs only a
-   Datadog `DD_API_KEY` (passed as `TF_VAR_dd_api_key`).
-
 The two flavors are independent — run either or both.
 
 ## Defaults
 
-- **Datadog site:** US5 (`us5.datadoghq.com`). Override `dd_site` (and `dd_api_url`
-  in `aws-integration/`) for other sites.
 - **Networking:** deploys into the VPC you supply via `vpc_id` (e.g.
   `export TF_VAR_vpc_id=vpc-...`); subnets default to all subnets in that VPC and
   must have outbound internet. Applies to `fargate/` and `ec2/`.
@@ -36,7 +28,7 @@ The two flavors are independent — run either or both.
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.5
 - AWS credentials with permission to manage ECS, EC2, and IAM
-- A Datadog account with an **API key** (and an **Application key** for the
-  integration step)
+- An Oodle account with an ingestion **API key** and an integration's collector
+  domains (`oodle integrations list -o json`, `oodle api-keys list -o json`).
 
 See each subdirectory's README for step-by-step usage and cleanup.
