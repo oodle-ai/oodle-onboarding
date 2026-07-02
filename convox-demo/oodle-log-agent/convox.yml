@@ -1,0 +1,18 @@
+# Convox v2 (generation 2) manifest for the host-local OTel log agent.
+#
+# `agent.enabled: true` runs one collector on EVERY rack instance (DaemonSet-style) and
+# publishes the host port, so rails-demo's Syslog log driver can target tcp://localhost:5140
+# on the same host. NOTE the gen-2 syntax: `ports` is nested under `agent:` (not top-level).
+environment:
+  - OODLE_INSTANCE
+  - OODLE_API_KEY
+services:
+  collector:
+    agent:
+      enabled: true
+      ports:
+        - 5140/tcp
+    build: .
+    scale:
+      cpu: 128
+      memory: 256
