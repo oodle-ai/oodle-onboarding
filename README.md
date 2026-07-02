@@ -20,6 +20,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [pydantic-ai-demo](./pydantic-ai-demo) | Traces | AI agent observability using Pydantic AI with built-in OTel GenAI instrumentation |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
 | [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
+| [convox-demo](./convox-demo) | Logs | Deploy a Rails app on Convox v2 (AWS ECS) and dual-write its logs to CloudWatch + Oodle via a host-local OTel Collector agent — no app code changes |
 
 ## Getting Started
 

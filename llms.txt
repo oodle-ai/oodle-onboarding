@@ -24,6 +24,7 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | AI agent observability (Pydantic AI + any LLM) | [pydantic-ai-demo](pydantic-ai-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
+| Convox (AWS ECS) | Logs | Dual-write app logs to CloudWatch + Oodle via host-local OTel agent (no app changes) | [convox-demo](convox-demo/oodle-log-agent/README.md) |
 
 ## Log Collection Agents
 
@@ -190,6 +191,18 @@ Self-hosted Temporal with an order processing workflow in Python, fully instrume
 - Collector: OTel Collector with otlp + prometheus receivers, exporting to Oodle via OTLP
 - Dashboards: temporal-server.json (server metrics), temporal-sdk.json (SDK metrics) — from github.com/temporalio/dashboards
 - Oodle onboarding guide: [OODLE_ONBOARDING.md](temporal-demo/OODLE_ONBOARDING.md)
+
+### convox-demo
+
+Deploy a sample stateless Rails 7.1 app on Convox v2 (generation 2, AWS ECS) and dual-write its logs to both CloudWatch and Oodle -- with no application code changes. An OTel Collector runs as a Convox agent (one per rack instance) receiving the app's logs via Convox's per-app Syslog log driver (`tcp://localhost:5140`), then fans out to CloudWatch and Oodle. The collector is the fan-out point, so CloudWatch is a removable exporter -- delete it to drop CloudWatch from the ingestion path while Oodle keeps flowing. The Syslog driver is a per-app parameter, so only the demo app is affected; other apps keep CloudWatch and `convox logs`.
+
+- Languages: Ruby (Rails 7.1)
+- Infra: Convox v2 (AWS ECS/EC2) -- not Docker Compose
+- Signals: Logs
+- Mechanism: per-app `LogDriver=Syslog` -> host-local OTel agent -> `awscloudwatchlogs` + `otlphttp/oodle`
+- Config files: `convox-demo/oodle-log-agent/otel-collector-config.yaml`, `convox-demo/oodle-log-agent/convox.yml`
+- Requires: Convox CLI + a generation-2 rack, Oodle credentials (set via `convox env set`)
+- Usage: `cd convox-demo/oodle-log-agent && make up` (wraps `convox deploy` + per-app param switch)
 
 ## Oodle Configuration
 
