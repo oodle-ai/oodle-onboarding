@@ -6,6 +6,7 @@
 environment:
   - OODLE_INSTANCE
   - OODLE_API_KEY
+  - CW_LOG_GROUP
 services:
   collector:
     agent:

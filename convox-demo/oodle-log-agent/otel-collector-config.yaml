@@ -24,6 +24,15 @@ processors:
       - key: deployment.source
         value: convox-syslog
         action: upsert
+  # Reconstruct the original container stdout line by dropping the rfc5424 syslog envelope
+  # (the receiver keeps the parsed line in attributes["message"]). This makes the CloudWatch
+  # copy match the pre-syslog `awslogs` format exactly — no downstream migration friction.
+  transform/rawline:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(body, attributes["message"]) where attributes["message"] != nil
   batch:
     timeout: 5s
     send_batch_size: 1000
@@ -32,8 +41,12 @@ exporters:
   # --- CloudWatch (removable: delete this exporter + its pipeline ref to drop CloudWatch) ---
   awscloudwatchlogs:
     region: us-east-1
-    log_group_name: /oodle-demo/rails-demo
-    log_stream_name: convox-syslog
+    # Same group name the native Convox `awslogs` driver used, so dashboards / queries / metric
+    # filters that reference it keep working. This exporter (NOT Convox CloudFormation) owns the
+    # group, so it is NOT deleted when rails-demo toggles LogDriver — it persists across switches.
+    log_group_name: "${env:CW_LOG_GROUP}"
+    log_stream_name: web
+    raw_log: true   # export just the reconstructed log line (matches original stdout), not OTel JSON
     # group/stream auto-created if the task role allows it (see IamPolicy in the Makefile).
 
   # --- Oodle ---
@@ -53,7 +66,7 @@ service:
   pipelines:
     logs:
       receivers: [syslog]
-      processors: [resource, batch]
+      processors: [resource, transform/rawline, batch]
       exporters: [awscloudwatchlogs, otlphttp/oodle]
   telemetry:
     logs:

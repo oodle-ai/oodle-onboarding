@@ -62,7 +62,7 @@ make up                       # create app, grant IAM, deploy agent, switch rail
 make ps                                   # one collector per rack instance, all running
 curl https://<rails-demo-endpoint>/       # generate traffic
 oodle logs query --query 'rails-demo' ... # logs appear in Oodle
-aws logs tail /oodle-demo/rails-demo --region us-east-1   # same logs in CloudWatch
+aws logs tail "$CW_LOG_GROUP" --region us-east-1          # same raw logs in CloudWatch
 ```
 
 ## Drop CloudWatch later
@@ -77,6 +77,25 @@ No app changes, no rack changes.
 make disable-syslog   # rails-demo → LogDriver=CloudWatch, restores `convox logs -a rails-demo`
 make clean            # also delete the agent app
 ```
+
+## CloudWatch group & format parity
+
+The collector writes the CloudWatch copy to the **same group name the native Convox `awslogs`
+driver used** (set via `CW_LOG_GROUP`, e.g. `gm-test-rails-demo-LogGroup-…`), in the **same raw
+format** — a `transform` processor drops the syslog envelope so each event is the original Rails
+stdout line (not OTel JSON). So existing dashboards / metric filters / queries keep working.
+
+Because **this exporter owns the group (not Convox CloudFormation)**, it is **not deleted when
+the app toggles `LogDriver`** — unlike Convox's native per-app group. It's created never-expire,
+so history is retained.
+
+> ⚠️ **One-time caveat:** switching an app *off* the native CloudWatch driver makes Convox delete
+> **its** managed group (`gm-test-<app>-LogGroup-…`) and the logs in it — CloudWatch deletion is
+> irreversible. For a real migration, **export/snapshot the native group first** (e.g. to S3), then
+> switch. After the switch, this collector-owned group persists across toggles.
+>
+> Note: `convox logs -a <app>` still won't work once the app is on Syslog (Convox has no group for
+> it); use `aws logs tail "$CW_LOG_GROUP"` or the Oodle UI instead.
 
 ## Notes
 
@@ -93,6 +112,7 @@ make clean            # also delete the agent app
 ## Verified
 
 rails-demo → `LogDriver=Syslog` (`tcp://localhost:5140`) → host-local OTel agent → fan-out:
-- **CloudWatch** `/oodle-demo/rails-demo` receives the parsed logs (structured + resource tags).
+- **CloudWatch** — the original group (`$CW_LOG_GROUP`) receives the **raw Rails log lines**
+  (same format as the native awslogs driver), never-expire retention.
 - **Oodle** OTLP logs endpoint returns 200 and the collector reports no export errors.
 - Port 5140 is bound host-local and reachable only within the VPC (`10.0.0.0/16`), not public.
