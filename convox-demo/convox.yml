@@ -1,0 +1,20 @@
+# Convox v2 (generation 2) manifest.
+# Deploys the Rails web service. No database — this demo is intentionally stateless.
+environment:
+  - RAILS_ENV=production
+  - RAILS_LOG_TO_STDOUT=true
+  - RAILS_SERVE_STATIC_FILES=true
+  - RAILS_MAX_THREADS=5
+  - SECRET_KEY_BASE
+services:
+  web:
+    build: .
+    port: 3000
+    health:
+      path: /up
+      interval: 10
+      timeout: 5
+    scale:
+      count: 1
+      cpu: 128
+      memory: 256
