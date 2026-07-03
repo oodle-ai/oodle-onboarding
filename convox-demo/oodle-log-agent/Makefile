@@ -32,7 +32,11 @@ iam: ## Grant the agent task role CloudWatch Logs write access
 deploy: ## Build & deploy the agent (must be running BEFORE enabling syslog)
 	convox deploy -a $(APP) -r $(RACK)
 
-preserve-history: ## Copy an app's existing CloudWatch history to a persistent group BEFORE switching (SRC=<managed-group> DST=<persistent-group>)
+retain-loggroup: ## Logically retain an app's managed LogGroup BEFORE switching, so it's orphaned not deleted (STACK=<rack>-<app>)
+	@test -n "$(STACK)" || { echo "usage: make retain-loggroup STACK=<rack>-<app>  (e.g. gm-test-rails-demo)"; exit 1; }
+	./retain-loggroup.sh $(STACK) $(REGION)
+
+preserve-history: ## Alt: copy an app's existing CloudWatch history to a persistent group BEFORE switching (SRC=<managed-group> DST=<persistent-group>)
 	@test -n "$(SRC)" && test -n "$(DST)" || { echo "usage: make preserve-history SRC=<managed-group> DST=<persistent-group>"; exit 1; }
 	./preserve-history.sh $(SRC) $(DST) $(REGION)
 
