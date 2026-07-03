@@ -97,6 +97,35 @@ so history is retained.
 > Note: `convox logs -a <app>` still won't work once the app is on Syslog (Convox has no group for
 > it); use `aws logs tail "$CW_LOG_GROUP"` or the Oodle UI instead.
 
+## Migrating an existing app without losing history
+
+Switching a Convox app off the CloudWatch driver **deletes its Convox-managed LogGroup and all
+its history** — verified: `LogDriver=""` and `LogDriver=Syslog` both delete it, and there is no
+Convox retain option. So **preserve the history before you switch**, into a persistent
+(non-Convox) group the collector will keep appending to. One group ends up with history + new
+logs; nothing is lost (only the group *name* changes).
+
+```bash
+# 1. Copy existing history OUT of the managed group into a persistent group (BEFORE switching).
+#    Recent logs (< 14 days) — verified end-to-end:
+./preserve-history.sh gm-test-rails-demo-LogGroup-XXXX  rails-demo-logs  us-east-1
+#    Older/large archives — CloudWatch PutLogEvents rejects events > 14 days old, so export the
+#    whole group to S3 instead (no age limit):
+#    aws logs create-export-task --log-group-name <managed-group> --from 0 --to $(date +%s)000 \
+#      --destination <s3-bucket> --destination-prefix <managed-group>
+
+# 2. Point the collector at that persistent group and deploy.
+convox env set CW_LOG_GROUP=rails-demo-logs -a oodle-log-agent -r <rack>
+make deploy
+
+# 3. Switch the app to syslog. Convox deletes its managed group, but history is already safe
+#    in rails-demo-logs, and the collector now appends new logs there.
+make enable-syslog
+```
+
+Because the persistent group is owned by the collector (not Convox CloudFormation), it survives
+all future `LogDriver` toggles.
+
 ## Notes
 
 - **Gen-2 agent port syntax gotcha:** host ports must be declared under the `agent:` map

@@ -7,6 +7,7 @@ RACK       ?= org-team-i4e/gm-test
 APP        ?= oodle-log-agent
 TARGET_APP ?= rails-demo
 SYSLOG_PORT ?= 5140
+REGION     ?= us-east-1
 # AWS managed policy granting CloudWatch Logs create/put (for the awscloudwatchlogs exporter).
 IAM_POLICY ?= arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
 
@@ -30,6 +31,10 @@ iam: ## Grant the agent task role CloudWatch Logs write access
 
 deploy: ## Build & deploy the agent (must be running BEFORE enabling syslog)
 	convox deploy -a $(APP) -r $(RACK)
+
+preserve-history: ## Copy an app's existing CloudWatch history to a persistent group BEFORE switching (SRC=<managed-group> DST=<persistent-group>)
+	@test -n "$(SRC)" && test -n "$(DST)" || { echo "usage: make preserve-history SRC=<managed-group> DST=<persistent-group>"; exit 1; }
+	./preserve-history.sh $(SRC) $(DST) $(REGION)
 
 enable-syslog: ## Point rails-demo's logs at the host-local agent (per-app, not rack-wide)
 	convox apps params set LogDriver=Syslog SyslogDestination=tcp://localhost:$(SYSLOG_PORT) SyslogFormat=rfc5424 \
