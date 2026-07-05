@@ -1,0 +1,37 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: pydantic-ai-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4320:4318"
+      - "13135:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - pydantic-ai-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: pydantic-ai-demo-app
+    ports:
+      - "8091:8091"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MODEL=${MODEL:-openai:gpt-4o-mini}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8091
+    depends_on:
+      - otel-collector
+    networks:
+      - pydantic-ai-net
+
+networks:
+  pydantic-ai-net:
+    driver: bridge
