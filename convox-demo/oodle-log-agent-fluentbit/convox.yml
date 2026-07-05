@@ -1,0 +1,19 @@
+# Convox v2 (generation 2) manifest for the Fluent Bit host-local log agent.
+#
+# Runs as an agent (one per rack instance, DaemonSet-style) on host port 5141 — DELIBERATELY
+# different from the OTel agent's 5140 so both can run side by side during validation.
+# `ports` is nested under `agent:` (gen-2 syntax; top-level ports on an agent are ignored).
+environment:
+  - OODLE_INSTANCE
+  - OODLE_API_KEY
+  - RACK_PREFIX          # short rack name (e.g. gm-test) — used to clean up the app name
+services:
+  collector:
+    agent:
+      enabled: true
+      ports:
+        - 5141/tcp
+    build: .
+    scale:
+      cpu: 128
+      memory: 256
