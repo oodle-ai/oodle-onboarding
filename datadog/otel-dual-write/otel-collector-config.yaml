@@ -1,0 +1,65 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  batch:
+    send_batch_max_size: 100
+    send_batch_size: 10
+    timeout: 10s
+
+connectors:
+  datadog/connector:
+    traces:
+      compute_top_level_by_span_kind: true
+
+exporters:
+  datadog/exporter:
+    api:
+      site: ${env:DD_SITE}
+      key: ${env:DD_API_KEY}
+    traces:
+      compute_top_level_by_span_kind: true
+
+  otlphttp/oodle:
+    endpoint: "https://${env:OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      X-OODLE-INSTANCE: "${env:OODLE_INSTANCE}"
+      X-API-KEY: "${env:OODLE_API_KEY}"
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 2s
+      max_interval: 45s
+      max_elapsed_time: 12m
+
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [datadog/connector, datadog/exporter, otlphttp/oodle, debug]
+    metrics:
+      receivers: [otlp, datadog/connector]
+      processors: [memory_limiter, batch]
+      exporters: [datadog/exporter, otlphttp/oodle]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [datadog/exporter, otlphttp/oodle]

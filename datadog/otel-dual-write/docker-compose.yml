@@ -1,0 +1,64 @@
+name: datadog-otel-dual-write
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=${DD_SITE:-datadoghq.com}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+    networks:
+      - otel-net
+
+  demo-app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: otel-demo-app
+    ports:
+      - "8080:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - OTEL_SERVICE_NAME=datadog-demo
+    depends_on:
+      - otel-collector
+    networks:
+      - otel-net
+
+  load-generator:
+    image: alpine:latest
+    container_name: otel-load-generator
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache curl > /dev/null 2>&1
+        DURATION=$${LOAD_DURATION:-86400}
+        INTERVAL=$${LOAD_INTERVAL:-3}
+        END=$$(( $$(date +%s) + DURATION ))
+        echo "Generating load for $${DURATION}s (every $${INTERVAL}s)..."
+        while [ $$(date +%s) -lt $$END ]; do
+          curl -s -X POST http://otel-demo-app:8080/api/order > /dev/null
+          curl -s http://otel-demo-app:8080/api/users > /dev/null
+          sleep $$INTERVAL
+        done
+        echo "Load generation complete."
+    environment:
+      - LOAD_DURATION=${LOAD_DURATION:-86400}
+      - LOAD_INTERVAL=${LOAD_INTERVAL:-3}
+    depends_on:
+      - demo-app
+    networks:
+      - otel-net
+
+networks:
+  otel-net:
+    driver: bridge
