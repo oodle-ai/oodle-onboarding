@@ -19,6 +19,7 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
 | None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
+| None (greenfield) | Traces | AI agent observability (Pydantic AI + any LLM) | [pydantic-ai-demo](pydantic-ai-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
 
@@ -131,6 +132,19 @@ LLM observability using the official OpenTelemetry GenAI instrumentation package
 - Collector: OTel Collector exporting to Oodle via OTLP
 - Requires: Google Gemini API key + Oodle credentials
 - Oodle onboarding guide: [OODLE_ONBOARDING.md](llmops-otel-demo/OODLE_ONBOARDING.md)
+
+### pydantic-ai-demo
+
+AI agent observability using Pydantic AI with built-in OpenTelemetry instrumentation. A Python FastAPI app runs multiple Pydantic AI agents (chat, structured output, tool use, multi-agent workflows) and exports traces to Oodle via OTel Collector. Uses `Agent.instrument_all()` to automatically emit spans following GenAI semantic conventions (`gen_ai.*`) — no manual instrumentation required.
+
+- Languages: Python
+- Infra: Docker Compose
+- Signals: Traces (LLM agent-specific)
+- Instrumentation: Pydantic AI built-in OTel (`Agent.instrument_all()` with `InstrumentationSettings`)
+- Collector: OTel Collector exporting to Oodle via OTLP
+- Requires: LLM provider API key (OpenAI, Google, or Anthropic) + Oodle credentials
+- Config files: `otel-collector-config.yaml`, `docker-compose.yml`
+- Spans emitted: `invoke_agent` (agent run), `chat` (model request), `execute_tool` (tool execution)
 
 ### k8s-otel-operator
 
