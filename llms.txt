@@ -15,6 +15,7 @@ Pick by your current stack and what you want to send:
 | OpenSearch | Logs | Dual-write (keep OS + add Oodle) | [opensearch-alternative/dual-write](opensearch-alternative/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Dual-write (keep DD + add Oodle) | [datadog/dual-write](datadog/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
+| Datadog (OTel) | Traces, metrics, logs | Dual-write from OTel Collector to Datadog + Oodle | [datadog/otel-dual-write](datadog/otel-dual-write/README.md) |
 | Datadog (AWS ECS) | Metrics, traces, logs | Single ECS task on Datadog — Fargate + EC2 (Terraform) | [datadog/ecs](datadog/ecs/README.md) |
 | None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
@@ -86,6 +87,17 @@ Baseline Datadog-only setup (no Oodle). Same Go demo app sending metrics, traces
 - Signals: Metrics, traces, logs
 - Agent: Datadog Agent
 - Requires: Datadog API key
+
+### datadog/otel-dual-write
+
+Dual-write from an OTel Collector to both Datadog and Oodle. A Go demo app sends OTLP traces to the collector, which fans out via `datadog/connector` + `datadog/exporter` and `otlphttp/oodle`. Mirrors the sidecar pattern used in Cloud Run / Knative deployments. Includes a built-in load generator for sustained traffic.
+
+- Languages: Go
+- Infra: Docker Compose
+- Signals: Traces, metrics, logs
+- Collector: OTel Collector Contrib v0.114.0 with `datadog/connector`, `datadog/exporter`, `otlphttp/oodle`
+- Config files: `otel-collector-config.yaml`, `docker-compose.yml`
+- Requires: Datadog API key + Oodle credentials
 
 ### datadog/ecs
 
