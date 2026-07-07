@@ -11,6 +11,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [opensearch-alternative/dual-write](./opensearch-alternative/dual-write) | Logs | Migrate from OpenSearch — dual-write to OS + Oodle via Fluent Bit, Vector, or OTel Collector |
 | [datadog/dual-write](./datadog/dual-write) | Metrics, traces, logs | Dual-ship from Datadog Agent to both Datadog and Oodle using native `DD_ADDITIONAL_ENDPOINTS` |
 | [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
+| [datadog/oodle-single-write](./datadog/oodle-single-write) | Metrics, traces, logs | Send from Datadog Agent to Oodle only — redirect primary endpoints, no data to Datadog |
 | [datadog/otel-dual-write](./datadog/otel-dual-write) | Traces, metrics, logs | Dual-write from OTel Collector to both Datadog and Oodle — mirrors a Cloud Run sidecar pattern |
 | [datadog/ecs](./datadog/ecs) | Metrics, traces, logs | Terraform demos running a single Datadog-instrumented ECS task — Fargate and EC2 flavors — via the `terraform-aws-ecs-datadog` module, plus the account-level AWS integration |
 | [tracing-demo](./tracing-demo) | Traces | End-to-end distributed tracing across Go, Java, and Python microservices with OpenTelemetry |
