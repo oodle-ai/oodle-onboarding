@@ -56,8 +56,12 @@ var stats *statsd.Client
 
 func main() {
 	// Start the Datadog APM tracer
+	service := os.Getenv("DD_SERVICE")
+	if service == "" {
+		service = "datadog-demo"
+	}
 	tracer.Start(
-		tracer.WithService("datadog-demo"),
+		tracer.WithService(service),
 		tracer.WithEnv("demo"),
 		tracer.WithServiceVersion("1.0.0"),
 	)

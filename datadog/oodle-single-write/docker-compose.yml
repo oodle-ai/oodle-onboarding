@@ -1,0 +1,54 @@
+name: datadog-oodle-single-write
+
+services:
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: datadog-agent-oodle
+    environment:
+      - DD_API_KEY=${OODLE_API_KEY}
+      - DD_APM_ENABLED=true
+      - DD_APM_NON_LOCAL_TRAFFIC=true
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+      - DD_PROCESS_AGENT_ENABLED=false
+      - DD_LOGS_ENABLED=true
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_CONTAINER_EXCLUDE=name:datadog-agent-oodle
+      - DD_LOG_LEVEL=info
+      # --- Redirect all endpoints to Oodle ---
+      - DD_DD_URL=https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog/${OODLE_INSTANCE_ID}
+      - DD_APM_DD_URL=https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog_traces/${OODLE_INSTANCE_ID}
+      - DD_LOGS_CONFIG_FORCE_USE_HTTP=true
+      - DD_LOGS_CONFIG_DD_URL=https://${OODLE_LOGS_COLLECTOR_DOMAIN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+      - "${DD_APM_PORT:-8126}:8126"
+      - "${DD_STATSD_PORT:-8125}:8125/udp"
+    networks:
+      - datadog-net
+
+  demo-app:
+    build:
+      context: ../single-write/app
+      dockerfile: Dockerfile
+    container_name: datadog-demo-app-oodle
+    labels:
+      com.datadoghq.ad.logs: '[{"source":"go","service":"datadog-oodle-demo"}]'
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - DD_AGENT_HOST=datadog-agent-oodle
+      - DD_TRACE_AGENT_PORT=8126
+      - DD_SERVICE=oodle-datadog-demo-single-write
+      - DD_ENV=demo
+      - DD_VERSION=1.0.0
+    depends_on:
+      - datadog-agent
+    networks:
+      - datadog-net
+
+networks:
+  datadog-net:
+    driver: bridge
