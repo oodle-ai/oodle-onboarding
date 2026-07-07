@@ -18,6 +18,34 @@ The agent is designed around a two-phase migration off CloudWatch:
 CloudWatch is a *removable output*, not the source of truth. Removing it fully removes CloudWatch
 from the path (not just downstream) — the goal of getting off CloudWatch.
 
+### Phase 0 — protect the app's EXISTING CloudWatch history (do this BEFORE the first switch)
+
+⚠️ **Switching an app off Convox's native CloudWatch driver DELETES its Convox-managed LogGroup
+and all its history** (verified — true for `LogDriver=Syslog` and `LogDriver=""`; Convox owns that
+group and tears it down on the switch). So before `make enable-syslog` on an app that has history
+worth keeping, do one of:
+
+- **Delete-protect it (no copy, recommended):** set `DeletionPolicy: Retain` on the app's managed
+  LogGroup so the switch **orphans** it (kept in place, same name, all history) instead of deleting
+  it — CloudFormation logs `DELETE_SKIPPED LogGroup`, zero data moved.
+  ```sh
+  make retain-loggroup STACK=<rack>-<app>      # e.g. STACK=gm-test-rails-demo
+  ```
+  Result: the original group remains as a historical archive; the agent writes new logs to
+  `/convox/<app>`.
+
+- **Copy/unify it:** copy the existing history into a persistent group (pass the agent's per-app
+  group so history + new logs live together):
+  ```sh
+  make preserve-history SRC=<managed-group> DST=/convox/<app>
+  ```
+  Subject to CloudWatch's 14-day `PutLogEvents` age limit; for older/large archives, export the
+  source group to S3 (`aws logs create-export-task`, no age limit — the script prints the command).
+
+Helpers: `retain-loggroup.sh` (no-copy, `DeletionPolicy=Retain` via a one-time CloudFormation
+update) and `preserve-history.sh` (copy). Both are agent-agnostic — pure AWS operations run once
+per app, before you flip it to syslog.
+
 ### Phase 1 → Phase 2 (single-write)
 
 1. Delete the `cloudwatch_logs` `[OUTPUT]` block in `fluent-bit.conf` (clearly fenced with a
