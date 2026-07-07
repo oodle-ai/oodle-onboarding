@@ -1,0 +1,179 @@
+name: datadog-dbm
+
+x-postgres-common: &postgres-common
+  image: postgres:15
+  command:
+    - postgres
+    - -c
+    - shared_preload_libraries=pg_stat_statements
+    - -c
+    - track_activity_query_size=4096
+    - -c
+    - pg_stat_statements.track=all
+    - -c
+    - track_io_timing=on
+  environment:
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    DBM_MONITORING_PASSWORD: ${DBM_MONITORING_PASSWORD:-datadog}
+  volumes:
+    - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql.template:ro
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  networks:
+    - dbm-net
+
+services:
+  orders-db:
+    <<: *postgres-common
+    container_name: dbm-orders-db
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DBM_MONITORING_PASSWORD: ${DBM_MONITORING_PASSWORD:-datadog}
+    volumes:
+      - orders-data:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql.template:ro
+    ports:
+      - "5432:5432"
+
+  analytics-db:
+    <<: *postgres-common
+    container_name: dbm-analytics-db
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DBM_MONITORING_PASSWORD: ${DBM_MONITORING_PASSWORD:-datadog}
+    volumes:
+      - analytics-data:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql.template:ro
+    ports:
+      - "5433:5432"
+
+  inventory-db:
+    <<: *postgres-common
+    container_name: dbm-inventory-db
+    environment:
+      POSTGRES_DB: inventory
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DBM_MONITORING_PASSWORD: ${DBM_MONITORING_PASSWORD:-datadog}
+    volumes:
+      - inventory-data:/var/lib/postgresql/data
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql.template:ro
+    ports:
+      - "5434:5432"
+
+  datadog-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: dbm-datadog-agent
+    environment:
+      DD_API_KEY: ${OODLE_API_KEY}
+      DD_SITE: datadoghq.com
+      DD_DD_URL: ${DD_DD_URL}
+      DD_DATABASE_MONITORING_SAMPLES_LOGS_DD_URL: ${DD_DATABASE_MONITORING_SAMPLES_LOGS_DD_URL}
+      DD_DATABASE_MONITORING_ACTIVITY_LOGS_DD_URL: ${DD_DATABASE_MONITORING_ACTIVITY_LOGS_DD_URL}
+      DD_DATABASE_MONITORING_METRICS_LOGS_DD_URL: ${DD_DATABASE_MONITORING_METRICS_LOGS_DD_URL}
+      DD_LOGS_ENABLED: "true"
+      DD_LOGS_NO_SSL: "false"
+      DD_APM_ENABLED: "false"
+      DD_PROCESS_AGENT_ENABLED: "false"
+      DD_LOG_LEVEL: info
+      DD_HOSTNAME: dbm-demo
+      DBM_MONITORING_PASSWORD: ${DBM_MONITORING_PASSWORD:-datadog}
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        mkdir -p /etc/datadog-agent/conf.d/postgres.d
+        cat > /etc/datadog-agent/conf.d/postgres.d/conf.yaml <<PGCONF
+        init_config:
+        instances:
+          - host: orders-db
+            port: 5432
+            username: datadog
+            password: '$${DBM_MONITORING_PASSWORD}'
+            dbname: orders
+            dbm: true
+            collect_raw_query_statement:
+              enabled: true
+            collect_schemas:
+              enabled: true
+            relations:
+              - relation_regex: '.*'
+            query_samples:
+              enabled: true
+              explain_function: datadog.explain_statement
+          - host: analytics-db
+            port: 5432
+            username: datadog
+            password: '$${DBM_MONITORING_PASSWORD}'
+            dbname: analytics
+            dbm: true
+            collect_raw_query_statement:
+              enabled: true
+            collect_schemas:
+              enabled: true
+            relations:
+              - relation_regex: '.*'
+            query_samples:
+              enabled: true
+              explain_function: datadog.explain_statement
+          - host: inventory-db
+            port: 5432
+            username: datadog
+            password: '$${DBM_MONITORING_PASSWORD}'
+            dbname: inventory
+            dbm: true
+            collect_raw_query_statement:
+              enabled: true
+            collect_schemas:
+              enabled: true
+            relations:
+              - relation_regex: '.*'
+            query_samples:
+              enabled: true
+              explain_function: datadog.explain_statement
+        PGCONF
+        exec /init
+    depends_on:
+      orders-db:
+        condition: service_healthy
+      analytics-db:
+        condition: service_healthy
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - dbm-net
+
+  workload:
+    image: postgres:15
+    container_name: dbm-workload
+    entrypoint: ["bash", "/workload/generate.sh"]
+    environment:
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./workload/generate.sh:/workload/generate.sh:ro
+    depends_on:
+      orders-db:
+        condition: service_healthy
+      analytics-db:
+        condition: service_healthy
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - dbm-net
+
+volumes:
+  orders-data:
+  analytics-data:
+  inventory-data:
+
+networks:
+  dbm-net:
+    driver: bridge
