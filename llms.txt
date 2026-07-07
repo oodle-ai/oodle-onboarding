@@ -194,15 +194,15 @@ Self-hosted Temporal with an order processing workflow in Python, fully instrume
 
 ### convox-demo
 
-Deploy a sample stateless Rails 7.1 app on Convox v2 (generation 2, AWS ECS) and dual-write its logs to both CloudWatch and Oodle -- with no application code changes. An OTel Collector runs as a Convox agent (one per rack instance) receiving the app's logs via Convox's per-app Syslog log driver (`tcp://localhost:5140`), then fans out to CloudWatch and Oodle. The collector is the fan-out point, so CloudWatch is a removable exporter -- delete it to drop CloudWatch from the ingestion path while Oodle keeps flowing. The Syslog driver is a per-app parameter, so only the demo app is affected; other apps keep CloudWatch and `convox logs`.
+Deploy a sample stateless Rails 7.1 app on Convox v2 (generation 2, AWS ECS) and route its logs to Oodle via a host-local Fluent Bit agent -- with no application code changes. Fluent Bit runs as a Convox agent (one per rack instance) receiving apps' logs via Convox's per-app Syslog log driver (`tcp://localhost:5140`). Convox's syslog driver sends no tag (only the container short-id), so the agent's `ecs` filter resolves each record's short-id to its app name via the ECS Agent introspection API -- reachable at the docker bridge gateway `172.17.0.1:51678` in Convox's bridge networking -- giving per-app routing with no per-app config. Migration is two-phase: dual-write to a per-app CloudWatch group + Oodle, then delete the CloudWatch output for single-write to Oodle only. The Syslog driver is a per-app parameter, so only opted-in apps are affected; others keep CloudWatch and `convox logs`.
 
 - Languages: Ruby (Rails 7.1)
 - Infra: Convox v2 (AWS ECS/EC2) -- not Docker Compose
 - Signals: Logs
-- Mechanism: per-app `LogDriver=Syslog` -> host-local OTel agent -> `awscloudwatchlogs` + `otlphttp/oodle`
-- Config files: `convox-demo/oodle-log-agent/otel-collector-config.yaml`, `convox-demo/oodle-log-agent/convox.yml`
-- Requires: Convox CLI + a generation-2 rack, Oodle credentials (set via `convox env set`)
-- Usage: `cd convox-demo/oodle-log-agent && make up` (wraps `convox deploy` + per-app param switch)
+- Mechanism: per-app `LogDriver=Syslog` -> host-local Fluent Bit agent (`ecs` filter via ECS introspection) -> `cloudwatch_logs` (dual-write) + `http` -> Oodle `/ingest/v1/logs`
+- Config files: `convox-demo/oodle-log-agent/fluent-bit.conf`, `convox-demo/oodle-log-agent/convox.yml`
+- Requires: Convox CLI + a generation-2 rack (EC2 launch type), Oodle credentials (set via `convox env set`)
+- Usage: `cd convox-demo/oodle-log-agent && make up && make enable-syslog` (wraps `convox deploy` + per-app param switch)
 
 ## Oodle Configuration
 

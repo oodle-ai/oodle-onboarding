@@ -1,7 +1,8 @@
-# OTel Collector contrib — has the syslog receiver + awscloudwatchlogs exporter.
-FROM otel/opentelemetry-collector-contrib:0.155.0
+# aws-for-fluent-bit bundles the syslog input, `ecs` filter, and the cloudwatch_logs + http
+# outputs we need — all built-in C plugins, no `-e` Go plugin loads required.
+# The base image's default CMD runs `-c /fluent-bit/etc/fluent-bit.conf`, which we overwrite.
+FROM public.ecr.aws/aws-observability/aws-for-fluent-bit:stable
 
-COPY otel-collector-config.yaml /etc/otel/config.yaml
-
-# Base image ENTRYPOINT is the collector binary; these are its args.
-CMD ["--config", "/etc/otel/config.yaml"]
+COPY fluent-bit.conf     /fluent-bit/etc/fluent-bit.conf
+COPY parsers-convox.conf /fluent-bit/etc/parsers-convox.conf
+COPY derive_app.lua      /fluent-bit/etc/derive_app.lua

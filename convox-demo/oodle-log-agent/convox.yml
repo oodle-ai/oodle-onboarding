@@ -1,12 +1,12 @@
-# Convox v2 (generation 2) manifest for the host-local OTel log agent.
+# Convox v2 (generation 2) manifest for the Fluent Bit host-local log agent.
 #
-# `agent.enabled: true` runs one collector on EVERY rack instance (DaemonSet-style) and
-# publishes the host port, so rails-demo's Syslog log driver can target tcp://localhost:5140
-# on the same host. NOTE the gen-2 syntax: `ports` is nested under `agent:` (not top-level).
+# Runs as an agent (one per rack instance, DaemonSet-style) binding host port 5140, so any app's
+# Syslog log driver can target tcp://localhost:5140 on the same host.
+# `ports` is nested under `agent:` (gen-2 syntax; top-level ports on an agent are ignored).
 environment:
   - OODLE_INSTANCE
   - OODLE_API_KEY
-  - CW_LOG_GROUP
+  - RACK_PREFIX          # short rack name (e.g. gm-test) — used to clean up the app name
 services:
   collector:
     agent:
