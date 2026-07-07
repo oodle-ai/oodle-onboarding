@@ -43,28 +43,34 @@ Data is sent **only to Oodle** — no data goes to Datadog. The agent uses `DD_D
 ## Prerequisites
 
 - Docker and Docker Compose
-- [Oodle account](https://app.oodle.ai) with a configured Datadog DBM integration
+- An Oodle account with a configured Datadog DBM integration
 
 ## Quick Start
 
-1. **Configure environment**
+1. **Get your credentials** from the Oodle DBM integration settings page:
+   ```
+   https://<deployment>.oodle.ai/settings?integration=DB_MONITORING
+   ```
+   Where `<deployment>` is your Oodle deployment (e.g. `us1`, `ap1`).
+
+2. **Configure environment**
    ```bash
    cp .env.example .env
-   # Edit .env and fill in your Oodle values
+   # Paste the API key and collector URLs from the integration page
    ```
 
-2. **Start services**
+3. **Start services**
    ```bash
    make up
    ```
 
-3. **Verify the agent is collecting**
+4. **Verify the agent is collecting**
    ```bash
    make logs-agent
    # Look for: "check:postgres | Running check..." for all three hosts
    ```
 
-4. **View in Oodle**
+5. **View in Oodle**
    - Database Monitoring — three hosts (orders-db, analytics-db, inventory-db) with query samples, explain plans, and activity
 
 ## Environment Variables
