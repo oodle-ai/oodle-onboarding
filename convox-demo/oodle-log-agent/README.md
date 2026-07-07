@@ -1,165 +1,111 @@
-# oodle-log-agent — dual-write Convox logs to CloudWatch + Oodle
+# Fluent Bit log agent — per-app routing via ECS introspection
 
-Ships `rails-demo`'s logs to **both CloudWatch and Oodle** with **no application code
-changes**, using a host-local OpenTelemetry Collector as the fan-out point.
+A host-local **Fluent Bit** log agent for Convox v2 (generation 2, ECS/EC2) that ships each
+app's logs to **Oodle** — and, during migration, **dual-writes** to CloudWatch too — deriving
+the app identity **per record** with **no per-app configuration** and **no application code
+changes**.
 
-## Why this shape
+## Migration path
 
-Convox v2's default `LogDriver=CloudWatch` makes CloudWatch the source of truth — anything
-downstream (Firehose, subscription filters, an OTel `awscloudwatch` receiver) keeps
-CloudWatch permanently load-bearing. Instead we make the **collector** the fan-out:
+The agent is designed around a two-phase migration off CloudWatch:
+
+| Phase | Outputs | CloudWatch role |
+|-------|---------|-----------------|
+| **1 — Dual-write** (default in this repo) | `cloudwatch_logs` **+** Oodle `http` | still written (one group per app), so nothing downstream breaks while you validate Oodle |
+| **2 — Single-write** | Oodle `http` only | dropped from the ingestion path entirely |
+
+**Why an agent, not CloudWatch subscription/pull:** the agent is the fan-out point, so
+CloudWatch is a *removable output*, not the source of truth. Removing it fully removes CloudWatch
+from the path (not just downstream) — the goal of getting off CloudWatch.
+
+### Phase 1 → Phase 2 (single-write)
+
+1. Delete the `cloudwatch_logs` `[OUTPUT]` block in `fluent-bit.conf` (clearly fenced with a
+   `DUAL-WRITE ONLY` banner).
+2. Drop the agent's CloudWatch IAM: `convox apps params set IamPolicy="" -a oodle-log-agent -r <rack>`.
+3. `make deploy`.
+
+Oodle keeps flowing throughout; no app is touched. To cut a *specific* app over first, only its
+`LogDriver` is changed (`make enable-syslog TARGET_APP=<app>`), so the switch is per-app and reversible.
+
+## The problem it solves
+
+Convox's `LogDriver=Syslog` runs Docker's syslog driver with **no `tag`**, so the rfc5424
+`APP-NAME` field carries only the **container short-id** (e.g. `02a2b9e2f2c0`), not the app
+name — and there is no Convox param to set the tag. A single shared agent therefore can't tell
+apps apart from the payload alone.
+
+Fluent Bit's **`ecs` filter** resolves that short-id to ECS task metadata (the app name) by
+querying the **ECS Agent introspection API**. The catch on Convox: agents run in ECS **bridge**
+networking, so the introspection endpoint is NOT reachable on `127.0.0.1:51678` (the container's
+own loopback). It **is** reachable on the **docker bridge gateway `172.17.0.1:51678`** (verified
+on `gm-test`), which is what `ECS_Meta_Host` points at.
+
+## Pipeline
 
 ```
-each EC2 instance in the rack:
-  rails-demo containers' stdout/stderr
-     │  Convox APP param on rails-demo only: LogDriver=Syslog, SyslogDestination=tcp://localhost:5140
-     ▼
-  OTel Collector  (Convox agent — agent.enabled:true → one per host, binds host port 5140)
-     ├─ exporter awscloudwatchlogs ─▶ CloudWatch   ← delete this to drop CloudWatch later
-     └─ exporter otlphttp/oodle ────▶ Oodle  /ingest/otel/v1/logs
+app (LogDriver=Syslog, dest tcp://localhost:5140)
+   │  Docker syslog rfc5424: APP-NAME = container short-id
+   ▼
+Fluent Bit agent (agent: one per host, host port 5140)
+   syslog input ──▶ rewrite_tag (short-id -> tag) ──▶ ecs filter (introspection @172.17.0.1:51678)
+                 ──▶ lua (clean app name -> Oodle canonical `service`)
+   ├─ cloudwatch_logs ──▶ /convox/<app>            (Phase 1 only — one group per app, auto-created)
+   └─ http            ──▶ Oodle /ingest/v1/logs    (JSON, gzip, per Oodle's logs_fluent_bit spec)
 ```
 
-- **No app changes** — logs leave via Convox's per-app Syslog log driver (a param), not the app.
-- **Collector owns fan-out** — CloudWatch is one exporter. Remove it + redeploy and CloudWatch
-  is out of the *ingestion path* entirely; Oodle keeps flowing.
-- **Host-local** — the driver targets `localhost:5140`, delivered to the agent on the same
-  host. No TLS, no cross-host endpoint, no rack-wide dependency.
+### Oodle canonical field mapping
 
-## Scope & tradeoff
+Oodle indexes a fixed set of top-level log fields. The agent emits **those names** (not custom
+ones) so enrichment is directly filterable in Oodle instead of buried in the nested `log.*` blob:
 
-The syslog driver is set as a **per-app parameter on `rails-demo`** (not rack-wide), so:
-- Only `rails-demo`'s logs redirect to the collector.
-- **`convox logs -a rails-demo` stops working** (its logs go via syslog now).
-- Every other app on the rack — and the agent itself — keeps CloudWatch and `convox logs`.
+| Source (ECS introspection / syslog) | Oodle canonical field |
+|-------------------------------------|-----------------------|
+| clean app name (from `$TaskDefinitionFamily`) | `service` |
+| `$TaskDefinitionFamily`             | `task_definition`     |
+| `$TaskID`                           | `task_id`             |
+| `$ECSContainerName`                 | `container_name`      |
+| container short-id (syslog appname) | `container_id`        |
+| `$ClusterName`                      | `cluster`             |
+
+After this, `service = <app>` is a first-class filter in the Oodle Logs Explorer / CLI.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `otel-collector-config.yaml` | syslog receiver (rfc5424) → `awscloudwatchlogs` + `otlphttp/oodle` |
-| `convox.yml` | Convox agent (`agent.enabled: true` + nested `ports`) binding host port 5140 |
-| `Dockerfile` | `otel/opentelemetry-collector-contrib` + baked config |
-| `Makefile` | `up` / `enable-syslog` / `disable-syslog` / `down` / `clean` |
-| `.env.example` | `OODLE_INSTANCE`, `OODLE_API_KEY`, `RACK`, `APP` |
+- `fluent-bit.conf` — the pipeline (syslog in → rewrite_tag → ecs → lua → cloudwatch_logs + http + debug stdout).
+- `parsers-convox.conf` — rfc5424 parser for Convox's Docker syslog output (names the app-name group `appname`).
+- `derive_app.lua` — reduces the ECS family to a clean app name and maps to `service`/`container_id`.
+- `Dockerfile` — `aws-for-fluent-bit` (has syslog/ecs/cloudwatch_logs/http built in) + the config.
+- `convox.yml` — agent on host port 5140; env `OODLE_INSTANCE`, `OODLE_API_KEY`, `RACK_PREFIX`.
+- `Makefile` — deploy + enable/disable an app's syslog + logs/ps/down/clean.
 
-## Deploy
+## Usage
 
-```bash
-cd convox-demo/oodle-log-agent
-cp .env.example .env          # fill in OODLE_INSTANCE / OODLE_API_KEY
-make up                       # create app, grant IAM, deploy agent, switch rails-demo to syslog
+```sh
+cp .env.example .env               # fill OODLE_INSTANCE / OODLE_API_KEY / RACK_PREFIX (never committed)
+make up                            # create app, grant IAM (CloudWatch write), deploy the agent
+make enable-syslog                 # point rails-demo's logs at this agent (add TARGET_APP=<app> for others)
+make logs                          # watch enriched records (debug stdout shows service/task_*)
+make disable-syslog                # revert the app to native CloudWatch
 ```
 
-`make up` runs, in order:
-1. `convox apps create` + `convox env set OODLE_INSTANCE/OODLE_API_KEY`
-2. `convox apps params set IamPolicy=…CloudWatchAgentServerPolicy` — task role for the CW exporter
-3. `convox deploy` — **agent must be running before logs redirect**
-4. `convox apps params set LogDriver=Syslog SyslogDestination=tcp://localhost:5140 … -a rails-demo`
+Deploy the agent **before** enabling syslog on any app (the app's syslog driver needs something
+listening on the host port, or its containers fail to start). Oodle host/key are passed only via
+`convox env` — **never committed**. The debug `stdout` output in `fluent-bit.conf` is optional;
+remove it in production to halve the agent's own log volume.
 
-## Verify
+## Validated end to end (gm-test)
 
-```bash
-make ps                                   # one collector per rack instance, all running
-curl https://<rails-demo-endpoint>/       # generate traffic
-oodle logs query --query 'rails-demo' ... # logs appear in Oodle
-aws logs tail "$CW_LOG_GROUP" --region us-east-1          # same raw logs in CloudWatch
-```
+- ECS introspection reachable from a bridge-mode agent at `172.17.0.1:51678`; `/v1/tasks` is host-scoped.
+- Live rails-demo traffic: container short-id `02a2b9e2f2c0` → `service=rails-demo` per record.
+- CloudWatch group `/convox/rails-demo` auto-created with the enriched records (Phase 1).
+- Oodle HTTP output `HTTP status=200`; records filterable by `service=rails-demo` via the `oodle` CLI.
 
-## Drop CloudWatch later
+## Notes / limitations
 
-Remove the `awscloudwatchlogs` exporter (and its entry in the `logs` pipeline) from
-`otel-collector-config.yaml`, then `make deploy`. Oodle keeps receiving; CloudWatch stops.
-No app changes, no rack changes.
-
-## Roll back
-
-```bash
-make disable-syslog   # rails-demo → LogDriver=CloudWatch, restores `convox logs -a rails-demo`
-make clean            # also delete the agent app
-```
-
-## CloudWatch group & format parity
-
-The collector writes the CloudWatch copy to the **same group name the native Convox `awslogs`
-driver used** (set via `CW_LOG_GROUP`, e.g. `gm-test-rails-demo-LogGroup-…`), in the **same raw
-format** — a `transform` processor drops the syslog envelope so each event is the original Rails
-stdout line (not OTel JSON). So existing dashboards / metric filters / queries keep working.
-
-Because **this exporter owns the group (not Convox CloudFormation)**, it is **not deleted when
-the app toggles `LogDriver`** — unlike Convox's native per-app group. It's created never-expire,
-so history is retained.
-
-> ⚠️ **One-time caveat:** switching an app *off* the native CloudWatch driver makes Convox delete
-> **its** managed group (`gm-test-<app>-LogGroup-…`) and the logs in it — CloudWatch deletion is
-> irreversible. For a real migration, **export/snapshot the native group first** (e.g. to S3), then
-> switch. After the switch, this collector-owned group persists across toggles.
->
-> Note: `convox logs -a <app>` still won't work once the app is on Syslog (Convox has no group for
-> it); use `aws logs tail "$CW_LOG_GROUP"` or the Oodle UI instead.
-
-## Migrating an existing app without losing history
-
-Switching a Convox app off the CloudWatch driver **deletes its Convox-managed LogGroup and all
-its history** by default — verified: both `LogDriver=""` and `LogDriver=Syslog` delete it.
-
-### Recommended: logical retain (no copy) — verified
-
-Set `DeletionPolicy: Retain` on the managed LogGroup **before** switching. CloudFormation then
-**skips the delete** (`DELETE_SKIPPED LogGroup`) and *orphans* the group — it stays in place with
-the **same name, all history, and retention**, just no longer Convox-managed. No log data is
-moved. Point the collector at that same group and it appends new logs to it.
-
-```bash
-# 1. Retain the app's managed LogGroup (one-time CFN update; stack name is "<rack>-<app>").
-./retain-loggroup.sh gm-test-rails-demo us-east-1
-#    or:  make retain-loggroup STACK=gm-test-rails-demo
-
-# 2. Point the collector at the SAME group name and deploy.
-convox env set CW_LOG_GROUP=<that-managed-group-name> -a oodle-log-agent -r <rack>
-make deploy
-
-# 3. Switch the app to syslog. CloudFormation retains (orphans) the group; the collector
-#    now appends new logs to it. History + new logs stay unified in one group.
-make enable-syslog
-```
-
-Verified on a real Convox stack: after the switch the group survived (CFN logged
-`DELETE_SKIPPED LogGroup`), kept its historical events, name, and retention, and was orphaned from
-the stack (so it also survives all future `LogDriver` toggles).
-
-### Alternative: copy/export the history out (when you can't touch the stack)
-
-If you'd rather not modify the app's CloudFormation stack, copy history into a separate persistent
-group before switching (then set `CW_LOG_GROUP` to it):
-
-```bash
-./preserve-history.sh <managed-group> <persistent-group> us-east-1   # recent logs (< 14 days)
-```
-
-`PutLogEvents` rejects events older than 14 days, so for older/large archives export the whole
-group to S3 instead (no age limit, no CloudWatch group):
-
-```bash
-aws logs create-export-task --log-group-name <managed-group> --from 0 --to $(date +%s)000 \
-  --destination <s3-bucket> --destination-prefix <managed-group>
-```
-
-## Notes
-
-- **Gen-2 agent port syntax gotcha:** host ports must be declared under the `agent:` map
-  (`agent: {enabled: true, ports: [5140/tcp]}`). The `agent: true` boolean with a top-level
-  `ports:` is silently ignored on gen-2 ECS (no host port is published), so the syslog driver
-  gets `connection refused` and rails-demo tasks fail to start.
-- The syslog driver connects at container start; the **agent must already be listening** or
-  the rails-demo tasks won't start. Deploy order in `make up` handles this.
-- Convox's `rfc5424` syslog output parses cleanly with the OTel `syslog` receiver
-  (`protocol: rfc5424`) — verified end-to-end. If a future format changes that, adjust
-  `protocol` / `enable_octet_counting` in `otel-collector-config.yaml`.
-
-## Verified
-
-rails-demo → `LogDriver=Syslog` (`tcp://localhost:5140`) → host-local OTel agent → fan-out:
-- **CloudWatch** — the original group (`$CW_LOG_GROUP`) receives the **raw Rails log lines**
-  (same format as the native awslogs driver), never-expire retention.
-- **Oodle** OTLP logs endpoint returns 200 and the collector reports no export errors.
-- Port 5140 is bound host-local and reachable only within the VPC (`10.0.0.0/16`), not public.
+- **EC2 launch type only** — the `ecs` filter's introspection API is not available on Fargate.
+- `172.17.0.1` is the Docker default bridge gateway (stable on the ECS-optimized AMI). If a rack
+  uses a non-default bridge, derive the gateway at start instead of hardcoding.
+- `convox scale collector --count 0` does NOT stop an agent (DaemonSet) — use `make down` (which
+  deletes the app) to actually stop it.
+- Non-rfc5424 lines (occasional Convox framing) fail the parser and are dropped — harmless.
