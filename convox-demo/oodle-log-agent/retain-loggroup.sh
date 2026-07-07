@@ -8,8 +8,7 @@
 # Run this ONCE, BEFORE `make enable-syslog`. The original group is then kept in place with all
 # its history (orphaned, same name, same retention); the Fluent Bit agent writes NEW logs to its
 # own per-app group /convox/<app>. So after migration: original group = historical archive,
-# /convox/<app> = new logs. Want history + new logs unified in ONE group instead? Use
-# preserve-history.sh to copy the old group into /convox/<app> before switching.
+# /convox/<app> = new logs. No log data is ever copied.
 #
 #   ./retain-loggroup.sh <cfn-stack-name> [region]
 #   e.g. ./retain-loggroup.sh gm-test-rails-demo us-east-1

@@ -23,28 +23,18 @@ from the path (not just downstream) — the goal of getting off CloudWatch.
 ⚠️ **Switching an app off Convox's native CloudWatch driver DELETES its Convox-managed LogGroup
 and all its history** (verified — true for `LogDriver=Syslog` and `LogDriver=""`; Convox owns that
 group and tears it down on the switch). So before `make enable-syslog` on an app that has history
-worth keeping, do one of:
+worth keeping, delete-protect its group first (no copy — nothing is moved):
 
-- **Delete-protect it (no copy, recommended):** set `DeletionPolicy: Retain` on the app's managed
-  LogGroup so the switch **orphans** it (kept in place, same name, all history) instead of deleting
-  it — CloudFormation logs `DELETE_SKIPPED LogGroup`, zero data moved.
-  ```sh
-  make retain-loggroup STACK=<rack>-<app>      # e.g. STACK=gm-test-rails-demo
-  ```
-  Result: the original group remains as a historical archive; the agent writes new logs to
-  `/convox/<app>`.
+```sh
+make retain-loggroup STACK=<rack>-<app>      # e.g. STACK=gm-test-rails-demo
+```
 
-- **Copy/unify it:** copy the existing history into a persistent group (pass the agent's per-app
-  group so history + new logs live together):
-  ```sh
-  make preserve-history SRC=<managed-group> DST=/convox/<app>
-  ```
-  Subject to CloudWatch's 14-day `PutLogEvents` age limit; for older/large archives, export the
-  source group to S3 (`aws logs create-export-task`, no age limit — the script prints the command).
+This sets `DeletionPolicy: Retain` on the app's managed LogGroup via a one-time CloudFormation
+update, so the switch **orphans** the group (kept in place, same name, all history) instead of
+deleting it — CloudFormation logs `DELETE_SKIPPED LogGroup`, zero data moved. Afterward the
+original group remains as a historical archive and the agent writes new logs to `/convox/<app>`.
 
-Helpers: `retain-loggroup.sh` (no-copy, `DeletionPolicy=Retain` via a one-time CloudFormation
-update) and `preserve-history.sh` (copy). Both are agent-agnostic — pure AWS operations run once
-per app, before you flip it to syslog.
+Helper: `retain-loggroup.sh` — agent-agnostic (pure AWS), run once per app before you flip it to syslog.
 
 ### Phase 1 → Phase 2 (single-write)
 
