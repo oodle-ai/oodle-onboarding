@@ -17,6 +17,7 @@ Pick by your current stack and what you want to send:
 | Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
 | Datadog | Metrics, traces, logs | Oodle only via Datadog Agent (redirect primary endpoints) | [datadog/oodle-single-write](datadog/oodle-single-write/README.md) |
 | Datadog (OTel) | Traces, metrics, logs | Dual-write from OTel Collector to Datadog + Oodle | [datadog/otel-dual-write](datadog/otel-dual-write/README.md) |
+| Datadog | Database monitoring | DBM for PostgreSQL — query samples, explain plans, schemas (Oodle only) | [datadog/dbm](datadog/dbm/README.md) |
 | Datadog (AWS ECS) | Metrics, traces, logs | Single ECS task on Datadog — Fargate + EC2 (Terraform) | [datadog/ecs](datadog/ecs/README.md) |
 | None (greenfield) | Traces | Multi-language OTel tracing (Go, Java, Python) | [tracing-demo](tracing-demo/README.md) |
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
@@ -110,6 +111,17 @@ Dual-write from an OTel Collector to both Datadog and Oodle. A Go demo app sends
 - Collector: OTel Collector Contrib v0.114.0 with `datadog/connector`, `datadog/exporter`, `otlphttp/oodle`
 - Config files: `otel-collector-config.yaml`, `docker-compose.yml`
 - Requires: Datadog API key + Oodle credentials
+
+### datadog/dbm
+
+Datadog Agent with Database Monitoring (DBM) for PostgreSQL, shipping exclusively to Oodle. Runs three local PostgreSQL 15 instances (orders-db, analytics-db, inventory-db) with pg_stat_statements enabled. The Datadog Agent collects query samples, explain plans, query activity, schema info, and relation metrics. A workload generator produces realistic SQL traffic across all three databases. Uses DD_DD_URL and DD_DATABASE_MONITORING_*_DD_URL to redirect all telemetry to Oodle (no data goes to Datadog).
+
+- Languages: none (psql workload generator)
+- Infra: Docker Compose
+- Signals: Database monitoring (query samples, explain plans, activity, schemas, metrics)
+- Agent: Datadog Agent with DBM-enabled PostgreSQL check
+- Config files: `docker-compose.yml` (agent config generated at startup), `postgres/init.sql` (monitoring user + explain function)
+- Requires: Oodle API key + Oodle collector URLs (from DBM integration setup)
 
 ### datadog/ecs
 

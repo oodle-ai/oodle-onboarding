@@ -13,6 +13,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
 | [datadog/oodle-single-write](./datadog/oodle-single-write) | Metrics, traces, logs | Send from Datadog Agent to Oodle only — redirect primary endpoints, no data to Datadog |
 | [datadog/otel-dual-write](./datadog/otel-dual-write) | Traces, metrics, logs | Dual-write from OTel Collector to both Datadog and Oodle — mirrors a Cloud Run sidecar pattern |
+| [datadog/dbm](./datadog/dbm) | Database monitoring | Datadog Agent with Database Monitoring (DBM) for PostgreSQL — query samples, explain plans, schema info — shipping only to Oodle |
 | [datadog/ecs](./datadog/ecs) | Metrics, traces, logs | Terraform demos running a single Datadog-instrumented ECS task — Fargate and EC2 flavors — via the `terraform-aws-ecs-datadog` module, plus the account-level AWS integration |
 | [tracing-demo](./tracing-demo) | Traces | End-to-end distributed tracing across Go, Java, and Python microservices with OpenTelemetry |
 | [traceloop-demo](./traceloop-demo) | Traces | LLM observability using Traceloop's OpenLLMetry SDK with Google Gemini |
