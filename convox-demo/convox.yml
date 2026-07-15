@@ -1,5 +1,5 @@
 # Convox v2 (generation 2) manifest.
-# Deploys the Rails web service. No database — this demo is intentionally stateless.
+# Deploys the Rails web service backed by a Convox-managed Postgres resource.
 environment:
   - RAILS_ENV=production
   - RAILS_LOG_TO_STDOUT=true
@@ -15,6 +15,14 @@ environment:
   - DD_SERVICE=rails-demo
   - DD_ENV=sales
   - DD_VERSION=1.0.0
+# Convox-managed containerized Postgres. Linking it to `web` (below) injects
+# DATABASE_URL (+ DATABASE_HOST/PORT/USER/PASS/NAME) into the web container.
+resources:
+  database:
+    type: postgres
+    options:
+      version: "16"
+      storage: 10
 services:
   web:
     build: .
@@ -23,6 +31,8 @@ services:
       path: /up
       interval: 10
       timeout: 5
+    resources:
+      - database
     scale:
       count: 1
       cpu: 128
