@@ -1,0 +1,40 @@
+# Convox v2 (generation 2) manifest for the Datadog Agent host-local daemon.
+#
+# Runs as an agent (one per rack instance, DaemonSet-style) publishing the APM
+# receiver on host port 8126/tcp and DogStatsD on 8125/udp. Bridge-network app
+# containers on the same host reach it at the docker bridge gateway 172.17.0.1
+# (the same trick the Fluent Bit log agent uses to reach ECS introspection).
+# `ports` is nested under `agent:` (gen-2 syntax; top-level ports on an agent are ignored).
+#
+# Non-local traffic is REQUIRED: traces/metrics arrive from OTHER containers, not
+# the agent's own loopback, so the APM + DogStatsD listeners must bind 0.0.0.0.
+environment:
+  - DD_API_KEY                              # secret — injected via `convox env`
+  - DD_SITE=us5.datadoghq.com               # the API key belongs to the us5 org
+  - DD_APM_ENABLED=true
+  - DD_APM_ENV=sales
+  - DD_APM_ANALYZED_SPANS=rails-demo|rack.request=1
+  - DD_APM_NON_LOCAL_TRAFFIC=true           # accept traces from other containers
+  - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true     # accept DogStatsD from other containers
+  - DD_CONFIG_PROVIDERS=docker              # autodiscovery via the docker socket
+  - DD_LISTENERS=docker
+  - DD_LOGS_ENABLED=false
+  - DD_LOG_LEVEL=off
+  - DD_PROCESS_AGENT_ENABLED=true
+  - DD_TAGS=env:SALES
+services:
+  agent:
+    image: gcr.io/datadoghq/agent:7
+    agent:
+      enabled: true
+      ports:
+        - 8125/udp
+        - 8126/tcp
+    privileged: true
+    scale:
+      cpu: 128
+      memory: 512
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc/:/host/proc/
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup/
