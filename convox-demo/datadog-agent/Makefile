@@ -20,10 +20,20 @@ help: ## Show this help
 
 up: create deploy ## Create the agent app, set secrets, deploy the daemon (does NOT touch any app yet)
 
-create: ## Create the agent app (no-op if it exists) and set the DD secrets
+# Oodle dual-write endpoints (metrics + traces), built from .env. The DD Agent forwards a
+# copy of all metrics/APM traces to these alongside Datadog. JSON carries the Oodle API key,
+# so it's injected via `convox env` (declared, not valued, in convox.yml — never committed).
+OODLE_METRICS_EP = {"https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog/$(OODLE_INSTANCE_ID)":["$(OODLE_API_KEY)"]}
+OODLE_TRACES_EP  = {"https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog_traces/$(OODLE_INSTANCE_ID)":["$(OODLE_API_KEY)"]}
+
+create: ## Create the agent app (no-op if it exists) and set the DD secrets + Oodle dual-write
 	@convox apps create $(APP) -r $(RACK) 2>/dev/null || echo "app $(APP) already exists"
 	@test -n "$(DD_API_KEY)" || { echo "Set DD_API_KEY (copy .env.example to .env)"; exit 1; }
-	convox env set DD_API_KEY=$(DD_API_KEY) DD_SITE=$(DD_SITE) -a $(APP) -r $(RACK)
+	@test -n "$(OODLE_API_KEY)" || { echo "Set OODLE_API_KEY/OODLE_COLLECTOR_DOMAIN/OODLE_INSTANCE_ID for dual-write"; exit 1; }
+	convox env set DD_API_KEY=$(DD_API_KEY) DD_SITE=$(DD_SITE) \
+		'DD_ADDITIONAL_ENDPOINTS=$(OODLE_METRICS_EP)' \
+		'DD_APM_ADDITIONAL_ENDPOINTS=$(OODLE_TRACES_EP)' \
+		-a $(APP) -r $(RACK)
 
 deploy: ## Build & deploy the agent (must be running BEFORE apps send traces to it)
 	convox deploy -a $(APP) -r $(RACK)
