@@ -16,5 +16,11 @@ if ENV["DD_AGENT_HOST"].present?
 
     # Web request spans (operation `rack.request`) — matches DD_APM_ANALYZED_SPANS.
     c.tracing.instrument :rails
+
+    # Database spans. :active_record captures the SQL (as the span resource) for each
+    # query; :pg adds the low-level libpq driver spans. Together they show DB queries
+    # with SQL as child spans of each web request in Datadog APM.
+    c.tracing.instrument :active_record
+    c.tracing.instrument :pg
   end
 end

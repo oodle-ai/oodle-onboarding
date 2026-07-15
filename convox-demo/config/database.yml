@@ -1,0 +1,18 @@
+# PostgreSQL. In production the connection comes from DATABASE_URL, which the Convox
+# `database` resource (type: postgres) injects into the linked web service.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+
+development:
+  <<: *default
+  database: app_development
+
+test:
+  <<: *default
+  database: app_test
+
+production:
+  <<: *default
+  url: <%= ENV["DATABASE_URL"] %>
