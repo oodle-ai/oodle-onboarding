@@ -18,6 +18,18 @@ environment:
   - DD_API_KEY                              # Oodle API key — injected via `convox env`
   - DD_DD_URL                               # metrics -> https://<collector>/v1/datadog/<instance>
   - DD_APM_DD_URL                           # traces  -> https://<collector>/v1/datadog_traces/<instance>
+  #
+  # --- ALTERNATIVE: Dual-shipping to Datadog + Oodle (metrics + traces) ---
+  # To send to BOTH Datadog and Oodle instead, comment out the three single-shipping vars
+  # above and uncomment the block below. Here the agent ships primarily to Datadog (DD_SITE +
+  # a Datadog API key as DD_API_KEY) and forwards a COPY to Oodle via the *ADDITIONAL_ENDPOINTS
+  # vars (JSON `{"<oodle-url>":["<oodle-key>"]}`, valued via `convox env`). Flip the Makefile
+  # `create` target to match (see the commented dual-shipping recipe there).
+  # - DD_API_KEY                            # Datadog API key — injected via `convox env`
+  # - DD_SITE=us5.datadoghq.com             # the Datadog API key belongs to the us5 org
+  # - DD_ADDITIONAL_ENDPOINTS               # metrics copy -> https://<collector>/v1/datadog/<instance>
+  # - DD_APM_ADDITIONAL_ENDPOINTS           # traces  copy -> https://<collector>/v1/datadog_traces/<instance>
+  #
   - DD_APM_ENABLED=true
   - DD_APM_ENV=sales
   - DD_APM_ANALYZED_SPANS=rails-demo|rack.request=1
