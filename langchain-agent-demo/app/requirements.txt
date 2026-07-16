@@ -1,0 +1,9 @@
+langchain>=0.3.0
+langchain-openai>=0.3.0
+langchain-google-genai>=2.1.0
+langgraph>=0.3.0
+opentelemetry-sdk>=1.30.0
+opentelemetry-exporter-otlp-proto-http>=1.30.0
+opentelemetry-instrumentation-langchain>=0.60.0
+fastapi>=0.115.0
+uvicorn>=0.34.0

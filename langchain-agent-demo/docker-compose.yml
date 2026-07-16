@@ -1,0 +1,37 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: langchain-agent-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4321:4318"
+      - "13136:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - langchain-agent-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: langchain-agent-demo-app
+    ports:
+      - "8092:8092"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - PROVIDER=${PROVIDER:-google}
+      - MODEL=${MODEL:-gemini-2.5-flash}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8092
+    depends_on:
+      - otel-collector
+    networks:
+      - langchain-agent-net
+
+networks:
+  langchain-agent-net:
+    driver: bridge
