@@ -3,8 +3,8 @@
 Runs the official **Datadog Agent** (`gcr.io/datadoghq/agent:7`) as a Convox
 generation-2 **agent** — one instance per rack host (DaemonSet-style) — collecting
 **APM traces**, **DogStatsD custom metrics**, host/process metrics, and container
-metadata, and shipping them to Datadog (`us5.datadoghq.com`) **and dual-writing metrics
-and traces to Oodle** (a copy of each, alongside Datadog — no app changes).
+metadata, and **single-shipping metrics and traces to Oodle only** (Oodle is the
+primary intake — nothing is sent to Datadog; no app changes).
 
 ## Why an agent (not a normal service)
 
@@ -27,28 +27,30 @@ rails-demo (bridge container)
    │  ddtrace -> DD_AGENT_HOST=172.17.0.1:8126
    ▼
 Datadog Agent (agent: one per host, publishes host 8126/tcp, 8125/udp)
-   ├─ APM traces ──▶ Datadog (us5)  +  Oodle   [service:rails-demo, env:sales]
-   ├─ DogStatsD   ──▶ Datadog (us5)
-   └─ host/process/container metrics ▶ Datadog (us5)  +  Oodle
+   ├─ APM traces ─────────────────────▶ Oodle   [service:rails-demo, env:sales]
+   ├─ DogStatsD custom metrics ───────▶ Oodle
+   └─ host/process/container metrics ─▶ Oodle
 ```
 
 `DD_APM_NON_LOCAL_TRAFFIC=true` / `DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true` are **required**
 — without them the receivers bind `127.0.0.1` inside the agent container and reject the
 cross-container traffic.
 
-## Dual-write to Oodle (metrics + traces)
+## Single-shipping to Oodle (metrics + traces)
 
-The Agent natively **dual-ships** — it forwards a copy of everything to extra endpoints
-alongside Datadog, no app changes. Two env vars carry the Oodle endpoints (JSON with the
-Oodle API key, so injected via `convox env`, declared in `convox.yml`):
+The Agent sends **only to Oodle** — Oodle is the primary intake, not an extra copy. Per
+the Oodle **Datadog integration tile** (single-shipping, "Datadog Agent" method), the
+primary intake URLs are overridden and the **Oodle API key is used as `DD_API_KEY`** (the
+values point at the Oodle collector, so they're declared in `convox.yml` and valued via
+`convox env`):
 
-| Signal | Env var | Oodle endpoint |
-|--------|---------|----------------|
-| Metrics | `DD_ADDITIONAL_ENDPOINTS` | `https://<collector>/v1/datadog/<instance>` |
-| Traces  | `DD_APM_ADDITIONAL_ENDPOINTS` | `https://<collector>/v1/datadog_traces/<instance>` |
+| Signal | Datadog config | Env var | Oodle endpoint |
+|--------|----------------|---------|----------------|
+| Metrics | `dd_url` + `api_key` | `DD_DD_URL` + `DD_API_KEY` | `https://<collector>/v1/datadog/<instance>` |
+| Traces  | `apm_config.apm_dd_url` | `DD_APM_DD_URL` | `https://<collector>/v1/datadog_traces/<instance>` |
 
-Logs are **not** dual-written (`DD_LOGS_ENABLED=false`). See
-[Datadog dual-shipping docs](https://docs.datadoghq.com/agent/configuration/dual-shipping/).
+There is **no** `DD_SITE` / Datadog API key and **no** `DD_ADDITIONAL_ENDPOINTS` — those are
+the dual-shipping knobs. Logs are not shipped (`DD_LOGS_ENABLED=false`).
 
 **Verify in Oodle** (CLI configured for the same instance):
 
@@ -65,14 +67,14 @@ Verified flowing: `dd_trace_stats_hits{service="rails-demo",env="sales"}` and
 
 ## Files
 
-- `convox.yml` — the agent manifest (image, `agent:` host ports, privileged, volumes, DD + dual-write env).
-- `.env` / `.env.example` — `DD_API_KEY`/`DD_SITE` + `OODLE_API_KEY`/`OODLE_COLLECTOR_DOMAIN`/`OODLE_INSTANCE_ID` (secrets; injected via `convox env`, never committed).
+- `convox.yml` — the agent manifest (image, `agent:` host ports, privileged, volumes, Oodle single-shipping env).
+- `.env` / `.env.example` — `OODLE_API_KEY`/`OODLE_COLLECTOR_DOMAIN`/`OODLE_INSTANCE_ID` (secrets; injected via `convox env`, never committed).
 - `Makefile` — create/deploy the agent, instrument the app, verify.
 
 ## Usage
 
 ```sh
-cp .env.example .env      # fill DD_API_KEY / DD_SITE  (already populated from datadog/dual-write/.env)
+cp .env.example .env      # fill OODLE_API_KEY / OODLE_COLLECTOR_DOMAIN / OODLE_INSTANCE_ID
 
 make up                   # create the agent app, set secrets, deploy the daemon
 make deploy-app           # rebuild rails-demo (gem + tracer env from convox.yml), from repo root

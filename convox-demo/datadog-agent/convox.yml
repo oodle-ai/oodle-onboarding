@@ -9,14 +9,15 @@
 # Non-local traffic is REQUIRED: traces/metrics arrive from OTHER containers, not
 # the agent's own loopback, so the APM + DogStatsD listeners must bind 0.0.0.0.
 environment:
-  - DD_API_KEY                              # secret — injected via `convox env`
-  - DD_SITE=us5.datadoghq.com               # the API key belongs to the us5 org
-  # --- Dual-write to Oodle (metrics + traces) ---
-  # JSON contains the Oodle API key, so declared here but set via `convox env` (never committed).
-  # The DD Agent forwards a COPY of all metrics / APM traces to these extra endpoints alongside
-  # Datadog — no app changes. Logs are not dual-written (DD_LOGS_ENABLED=false).
-  - DD_ADDITIONAL_ENDPOINTS                 # metrics  -> https://<collector>/v1/datadog/<instance>
-  - DD_APM_ADDITIONAL_ENDPOINTS            # traces   -> https://<collector>/v1/datadog_traces/<instance>
+  # --- Single-shipping to Oodle ONLY (metrics + traces) ---
+  # Oodle is the PRIMARY intake — nothing is sent to Datadog. Per the Oodle Datadog integration
+  # tile (single-shipping, Datadog Agent method): metrics via `dd_url` (DD_DD_URL) authenticated
+  # with the Oodle API key as DD_API_KEY, and traces via apm_config.apm_dd_url (DD_APM_DD_URL).
+  # The key/URLs point at the Oodle collector, so they're declared here but valued via
+  # `convox env` (never committed). Logs are not shipped (DD_LOGS_ENABLED=false).
+  - DD_API_KEY                              # Oodle API key — injected via `convox env`
+  - DD_DD_URL                               # metrics -> https://<collector>/v1/datadog/<instance>
+  - DD_APM_DD_URL                           # traces  -> https://<collector>/v1/datadog_traces/<instance>
   - DD_APM_ENABLED=true
   - DD_APM_ENV=sales
   - DD_APM_ANALYZED_SPANS=rails-demo|rack.request=1
