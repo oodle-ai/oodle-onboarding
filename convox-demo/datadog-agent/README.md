@@ -52,6 +52,25 @@ values point at the Oodle collector, so they're declared in `convox.yml` and val
 There is **no** `DD_SITE` / Datadog API key and **no** `DD_ADDITIONAL_ENDPOINTS` — those are
 the dual-shipping knobs. Logs are not shipped (`DD_LOGS_ENABLED=false`).
 
+<details>
+<summary><strong>Alternative: dual-shipping to Datadog + Oodle</strong></summary>
+
+To send to **both** Datadog and Oodle, the Agent ships primarily to Datadog and forwards a
+**copy** to Oodle via `*ADDITIONAL_ENDPOINTS` (JSON `{"<oodle-url>":["<oodle-key>"]}`). This
+needs a **Datadog** API key as `DD_API_KEY` plus `DD_SITE`; the Oodle key travels inside the
+JSON, not as `DD_API_KEY`.
+
+| Signal | Datadog config | Env var | Oodle endpoint |
+|--------|----------------|---------|----------------|
+| Metrics | `additional_endpoints` | `DD_ADDITIONAL_ENDPOINTS` | `https://<collector>/v1/datadog/<instance>` |
+| Traces  | `apm_config.additional_endpoints` | `DD_APM_ADDITIONAL_ENDPOINTS` | `https://<collector>/v1/datadog_traces/<instance>` |
+
+Swap in the dual-shipping variants that are kept as **commented blocks** in `convox.yml`
+(env block), `Makefile` (`create` recipe), and `.env.example` (`DD_API_KEY` + `DD_SITE`).
+See the [Datadog dual-shipping docs](https://docs.datadoghq.com/agent/configuration/dual-shipping/).
+
+</details>
+
 **Verify in Oodle** (CLI configured for the same instance):
 
 ```sh

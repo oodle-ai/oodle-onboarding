@@ -27,6 +27,13 @@ up: create deploy ## Create the agent app, set secrets, deploy the daemon (does 
 OODLE_METRICS_URL = https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog/$(OODLE_INSTANCE_ID)
 OODLE_TRACES_URL  = https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog_traces/$(OODLE_INSTANCE_ID)
 
+# --- ALTERNATIVE: Dual-shipping endpoints (Datadog + Oodle) ---
+# For dual-shipping, Oodle receives a COPY via *ADDITIONAL_ENDPOINTS (JSON carries the Oodle
+# API key). Uncomment these and the dual-shipping `convox env set` in `create` below (and swap
+# the convox.yml env block to the dual-shipping variant).
+# OODLE_METRICS_EP = {"https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog/$(OODLE_INSTANCE_ID)":["$(OODLE_API_KEY)"]}
+# OODLE_TRACES_EP  = {"https://$(OODLE_COLLECTOR_DOMAIN)/v1/datadog_traces/$(OODLE_INSTANCE_ID)":["$(OODLE_API_KEY)"]}
+
 create: ## Create the agent app (no-op if it exists) and set the Oodle single-shipping secrets
 	@convox apps create $(APP) -r $(RACK) 2>/dev/null || echo "app $(APP) already exists"
 	@test -n "$(OODLE_API_KEY)" || { echo "Set OODLE_API_KEY/OODLE_COLLECTOR_DOMAIN/OODLE_INSTANCE_ID (copy .env.example to .env)"; exit 1; }
@@ -36,6 +43,16 @@ create: ## Create the agent app (no-op if it exists) and set the Oodle single-sh
 		-a $(APP) -r $(RACK)
 	@# Clear stale dual-write vars from a prior dual-shipping deploy (harmless if absent).
 	-@convox env unset DD_SITE DD_ADDITIONAL_ENDPOINTS DD_APM_ADDITIONAL_ENDPOINTS -a $(APP) -r $(RACK) 2>/dev/null || true
+
+# --- ALTERNATIVE: dual-shipping `create` recipe (Datadog + Oodle) ---
+# Replaces the single-shipping body above. Needs DD_API_KEY (a Datadog key) + DD_SITE in .env.
+#	@convox apps create $(APP) -r $(RACK) 2>/dev/null || echo "app $(APP) already exists"
+#	@test -n "$(DD_API_KEY)" || { echo "Set DD_API_KEY (Datadog key) + DD_SITE in .env"; exit 1; }
+#	@test -n "$(OODLE_API_KEY)" || { echo "Set OODLE_API_KEY/OODLE_COLLECTOR_DOMAIN/OODLE_INSTANCE_ID"; exit 1; }
+#	convox env set DD_API_KEY=$(DD_API_KEY) DD_SITE=$(DD_SITE) \
+#		'DD_ADDITIONAL_ENDPOINTS=$(OODLE_METRICS_EP)' \
+#		'DD_APM_ADDITIONAL_ENDPOINTS=$(OODLE_TRACES_EP)' \
+#		-a $(APP) -r $(RACK)
 
 deploy: ## Build & deploy the agent (must be running BEFORE apps send traces to it)
 	convox deploy -a $(APP) -r $(RACK)
