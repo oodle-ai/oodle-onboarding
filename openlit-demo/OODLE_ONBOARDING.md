@@ -11,9 +11,9 @@ This setup shows how to use the [OpenLit SDK](https://github.com/openlit/openlit
 
 ## How It Works
 
-1. The **OpenLit SDK** is initialized with `openlit.init()` in both the Flask app and the MCP server. This single call auto-instruments all supported libraries (Google GenAI, ChromaDB, MCP) — no decorators or manual span creation needed
-2. **Guardrails** use `openlit.guard.All()` to check prompts via an LLM judge (Gemini through its OpenAI-compatible endpoint) before allowing them through to the main LLM call
-3. **ChromaDB** operations (add documents, similarity search) are automatically traced when `openlit.init()` is active
+1. The **OpenLit SDK** is initialized with `openlit.init()` in the Flask app, the RAG server, and the MCP server. This single call auto-instruments all supported libraries (Google GenAI, ChromaDB, MCP) — no decorators or manual span creation needed
+2. **Guardrails** use `openlit.guard.Pipeline` with `PromptInjection` and `SensitiveTopic` guards to check prompts via an LLM judge (Gemini through its OpenAI-compatible endpoint) before allowing them through to the main LLM call
+3. **ChromaDB** operations (add documents, similarity search) run in the **RAG server** (`rag-server:8091`) and are automatically traced when `openlit.init()` is active
 4. **MCP tool calls** from the client and tool executions on the server are automatically traced
 5. All telemetry is exported via OTLP HTTP to an **OpenTelemetry Collector**
 6. The collector forwards traces to **Oodle** using the `-otlp` subdomain endpoint
@@ -35,7 +35,7 @@ The `-otlp` subdomain supports standard OTLP paths (`/v1/traces`, `/v1/metrics`)
 
 ## What You'll See in Oodle
 
-After sending requests, navigate to **Traces** in your Oodle dashboard. Filter by service name `openlit-demo` or `openlit-mcp-server`.
+After sending requests, navigate to **Traces** in your Oodle dashboard. Filter by service name `openlit-demo`, `pokedex-rag`, or `openlit-mcp-server`.
 
 ### AI Observability traces (`/chat`, `/summarize`)
 - **Gemini LLM spans** with model name, token usage (prompt/completion/total), and latency
@@ -47,10 +47,10 @@ After sending requests, navigate to **Traces** in your Oodle dashboard. Filter b
 - **Verdict, score, classification, and explanation** for each guard type (prompt injection, sensitive topics, topic restriction)
 - **Blocked requests** visible as traces that end at the guard step without an LLM call
 
-### VectorDB traces (`/rag`)
-- **ChromaDB spans** for collection operations — `query`, `add`, `create_collection`
+### VectorDB traces (`rag-server /query`, `/search`)
+- **ChromaDB spans** for collection operations — `query`, `add`, `create_collection` (service: `pokedex-rag`)
 - **Embedding and retrieval details** — query text, number of results, document IDs
-- **End-to-end RAG trace** showing retrieval followed by LLM generation
+- **End-to-end RAG trace** showing retrieval followed by LLM generation (on `/query`)
 
 ### MCP traces (`/mcp-search`)
 - **MCP client spans** showing tool discovery and invocation
