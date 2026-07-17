@@ -1,0 +1,4 @@
+setuptools<72
+openlit==1.44.0
+mcp>=1.0.0
+ddgs>=8.1.0
