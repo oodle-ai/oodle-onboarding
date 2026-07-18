@@ -1,0 +1,219 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Always-on services (app + OTel Collector)
+  # ---------------------------------------------------------------------------
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: langfuse-demo-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4322:4318"
+      - "13137:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - langfuse-demo-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: langfuse-demo-app
+    ports:
+      - "8093:8093"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - LANGFUSE_SERVICE_NAME=${LANGFUSE_SERVICE_NAME:-langfuse-demo}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-langfuse-demo-otel}
+      - OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental
+      - OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=span_and_event
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-http://langfuse-web:3000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - PORT=8093
+    depends_on:
+      - otel-collector
+    networks:
+      - langfuse-demo-net
+
+  # ---------------------------------------------------------------------------
+  # Self-hosted Langfuse (profile: langfuse)
+  # Activate with: docker compose --profile langfuse up
+  # ---------------------------------------------------------------------------
+
+  langfuse-worker:
+    image: docker.io/langfuse/langfuse-worker:3
+    profiles: [langfuse]
+    restart: always
+    depends_on: &langfuse-deps
+      langfuse-postgres:
+        condition: service_healthy
+      langfuse-minio:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+      langfuse-clickhouse:
+        condition: service_healthy
+    environment: &langfuse-env
+      NEXTAUTH_URL: http://localhost:3060
+      DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/postgres
+      SALT: langfuse-demo-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_USE_AZURE_BLOB: "false"
+      LANGFUSE_USE_OCI_NATIVE_OBJECT_STORAGE: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://localhost:9090
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      LANGFUSE_S3_BATCH_EXPORT_ENABLED: "false"
+      REDIS_HOST: langfuse-redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: langfuse-redis-secret
+      LANGFUSE_BULLMQ_SKIP_REDIS_VERSION_CHECK: "false"
+      REDIS_TLS_ENABLED: "false"
+    networks:
+      - langfuse-demo-net
+
+  langfuse-web:
+    image: docker.io/langfuse/langfuse:3
+    profiles: [langfuse]
+    restart: always
+    depends_on: *langfuse-deps
+    ports:
+      - "3060:3000"
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: langfuse-demo-secret
+      # Auto-create org, project, and API keys for zero-config startup
+      LANGFUSE_INIT_ORG_ID: demo-org
+      LANGFUSE_INIT_ORG_NAME: "Langfuse Demo"
+      LANGFUSE_INIT_PROJECT_ID: demo-project
+      LANGFUSE_INIT_PROJECT_NAME: "Langfuse Demo Project"
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-demo-public-key}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-demo-secret-key}
+      LANGFUSE_INIT_USER_EMAIL: demo@langfuse.local
+      LANGFUSE_INIT_USER_NAME: Demo User
+      LANGFUSE_INIT_USER_PASSWORD: demo-password
+    networks:
+      - langfuse-demo-net
+
+  langfuse-clickhouse:
+    image: docker.io/clickhouse/clickhouse-server
+    profiles: [langfuse]
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    networks:
+      - langfuse-demo-net
+
+  langfuse-minio:
+    image: cgr.dev/chainguard/minio
+    profiles: [langfuse]
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    ports:
+      - "9090:9000"
+    volumes:
+      - langfuse_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+      start_period: 1s
+    networks:
+      - langfuse-demo-net
+
+  langfuse-redis:
+    image: docker.io/redis:7
+    profiles: [langfuse]
+    restart: always
+    command: >
+      --requirepass langfuse-redis-secret
+      --maxmemory-policy noeviction
+    volumes:
+      - langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+    networks:
+      - langfuse-demo-net
+
+  langfuse-postgres:
+    image: docker.io/postgres:17
+    profiles: [langfuse]
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - langfuse-demo-net
+
+networks:
+  langfuse-demo-net:
+    driver: bridge
+
+volumes:
+  langfuse_clickhouse_data:
+    driver: local
+  langfuse_clickhouse_logs:
+    driver: local
+  langfuse_minio_data:
+    driver: local
+  langfuse_redis_data:
+    driver: local
+  langfuse_postgres_data:
+    driver: local
