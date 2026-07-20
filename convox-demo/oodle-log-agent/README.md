@@ -32,7 +32,8 @@ make retain-loggroup STACK=<rack>-<app>      # e.g. STACK=gm-test-rails-demo
 This sets `DeletionPolicy: Retain` on the app's managed LogGroup via a one-time CloudFormation
 update, so the switch **orphans** the group (kept in place, same name, all history) instead of
 deleting it — CloudFormation logs `DELETE_SKIPPED LogGroup`, zero data moved. Afterward the
-original group remains as a historical archive and the agent writes new logs to `/convox/<app>`.
+original group remains as a historical archive and the agent writes new logs to
+`<rack>-<app>-LogGroup-oodle` (mirrors Convox's native `<rack>-<app>-LogGroup-<hash>`).
 
 Helper: `retain-loggroup.sh` — agent-agnostic (pure AWS), run once per app before you flip it to syslog.
 
@@ -68,7 +69,7 @@ app (LogDriver=Syslog, dest tcp://localhost:5140)
 Fluent Bit agent (agent: one per host, host port 5140)
    syslog input ──▶ rewrite_tag (short-id -> tag) ──▶ ecs filter (introspection @172.17.0.1:51678)
                  ──▶ lua (clean app name -> Oodle canonical `service`)
-   ├─ cloudwatch_logs ──▶ /convox/<app>            (Phase 1 only — one group per app, auto-created)
+   ├─ cloudwatch_logs ──▶ <rack>-<app>-LogGroup-oodle  (Phase 1 only — one group per app, auto-created)
    └─ http            ──▶ Oodle /ingest/v1/logs    (JSON, gzip, per Oodle's logs_fluent_bit spec)
 ```
 
@@ -116,7 +117,11 @@ remove it in production to halve the agent's own log volume.
 
 - ECS introspection reachable from a bridge-mode agent at `172.17.0.1:51678`; `/v1/tasks` is host-scoped.
 - Live rails-demo traffic: container short-id `02a2b9e2f2c0` → `service=rails-demo` per record.
-- CloudWatch group `/convox/rails-demo` auto-created with the enriched records (Phase 1).
+- CloudWatch group `<rack>-<app>-LogGroup-oodle` (mirrors Convox's native `<rack>-<app>-LogGroup-<hash>`)
+  auto-created with the enriched records (Phase 1); streams named `service.<container>.<task-id>`.
+  Verified by running these exact reference files (`derive_app.lua` + the `cloudwatch_logs` block) in
+  the `aws-for-fluent-bit` image against CloudWatch: group `gm-test-oodle-verify-LogGroup-oodle` and
+  stream `service.web.<task-id>` were created, confirmed via `aws logs`.
 - Oodle HTTP output `HTTP status=200`; records filterable by `service=rails-demo` via the `oodle` CLI.
 
 ## Notes / limitations
