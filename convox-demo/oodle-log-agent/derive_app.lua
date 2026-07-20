@@ -28,6 +28,14 @@ function derive_app(tag, ts, record)
         if stripped ~= nil then app = stripped end     -- strip "<rack>-" prefix
     end
     record["service"] = app                            -- Oodle canonical app field
+    -- CloudWatch group that mirrors Convox's native <rack>-<app>-LogGroup-<hash>, with a fixed
+    -- "oodle" suffix in place of the CloudFormation hash. Composed here rather than in the output
+    -- template because cloudwatch_logs templates can't place a hyphen after a $variable.
+    if RACK_PREFIX ~= "" then
+        record["cw_group"] = RACK_PREFIX .. "-" .. app .. "-LogGroup-oodle"
+    else
+        record["cw_group"] = app .. "-LogGroup-oodle"
+    end
     if record["appname"] ~= nil then
         record["container_id"] = record["appname"]     -- Oodle canonical container id (short)
     end
