@@ -1,6 +1,8 @@
-.PHONY: up down logs logs-collector logs-app logs-mcp logs-rag clean restart status help \
+.PHONY: up down logs logs-collector logs-app logs-mcp logs-rag logs-agent clean restart status help \
        test-chat test-summarize test-safe-chat test-safe-chat-injection \
-       test-rag test-rag-search test-mcp test-all
+       test-rag test-rag-search test-mcp \
+       test-agent-chat test-agent-trip test-agent-research \
+       test-all
 
 help:
 	@echo "OpenLit Demo (Full Showcase)"
@@ -13,6 +15,7 @@ help:
 	@echo "  make logs-app                 - View app logs"
 	@echo "  make logs-mcp                 - View MCP server logs"
 	@echo "  make logs-rag                 - View RAG server logs"
+	@echo "  make logs-agent               - View LangGraph agent logs"
 	@echo "  make clean                    - Stop and remove volumes"
 	@echo "  make restart                  - Restart all services"
 	@echo "  make status                   - Show service status"
@@ -25,6 +28,9 @@ help:
 	@echo "  make test-rag                 - Pokedex RAG: ask about Pokemon"
 	@echo "  make test-rag-search          - Pokedex RAG: vector search only"
 	@echo "  make test-mcp                 - MCP: invoke MCP server tool"
+	@echo "  make test-agent-chat          - Agent: LangGraph ReAct chat"
+	@echo "  make test-agent-trip          - Agent: plan a trip (multi-tool)"
+	@echo "  make test-agent-research      - Agent: research a city"
 	@echo "  make test-all                 - Run all test targets"
 
 up:
@@ -49,6 +55,9 @@ logs-mcp:
 
 logs-rag:
 	docker-compose logs -f rag-server
+
+logs-agent:
+	docker-compose logs -f agent
 
 clean:
 	@echo "Cleaning up..."
@@ -98,7 +107,22 @@ test-mcp:
 		-H 'Content-Type: application/json' \
 		-d '{"query": "What is OpenTelemetry?", "synthesize": true}' | python3 -m json.tool
 
-test-all: test-chat test-summarize test-safe-chat test-safe-chat-injection test-rag test-rag-search test-mcp
+test-agent-chat:
+	@echo "Sending LangGraph agent chat request (Tavily search)..."
+	@curl -s -X POST 'http://localhost:8093/chat?message=whats+the+weather+in+San+Francisco' \
+		| python3 -m json.tool
+
+test-agent-trip:
+	@echo "Planning a trip with LangGraph ReAct agent..."
+	@curl -s -X POST 'http://localhost:8093/plan-trip?city=Paris&days=3&style=moderate' \
+		| python3 -m json.tool
+
+test-agent-research:
+	@echo "Researching with LangGraph ReAct agent..."
+	@curl -s -X POST 'http://localhost:8093/research?query=latest+developments+in+AI+observability' \
+		| python3 -m json.tool
+
+test-all: test-chat test-summarize test-safe-chat test-safe-chat-injection test-rag test-rag-search test-mcp test-agent-chat test-agent-trip test-agent-research
 
 status:
 	docker-compose ps

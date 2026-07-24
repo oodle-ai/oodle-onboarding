@@ -20,8 +20,11 @@ app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 openlit.init(
+    service_name="openlit-demo",
+    environment=os.environ.get("OTEL_DEPLOYMENT_ENVIRONMENT", "production"),
     otlp_endpoint=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318"),
-    application_name="openlit-demo",
+    capture_message_content=True,
+    custom_metrics_attributes={"team": "platform-ai"},
 )
 FlaskInstrumentor().instrument_app(app)
 
