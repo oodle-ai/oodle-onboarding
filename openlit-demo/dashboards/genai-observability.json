@@ -1,0 +1,116 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": 748,
+    "links": [
+        {
+            "asDropdown": false,
+            "icon": "bolt",
+            "includeVars": false,
+            "keepTime": false,
+            "tags": [],
+            "targetBlank": true,
+            "title": "OpenLIT Github",
+            "tooltip": "Github",
+            "type": "link",
+            "url": "https://github.com/openlit/openlit"
+        },
+        {
+            "asDropdown": false,
+            "icon": "doc",
+            "includeVars": false,
+            "keepTime": false,
+            "tags": [
+                "GPU",
+                "AI"
+            ],
+            "targetBlank": true,
+            "title": "OpenLIT Docs",
+            "tooltip": "Documentation",
+            "type": "link",
+            "url": "https://docs.openlit.io/"
+        }
+    ],
+    "panels": [
+        {
+            "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 5,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "id": 21,
+            "options": {
+                "code": {
+                    "language": "plaintext",
+                    "showLineNumbers": false,
+                    "showMiniMap": false
+                },
+                "content": "---\n# GenAI Observability\n\nThis dashboard displays the usage stats of LLMs, Vector Databases, tracking OpenTelemetry Metrics sent using [OpenLIT](https://github.com/openlit/openlit).\n\n---",
+                "mode": "markdown"
+            },
+            "pluginVersion": "11.3.0",
+            "title": "",
+            "transparent": true,
+            "type": "text"
+        }
+    ],
+    "preload": false,
+    "refresh": "",
+    "schemaVersion": 40,
+    "tags": [
+        "LLM",
+        "VectorDB",
+        "GenAI",
+        "GPU"
+    ],
+    "templating": {
+        "list": [
+            {
+                "current": {
+                    "text": "oodle",
+                    "value": "P4033CA274A2C2DFE"
+                },
+                "includeAll": false,
+                "label": "Metrics Datasource",
+                "name": "metricsDatasource",
+                "options": [],
+                "query": "prometheus",
+                "refresh": 1,
+                "regex": "",
+                "type": "datasource"
+            }
+        ]
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "GenAI Observability",
+    "uid": "cdiz9piuoa3gge",
+    "version": 34,
+    "weekStart": ""
+}

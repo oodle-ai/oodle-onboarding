@@ -5,6 +5,7 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
+      - "4320:4317"
       - "4319:4318"
       - "13134:13133"
     environment:
@@ -60,6 +61,28 @@ services:
     depends_on:
       - otel-collector
       - mcp-server
+    networks:
+      - openlit-net
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: openlit-agent
+    ports:
+      - "8093:8093"
+    environment:
+      - PROVIDER=${PROVIDER:-anthropic}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-5-20250929}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GOOGLE_API_KEY=${GEMINI_API_KEY}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8093
+    depends_on:
+      - otel-collector
     networks:
       - openlit-net
 

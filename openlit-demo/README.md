@@ -1,8 +1,9 @@
 # OpenLit Demo
 
-Full-showcase demo of [OpenLit](https://github.com/openlit/openlit) — an OpenTelemetry-native LLM observability SDK — exporting traces to Oodle. This demo covers four OpenLit capabilities:
+Full-showcase demo of [OpenLit](https://github.com/openlit/openlit) — an OpenTelemetry-native LLM observability SDK — exporting both metrics and traces to Oodle. This demo covers five OpenLit capabilities:
 
 - **AI Observability** — auto-instrument Google Gemini LLM calls
+- **Agent Observability** — auto-instrument LangGraph ReAct agents with nested span trees
 - **Guardrails** — prompt injection detection, sensitive topic filtering, topic restriction
 - **VectorDB Observability** — auto-instrument ChromaDB operations in a RAG pipeline
 - **MCP Observability** — auto-instrument Model Context Protocol tool calls
@@ -22,7 +23,9 @@ Flask App (:8090) — instrumented with OpenLit SDK
      +---> MCP Server (:8080)         (MCP Observability)
      |
      v
-OTel Collector (OTLP :4318) --> Oodle (traces)
+OTel Collector (OTLP :4317/:4318)
+     |
+     +---> Oodle (metrics + traces)
 
 User Request
      |
@@ -33,7 +36,19 @@ RAG Server (:8091) — instrumented with OpenLit SDK
      +---> Google Gemini API          (AI Observability)
      |
      v
-OTel Collector (OTLP :4318) --> Oodle (traces)
+OTel Collector --> Oodle (metrics + traces)
+
+User Request
+     |
+     v
+LangGraph Agent (:8093) — instrumented with OpenLit SDK
+     |
+     +---> LangGraph ReAct Agent      (Agent Observability)
+     +---> Tavily Search              (real web search)
+     +---> Anthropic Claude API       (default; or Gemini via PROVIDER=google)
+     |
+     v
+OTel Collector --> Oodle (metrics + traces)
 ```
 
 ## Components
@@ -42,14 +57,17 @@ OTel Collector (OTLP :4318) --> Oodle (traces)
 |---------|-------------|------|
 | app | Flask app with OpenLit SDK, Gemini, guardrails, MCP client | 8090 |
 | rag-server | Pokedex RAG server with ChromaDB + Gemini | 8091 |
+| agent | LangGraph ReAct agent with Tavily search + Claude (or Gemini) | 8093 |
 | mcp-server | FastMCP server with DuckDuckGo web search tool | 8080 |
-| otel-collector | OpenTelemetry Collector | 4319 (host) -> 4318 (container) |
+| otel-collector | OpenTelemetry Collector (gRPC + HTTP) | 4320/4319 (host) -> 4317/4318 (container) |
 
 ## Prerequisites
 
 - Docker & Docker Compose
 - An [Oodle](https://oodle.ai) account (instance ID and API key)
-- A [Google Gemini](https://aistudio.google.com/apikey) API key
+- A [Google Gemini](https://aistudio.google.com/apikey) API key (for app, rag-server)
+- An [Anthropic](https://console.anthropic.com/) API key (for agent service; or set `PROVIDER=google` to use Gemini)
+- A [Tavily](https://tavily.com/) API key (for the agent's search tool)
 
 ## Quick Start
 
@@ -68,6 +86,8 @@ make help
    OODLE_INSTANCE=your-instance-id
    OODLE_API_KEY=your-api-key
    GEMINI_API_KEY=your-gemini-api-key
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   TAVILY_API_KEY=your-tavily-api-key
    ```
 
 3. Build and start all services:
@@ -142,6 +162,27 @@ curl -s -X POST http://localhost:8090/mcp-search \
   -d '{"query": "What is OpenTelemetry?", "synthesize": true}' | python3 -m json.tool
 ```
 
+### POST /chat (agent) — Agent Observability
+Chat with a LangGraph ReAct agent backed by Tavily search. Produces nested span trees (`invoke_workflow` / `invoke_agent` / `chat` / `execute_tool`). Uses Anthropic Claude by default (set `PROVIDER=google` for Gemini). Served by `agent` on port **8093**.
+
+```bash
+curl -s -X POST 'http://localhost:8093/chat?message=whats+the+weather+in+San+Francisco' | python3 -m json.tool
+```
+
+### POST /plan-trip — Agent Observability
+Plan a trip using a ReAct agent with Tavily search + simulated weather/budget tools.
+
+```bash
+curl -s -X POST 'http://localhost:8093/plan-trip?city=Paris&days=3&style=moderate' | python3 -m json.tool
+```
+
+### POST /research — Agent Observability
+Open-ended research using the ReAct agent with Tavily search.
+
+```bash
+curl -s -X POST 'http://localhost:8093/research?query=latest+developments+in+AI+observability' | python3 -m json.tool
+```
+
 ### GET /health
 Health check.
 
@@ -153,7 +194,7 @@ curl -s http://localhost:8090/health
 
 1. Log in to your Oodle instance
 2. Navigate to the **Traces** section
-3. Filter by service name `openlit-demo`, `pokedex-rag`, or `openlit-mcp-server`
+3. Filter by service name `openlit-demo`, `pokedex-rag`, `openlit-mcp-server`, or `openlit-agent`
 4. Click on a trace to see the full span waterfall
 
 You should see:
@@ -161,7 +202,8 @@ You should see:
 - **Guardrail spans/metrics** showing prompt safety checks with verdicts and classifications
 - **ChromaDB spans** showing vector operations (collection creation, document addition, similarity queries)
 - **MCP spans** showing tool discovery, invocation, and response handling
-- **Prompt/response content** captured in span attributes (when `trace_content=True`)
+- **Agent span trees** showing the full LangGraph execution flow (`invoke_workflow` / `invoke_agent` / `chat` / `execute_tool`)
+- **Prompt/response content** captured in span attributes (enabled via `capture_message_content=True`)
 
 ## How This Differs from Other Demos
 
@@ -174,8 +216,17 @@ You should see:
 | MCP instrumentation | No | No | Auto |
 | Guardrails | No | No | Built-in (`openlit.guard`) |
 | Cost tracking | No | No | Built-in |
-| Content capture | Automatic | Opt-in via env vars | `trace_content=True` |
+| Content capture | Automatic | Opt-in via env vars | `capture_message_content=True` |
 | Export config | `TRACELOOP_BASE_URL` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `otlp_endpoint` param or `OTEL_EXPORTER_OTLP_ENDPOINT` |
+
+## Import the Pre-Built Dashboard
+
+A ready-made Grafana dashboard JSON is included at [`dashboards/genai-observability.json`](./dashboards/genai-observability.json), sourced from the [OpenLIT Oodle destination docs](https://docs.openlit.io/latest/sdk/destinations/oodle). It covers request rates, usage costs, token consumption, model performance, and vector DB operations.
+
+1. Log into your Oodle instance
+2. Go to **Dashboards** -> **New** -> **Import**
+3. Paste the contents of `dashboards/genai-observability.json`
+4. Save
 
 ## Troubleshooting
 
@@ -210,6 +261,12 @@ You should see:
 
 - Check RAG server logs: `make logs-rag`
 - The server loads the Pokemon dataset at startup — if it fails, ChromaDB or pandas may be misconfigured
+
+### Agent errors
+
+- Check agent logs: `make logs-agent`
+- The agent defaults to Anthropic Claude — ensure `ANTHROPIC_API_KEY` is valid (or set `PROVIDER=google` and use `GEMINI_API_KEY`)
+- The search tool requires `TAVILY_API_KEY` — get one at [tavily.com](https://tavily.com/)
 
 ### Guardrails not blocking
 

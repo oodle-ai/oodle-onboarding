@@ -11,8 +11,10 @@ from ddgs import DDGS
 from mcp.server.fastmcp import FastMCP
 
 openlit.init(
+    service_name="openlit-mcp-server",
+    environment=os.environ.get("OTEL_DEPLOYMENT_ENVIRONMENT", "production"),
     otlp_endpoint=os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318"),
-    application_name="openlit-mcp-server",
+    capture_message_content=True,
 )
 
 mcp = FastMCP("openlit-demo-tools", host="0.0.0.0", port=8080)
