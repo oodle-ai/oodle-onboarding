@@ -5,6 +5,7 @@ by the OpenLit SDK and exported to Oodle via an OpenTelemetry Collector.
 """
 
 import asyncio
+import logging
 import os
 
 import openlit
@@ -14,7 +15,12 @@ from google.genai import types
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from opentelemetry import trace
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
 
 app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -28,10 +34,21 @@ openlit.init(
 )
 FlaskInstrumentor().instrument_app(app)
 
+_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+_logger_provider = LoggerProvider(
+    resource=Resource.create({"service.name": "openlit-demo"}),
+)
+_logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(OTLPLogExporter(endpoint=_otlp_endpoint))
+)
+set_logger_provider(_logger_provider)
+logger = logging.getLogger("openlit-demo")
+logger.setLevel(logging.INFO)
+logger.addHandler(LoggingHandler(level=logging.INFO, logger_provider=_logger_provider))
+
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://mcp-server:8080/sse")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
 
 tracer = trace.get_tracer("openlit-demo")
 
@@ -97,8 +114,10 @@ def chat():
             "You are a helpful assistant. Keep responses concise.",
         )
     except Exception as e:
+        logger.error("Gemini chat call failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
+    logger.info("Chat response generated with model=%s", model)
     return jsonify({"reply": reply, "model": model})
 
 
@@ -120,8 +139,10 @@ def summarize():
             operation_name="summarize",
         )
     except Exception as e:
+        logger.error("Gemini summarize call failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
+    logger.info("Summarize completed, input_length=%d", len(text))
     return jsonify({"summary": summary})
 
 
@@ -158,6 +179,7 @@ def safe_chat():
             ]
             span.set_attribute("gen_ai.guardrail.action", "deny")
             span.set_attribute("gen_ai.guardrail.violations", str(violations))
+            logger.warning("Guardrail denied prompt: %s", [v["guard"] for v in violations])
             return jsonify({"blocked": True, "violations": violations}), 422
 
         span.set_attribute("gen_ai.guardrail.action", "allow")
@@ -247,7 +269,7 @@ def mcp_search():
         fc = response.function_calls[0]
         tool_args = dict(fc.args) if fc.args else {"query": query}
 
-        # Execute the tool via the MCP server
+        logger.info("Gemini requested tool=%s", fc.name)
         tool_result = asyncio.run(_call_mcp_tool(fc.name, tool_args))
 
         if not synthesize:
