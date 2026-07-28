@@ -15,6 +15,17 @@ processors:
     timeout: 5s
     send_batch_size: 512
 
+  redaction:
+    allow_all_keys: true
+    blocked_values:
+      - '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+      - '\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}'
+      - '\d{3}-\d{2}-\d{4}'
+      - '\+?\d{1,3}[-.\ ]?\(?\d{2,4}\)?[-.\ ]?\d{3,4}[-.\ ]?\d{3,4}'
+      - '(sk-|pk_|Bearer\s+)[A-Za-z0-9_-]{20,}'
+      - 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+    summary: silent
+
 exporters:
   # Oodle — uses the -otlp subdomain which supports standard OTLP paths
   otlphttp/oodle:
@@ -23,7 +34,13 @@ exporters:
       "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
       "X-API-KEY": "${OODLE_API_KEY}"
 
-  # Debug/logging for local development (prints traces to collector stdout)
+  otlphttp/oodle-logs:
+    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+
+  # Debug/logging for local development (prints telemetry to collector stdout)
   debug:
     verbosity: basic
 
@@ -32,9 +49,13 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [redaction, batch]
       exporters: [otlphttp/oodle, debug]
     metrics:
       receivers: [otlp]
-      processors: [batch]
+      processors: [redaction, batch]
       exporters: [otlphttp/oodle, debug]
+    logs:
+      receivers: [otlp]
+      processors: [redaction, batch]
+      exporters: [otlphttp/oodle-logs, debug]

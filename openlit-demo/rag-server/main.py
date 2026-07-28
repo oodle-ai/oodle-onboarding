@@ -5,6 +5,7 @@ All ChromaDB and Gemini calls are auto-instrumented by OpenLit and exported
 to Oodle via the OpenTelemetry Collector.
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -15,7 +16,12 @@ from flask import Flask, jsonify, request
 from google import genai
 from google.genai import types
 from opentelemetry import trace
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
 
 app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
@@ -27,6 +33,18 @@ openlit.init(
     capture_message_content=True,
 )
 FlaskInstrumentor().instrument_app(app)
+
+_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+_logger_provider = LoggerProvider(
+    resource=Resource.create({"service.name": "pokedex-rag"}),
+)
+_logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(OTLPLogExporter(endpoint=_otlp_endpoint))
+)
+set_logger_provider(_logger_provider)
+logger = logging.getLogger("pokedex-rag")
+logger.setLevel(logging.INFO)
+logger.addHandler(LoggingHandler(level=logging.INFO, logger_provider=_logger_provider))
 
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 tracer = trace.get_tracer("pokedex-rag")
@@ -91,14 +109,14 @@ def _load_pokemon_data(csv_path: Path) -> list[dict]:
     return docs
 
 
-print("Loading Pokemon dataset into ChromaDB...")
+logger.info("Loading Pokemon dataset into ChromaDB...")
 pokemon_docs = _load_pokemon_data(CSV_PATH)
 
 pokedex_collection.add(
     ids=[doc["id"] for doc in pokemon_docs],
     documents=[doc["text"] for doc in pokemon_docs],
 )
-print(f"Loaded {len(pokemon_docs)} Pokemon into the Pokedex collection.")
+logger.info("Loaded %d Pokemon into the Pokedex collection", len(pokemon_docs))
 
 
 # ---------------------------------------------------------------------------
@@ -166,8 +184,10 @@ def query():
     try:
         answer = _gemini_call(DEFAULT_MODEL, _user_content(prompt), SYSTEM_PROMPT)
     except Exception as e:
+        logger.error("RAG query failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
+    logger.info("RAG query completed, sources=%d", len(doc_ids))
     return jsonify({
         "answer": answer,
         "sources": doc_ids,

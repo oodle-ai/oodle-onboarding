@@ -8,6 +8,7 @@ execute_tool) that OpenLIT auto-generates for LangGraph agents, exported to
 Oodle via the shared OTel Collector.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -17,6 +18,11 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
 
 openlit.init(
     service_name="research-agent",
@@ -25,6 +31,18 @@ openlit.init(
     capture_message_content=True,
     custom_metrics_attributes={"team": "platform-ai"},
 )
+
+_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+_logger_provider = LoggerProvider(
+    resource=Resource.create({"service.name": "research-agent"}),
+)
+_logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(OTLPLogExporter(endpoint=_otlp_endpoint))
+)
+set_logger_provider(_logger_provider)
+logger = logging.getLogger("research-agent")
+logger.setLevel(logging.INFO)
+logger.addHandler(LoggingHandler(level=logging.INFO, logger_provider=_logger_provider))
 
 app = FastAPI(title="OpenLIT Agent Demo")
 
@@ -157,11 +175,13 @@ async def chat(message: str = Query(default="whats the weather in San Francisco?
     """
     agent = _create_research_agent()
     config = {"configurable": {"thread_id": _next_thread_id()}}
+    logger.info("Chat request: provider=%s", PROVIDER)
     result = await agent.ainvoke(
         {"messages": [HumanMessage(content=message)]}, config,
     )
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
+    logger.info("Chat completed: model=%s, reply_length=%d", model, len(reply))
     return {"reply": reply, "model": model, "provider": PROVIDER}
 
 
@@ -175,6 +195,7 @@ async def plan_trip(
 
     Produces deep span trees with multiple tool invocations per turn.
     """
+    logger.info("Trip planning: city=%s, days=%d, style=%s", city, days, style)
     agent = _create_travel_agent()
     config = {"configurable": {"thread_id": _next_thread_id()}}
     prompt = (
@@ -189,12 +210,14 @@ async def plan_trip(
     )
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
+    logger.info("Trip plan completed: city=%s, model=%s", city, model)
     return {"trip_plan": reply, "city": city, "days": days, "model": model}
 
 
 @app.post("/research")
 async def research(query: str = Query(default="latest developments in AI observability")):
     """Open-ended research using the ReAct agent with Tavily search."""
+    logger.info("Research request: query=%s", query)
     agent = _create_research_agent()
     config = {"configurable": {"thread_id": _next_thread_id()}}
     result = await agent.ainvoke(
@@ -202,6 +225,7 @@ async def research(query: str = Query(default="latest developments in AI observa
     )
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
+    logger.info("Research completed: model=%s", model)
     return {"research": reply, "query": query, "model": model}
 
 
