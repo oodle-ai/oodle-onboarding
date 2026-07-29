@@ -1,0 +1,70 @@
+name: datadog-alloy-single-write
+
+services:
+  alloy:
+    image: grafana/alloy:latest
+    container_name: alloy-oodle
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+      # otelcol.exporter.datadog is a community component; enable it.
+      - --feature.community-components.enabled=true
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy
+    environment:
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      # Datadog single-write endpoints, composed from the Oodle collector domain + instance id.
+      - OODLE_DD_METRICS_ENDPOINT=https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog/${OODLE_INSTANCE_ID}
+      - OODLE_DD_TRACES_ENDPOINT=https://${OODLE_COLLECTOR_DOMAIN}/v1/datadog_traces/${OODLE_INSTANCE_ID}
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "12345:12345" # Alloy UI / debug
+    networks:
+      - alloy-net
+
+  demo-app:
+    build:
+      context: ../otel-dual-write/app
+      dockerfile: Dockerfile
+    container_name: alloy-demo-app
+    ports:
+      - "8080:8080"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
+      - OTEL_SERVICE_NAME=alloy-oodle-demo
+    depends_on:
+      - alloy
+    networks:
+      - alloy-net
+
+  load-generator:
+    image: alpine:latest
+    container_name: alloy-load-generator
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache curl > /dev/null 2>&1
+        DURATION=$${LOAD_DURATION:-86400}
+        INTERVAL=$${LOAD_INTERVAL:-3}
+        END=$$(( $$(date +%s) + DURATION ))
+        echo "Generating load for $${DURATION}s (every $${INTERVAL}s)..."
+        while [ $$(date +%s) -lt $$END ]; do
+          curl -s -X POST http://alloy-demo-app:8080/api/order > /dev/null
+          curl -s http://alloy-demo-app:8080/api/users > /dev/null
+          sleep $$INTERVAL
+        done
+        echo "Load generation complete."
+    environment:
+      - LOAD_DURATION=${LOAD_DURATION:-86400}
+      - LOAD_INTERVAL=${LOAD_INTERVAL:-3}
+    depends_on:
+      - demo-app
+    networks:
+      - alloy-net
+
+networks:
+  alloy-net:
+    driver: bridge

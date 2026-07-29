@@ -1,0 +1,78 @@
+// Grafana Alloy -> Datadog + Oodle (dual-write)
+//
+// Two otelcol.exporter.datadog components fan out the same telemetry:
+//   - "datadog": the normal Datadog intake (site-derived endpoints, Datadog API key)
+//   - "oodle":   Oodle's Datadog single-write endpoints (Oodle API key)
+//
+// otelcol.exporter.datadog is a community component, so Alloy must be started
+// with --feature.community-components.enabled=true (see docker-compose.yml).
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  send_batch_size     = 10
+  send_batch_max_size = 100
+  timeout             = "10s"
+  output {
+    metrics = [otelcol.exporter.datadog.datadog.input, otelcol.exporter.datadog.oodle.input]
+    logs    = [otelcol.exporter.datadog.datadog.input, otelcol.exporter.datadog.oodle.input]
+    traces  = [otelcol.exporter.datadog.datadog.input, otelcol.exporter.datadog.oodle.input]
+  }
+}
+
+// --- Exporter 1: real Datadog ---
+otelcol.exporter.datadog "datadog" {
+  hostname = "alloy-dual-write-demo"
+  client {
+    timeout = "30s"
+  }
+  api {
+    api_key             = sys.env("DD_API_KEY")
+    site                = sys.env("DD_SITE")
+    fail_on_invalid_key = false
+  }
+  traces {
+    compute_stats_by_span_kind     = true
+    compute_top_level_by_span_kind = true
+  }
+  metrics {
+    exporter {
+      resource_attributes_as_tags = true
+    }
+  }
+}
+
+// --- Exporter 2: Oodle via the Datadog intake path ---
+otelcol.exporter.datadog "oodle" {
+  hostname = "alloy-dual-write-demo"
+  client {
+    timeout = "30s"
+  }
+  api {
+    api_key             = sys.env("OODLE_API_KEY")
+    fail_on_invalid_key = false
+  }
+  traces {
+    endpoint                       = sys.env("OODLE_DD_TRACES_ENDPOINT")
+    compute_stats_by_span_kind     = true
+    compute_top_level_by_span_kind = true
+  }
+  metrics {
+    endpoint = sys.env("OODLE_DD_METRICS_ENDPOINT")
+    exporter {
+      resource_attributes_as_tags = true
+    }
+  }
+}

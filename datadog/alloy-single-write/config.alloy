@@ -1,0 +1,75 @@
+// Grafana Alloy -> Oodle (single-write via the Datadog intake path)
+//
+// This deliberately does NOT use an OTLP exporter to reach Oodle. Instead the
+// otelcol.exporter.datadog component (which normally talks to Datadog) is
+// pointed at Oodle's Datadog single-write endpoints:
+//
+//   metrics -> https://<collectorDomain>/v1/datadog/<instanceId>
+//   traces  -> https://<collectorDomain>/v1/datadog_traces/<instanceId>
+//
+// Oodle accepts the native Datadog intake protocol on those paths, so Alloy
+// ships Datadog-format payloads and Oodle ingests them directly.
+//
+// otelcol.exporter.datadog is a community component, so Alloy must be started
+// with --feature.community-components.enabled=true (see docker-compose.yml).
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs    = [otelcol.processor.batch.default.input]
+    traces  = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  send_batch_size     = 10
+  send_batch_max_size = 100
+  timeout             = "10s"
+  output {
+    metrics = [otelcol.exporter.datadog.oodle.input]
+    logs    = [otelcol.exporter.datadog.oodle.input]
+    traces  = [otelcol.exporter.datadog.oodle.input]
+  }
+}
+
+otelcol.exporter.datadog "oodle" {
+  // Fallback hostname for payloads that carry no host-identifying attributes,
+  // so metrics are not attributed to an empty host.
+  hostname = "alloy-single-write-demo"
+
+  client {
+    timeout = "30s"
+  }
+
+  api {
+    // Oodle API key (from the oodle CLI's configured instance), NOT a Datadog key.
+    api_key             = sys.env("OODLE_API_KEY")
+    fail_on_invalid_key = false
+  }
+
+  traces {
+    // Oodle Datadog single-write traces endpoint.
+    endpoint = sys.env("OODLE_DD_TRACES_ENDPOINT")
+
+    // Compute APM stats for non-top-level / client spans too. This is what
+    // makes Oodle emit dd_trace_span metrics for every span kind, not just
+    // server entry spans.
+    compute_stats_by_span_kind     = true
+    compute_top_level_by_span_kind = true
+  }
+
+  metrics {
+    // Oodle Datadog single-write metrics endpoint.
+    endpoint = sys.env("OODLE_DD_METRICS_ENDPOINT")
+
+    exporter {
+      resource_attributes_as_tags = true
+    }
+  }
+}
