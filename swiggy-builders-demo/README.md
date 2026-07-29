@@ -38,20 +38,22 @@ No approval needed to start — prototype on localhost against real tool schemas
 ## Quick Start
 
 ```bash
-# 1. Clone and enter the demo
+# 1. Sign up on Oodle at https://ap1.oodle.ai/signup
+
+# 2. Clone and enter the demo
 cd swiggy-builders-demo
 
-# 2. Set up environment
+# 3. Set up environment
 cp .env.example .env
 # Edit .env with your OPENAI_API_KEY, OODLE_INSTANCE, OODLE_API_KEY
 
-# 3. Authenticate with Swiggy (opens browser for phone+OTP)
+# 4. Authenticate with Swiggy (opens browser for phone+OTP)
 make auth
 
-# 4. Start services
+# 5. Start services
 make up
 
-# 5. Try it out
+# 6. Try it out
 make test-food       # Order biryani
 make test-grocery    # Order milk
 make test-dineout    # Book an Italian restaurant for 4
