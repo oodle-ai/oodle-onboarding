@@ -87,6 +87,7 @@ Available metrics from this path include: `dd_trace_stats_hits`, `dd_trace_stats
 | [datadog/oodle-single-write](../oodle-single-write) | Datadog Agent | Oodle only |
 | [datadog/otel-dual-write](../otel-dual-write) | OTel Collector | Datadog + Oodle |
 | **datadog/alloy-single-write** | **Grafana Alloy** | **Oodle only (Datadog intake)** |
+| [datadog/alloy-dual-write](../alloy-dual-write) | Grafana Alloy | Datadog + Oodle |
 
 ## Cleanup
 
