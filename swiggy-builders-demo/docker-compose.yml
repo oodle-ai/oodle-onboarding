@@ -1,0 +1,37 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: swiggy-builders-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4323:4318"
+      - "13138:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - swiggy-builders-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: swiggy-builders-demo-app
+    ports:
+      - "8094:8094"
+    environment:
+      - SWIGGY_ACCESS_TOKEN=${SWIGGY_ACCESS_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - MODEL=${MODEL:-gpt-4o-mini}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8094
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8094"]
+    depends_on:
+      - otel-collector
+    networks:
+      - swiggy-builders-net
+
+networks:
+  swiggy-builders-net:
+    driver: bridge
