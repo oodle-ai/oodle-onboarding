@@ -1,0 +1,43 @@
+# Reads the delta metric objects the "lambdas" wrote to S3 (MinIO), merges the
+# per-invocation deltas into cumulative series, then prints them to stdout.
+#
+#   awss3receiver  -> deltatocumulative -> interval -> debug (stdout)
+#
+# START_TIME / END_TIME (UTC "YYYY-MM-DD HH:MM") select the replay window.
+receivers:
+  awss3:
+    starttime: "${env:START_TIME}"
+    endtime: "${env:END_TIME}"
+    s3downloader:
+      region: us-east-1
+      s3_bucket: otel
+      s3_prefix: telemetry
+      endpoint: http://minio:9000
+      s3_force_path_style: true
+      s3_partition_format: "year=%Y/month=%m/day=%d/hour=%H/minute=%M"
+
+processors:
+  # Merge delta samples of each stream (fanned in from many "lambdas") into a
+  # running cumulative total. Requires per-stream samples in increasing time
+  # order; drops out-of-order ones as delta.ErrOutOfOrder.
+  deltatocumulative:
+    max_stale: 5m
+  # Emit at most one sample per series per tick. On fast historical replay every
+  # sample lands in one wall-clock bucket, so output collapses to the final
+  # merged cumulative value per series.
+  interval:
+    interval: 15s
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    metrics:
+      receivers: [awss3]
+      processors: [deltatocumulative, interval]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info
