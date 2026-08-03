@@ -1,0 +1,24 @@
+receivers:
+  awss3:
+    starttime: "${env:START_TIME}"
+    endtime: "${env:END_TIME}"
+    s3downloader:
+      region: us-east-1
+      s3_bucket: otel
+      s3_prefix: telemetry
+      endpoint: http://minio:9000
+      s3_force_path_style: true
+      s3_partition_format: "year=%Y/month=%m/day=%d/hour=%H/minute=%M"
+
+exporters:
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    metrics:
+      receivers: [awss3]
+      exporters: [debug]
+  telemetry:
+    logs:
+      level: info

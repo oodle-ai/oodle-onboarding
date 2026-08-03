@@ -1,0 +1,38 @@
+receivers:
+  awss3:
+    starttime: "${env:START_TIME}"
+    endtime: "${env:END_TIME}"
+    s3downloader:
+      region: us-east-1
+      s3_bucket: otel
+      s3_prefix: telemetry
+      endpoint: http://minio:9000
+      s3_force_path_style: true
+      s3_partition_format: "year=%Y/month=%m/day=%d/hour=%H/minute=%M"
+
+processors:
+  deltatocumulative:
+    max_stale: 5m
+  interval:
+    interval: 60s
+
+exporters:
+  nop:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [awss3]
+      processors: [deltatocumulative, interval]
+      exporters: [nop]
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
+    logs:
+      level: info

@@ -1,0 +1,49 @@
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - minio-data:/data
+
+  # Creates the "otel" bucket once MinIO is healthy.
+  createbucket:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/otel &&
+      echo 'bucket otel ready'
+      "
+
+  # Producer: OTLP in -> awss3exporter -> MinIO
+  collector-exporter:
+    image: otel/opentelemetry-collector-contrib:latest
+    depends_on:
+      createbucket:
+        condition: service_completed_successfully
+    command: ["--config=/etc/otel/exporter-config.yaml"]
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_REGION: us-east-1
+    volumes:
+      - ./exporter-config.yaml:/etc/otel/exporter-config.yaml:ro
+    ports:
+      - "4317:4317"
+
+volumes:
+  minio-data:

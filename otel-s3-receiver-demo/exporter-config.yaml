@@ -1,0 +1,33 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 1s
+
+exporters:
+  awss3:
+    marshaler: otlp_json          # writes .json objects (receiver auto-detects by extension)
+    s3uploader:
+      region: us-east-1
+      s3_bucket: otel
+      s3_prefix: telemetry
+      endpoint: http://minio:9000
+      s3_force_path_style: true   # MinIO uses path-style addressing
+      disable_ssl: true           # plaintext http:// endpoint
+      compression: none
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [awss3, debug]
+  telemetry:
+    logs:
+      level: info
