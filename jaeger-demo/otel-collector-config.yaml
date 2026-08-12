@@ -1,0 +1,32 @@
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+receivers:
+  jaeger:
+    protocols:
+      thrift_http:
+        endpoint: "0.0.0.0:14268"
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+exporters:
+  otlphttp/oodle:
+    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [jaeger]
+      processors: [batch]
+      exporters: [otlphttp/oodle, debug]
