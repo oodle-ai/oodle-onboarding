@@ -81,9 +81,22 @@ func initTracerProvider(_ context.Context) (*sdktrace.TracerProvider, error) {
 		serviceName = "jaeger-demo-service"
 	}
 
-	exporter, err := jaeger.New(
-		jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(endpoint)),
-	)
+	opts := []jaeger.CollectorEndpointOption{jaeger.WithEndpoint(endpoint)}
+
+	apiKey := os.Getenv("OODLE_API_KEY")
+	instance := os.Getenv("OODLE_INSTANCE")
+	if apiKey != "" && instance != "" {
+		opts = append(opts, jaeger.WithHTTPClient(&http.Client{
+			Transport: &authTransport{
+				base:     http.DefaultTransport,
+				apiKey:   apiKey,
+				instance: instance,
+			},
+		}))
+		log.Printf("direct ingestion enabled → %s", endpoint)
+	}
+
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(opts...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Jaeger exporter: %w", err)
 	}
@@ -104,6 +117,18 @@ func initTracerProvider(_ context.Context) (*sdktrace.TracerProvider, error) {
 
 	otel.SetTracerProvider(tp)
 	return tp, nil
+}
+
+type authTransport struct {
+	base     http.RoundTripper
+	apiKey   string
+	instance string
+}
+
+func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("X-API-KEY", t.apiKey)
+	req.Header.Set("X-OODLE-INSTANCE", t.instance)
+	return t.base.RoundTrip(req)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

@@ -1,14 +1,11 @@
 # Zipkin Demo — Send Traces to Oodle
 
-This demo shows how to send traces from a **Zipkin-instrumented Go service** to Oodle using an OpenTelemetry Collector with the Zipkin receiver.
+This demo shows how to send traces from a **Zipkin-instrumented Go service** to Oodle. Two paths are provided:
 
-## Architecture
-
-```
-Go Service (Zipkin JSON exporter) → OTel Collector (zipkin receiver) → Oodle
-```
-
-The Go service exports traces in Zipkin JSON format to the OTel Collector's Zipkin receiver (port 9411). The collector then forwards traces to Oodle via OTLP.
+| Path | Description |
+|------|-------------|
+| **Via OTel Collector** | App → OTel Collector (Zipkin receiver) → Oodle (OTLP) |
+| **Direct Ingestion** | App → Oodle (native Zipkin protocol, no collector needed) |
 
 ## Prerequisites
 
@@ -24,32 +21,48 @@ cp .env.example .env
 # Edit .env with your OODLE_INSTANCE and OODLE_API_KEY
 ```
 
-2. Start the services:
+### Path 1: Via OTel Collector (recommended)
 
-```bash
-make up
+```
+Go Service (Zipkin JSON exporter) → OTel Collector (zipkin receiver) → Oodle
 ```
 
-3. Send a test request:
+The Go service exports traces in Zipkin JSON format to the OTel Collector's Zipkin receiver (port 9411). The collector then forwards traces to Oodle via OTLP.
 
 ```bash
-make test
+make up       # start all services
+make test     # send a test request
+make logs-collector  # verify traces are being exported
 ```
 
-4. Check the collector logs to verify traces are being exported:
+### Path 2: Direct Ingestion (no collector)
+
+```
+Go Service (Zipkin JSON exporter) → Oodle (native Zipkin endpoint)
+```
+
+The Go service sends Zipkin JSON traces directly to Oodle's Zipkin-compatible endpoint. No OTel Collector is needed.
 
 ```bash
-make logs-collector
+make up-direct   # start app only (sends directly to Oodle)
+make test        # send a test request
+make logs-direct # view app logs
 ```
-
-5. View your traces in the Oodle UI.
 
 ## Services
+
+### Via OTel Collector
 
 | Service | Port | Description |
 |---------|------|-------------|
 | app | 8080 | Go HTTP service with Zipkin exporter |
 | otel-collector | 9411 | OTel Collector with Zipkin receiver |
+
+### Direct Ingestion
+
+| Service | Port | Description |
+|---------|------|-------------|
+| app | 8080 | Go HTTP service sending directly to Oodle |
 
 ## API
 
@@ -68,6 +81,12 @@ curl -X POST http://localhost:8080/order \
 
 If you already have services sending traces to a Zipkin collector, you can migrate to Oodle by:
 
-1. Replacing your Zipkin server with the OTel Collector (using the `zipkin` receiver)
-2. Configuring the OTel Collector to export to Oodle (using the `otlphttp` exporter)
+**Option A — Via OTel Collector:**
+1. Replace your Zipkin server with the OTel Collector (using the `zipkin` receiver)
+2. Configure the OTel Collector to export to Oodle (using the `otlphttp` exporter)
 3. No changes needed in your application code
+
+**Option B — Direct Ingestion:**
+1. Point your Zipkin reporter endpoint directly at Oodle's Zipkin-compatible endpoint
+2. Add Oodle authentication headers (`X-API-KEY`, `X-OODLE-INSTANCE`) to the reporter's HTTP client
+3. No OTel Collector deployment needed

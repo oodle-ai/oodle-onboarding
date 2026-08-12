@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: jaeger-demo-app
+    ports:
+      - "8080:8080"
+    environment:
+      - JAEGER_ENDPOINT=https://${OODLE_INSTANCE}.collector.oodle.ai/v1/jaeger/traces
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OTEL_SERVICE_NAME=jaeger-demo-service
