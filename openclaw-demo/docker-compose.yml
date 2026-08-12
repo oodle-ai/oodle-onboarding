@@ -1,0 +1,43 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: openclaw-demo-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4323:4318"
+      - "13138:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - openclaw-demo-net
+
+  openclaw:
+    build:
+      context: .
+      dockerfile: openclaw/Dockerfile
+    container_name: openclaw-demo
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-openclaw}
+      - OPENCLAW_MODEL=${OPENCLAW_MODEL:-google/gemini-2.5-flash}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - openclaw_state:/state
+    depends_on:
+      - otel-collector
+    # Nothing to serve: the container stays up so `make ask` can run turns
+    # inside it. Each turn is a one-shot `openclaw agent --local`.
+    command: ["sleep", "infinity"]
+    networks:
+      - openclaw-demo-net
+
+networks:
+  openclaw-demo-net:
+    driver: bridge
+
+volumes:
+  openclaw_state:
+    driver: local

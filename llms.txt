@@ -23,6 +23,7 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
 | None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
 | None (greenfield) | Traces | AI agent observability (Pydantic AI + any LLM) | [pydantic-ai-demo](pydantic-ai-demo/README.md) |
+| OpenClaw + Langfuse SDK | Traces | Real agent traced through the Langfuse SDK — `langfuse.*` attributes instead of GenAI semconv | [openclaw-demo](openclaw-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
 | Convox (AWS ECS) | Logs | Dual-write app logs to CloudWatch + Oodle via host-local OTel agent (no app changes) | [convox-demo](convox-demo/oodle-log-agent/README.md) |
@@ -181,6 +182,20 @@ AI agent observability using Pydantic AI with built-in OpenTelemetry instrumenta
 - Requires: LLM provider API key (OpenAI, Google, or Anthropic) + Oodle credentials
 - Config files: `otel-collector-config.yaml`, `docker-compose.yml`
 - Spans emitted: `invoke_agent` (agent run), `chat` (model request), `execute_tool` (tool execution)
+
+### openclaw-demo
+
+The real OpenClaw agent (npm `openclaw`, run as `openclaw agent --local`) traced by an OpenClaw plugin that records observations through the real Langfuse SDK (`@langfuse/tracing`) and exports them over OTLP. The plugin maps OpenClaw's typed hooks (`before_agent_start`, `llm_input`, `llm_output`, `after_tool_call`, `agent_end`) onto Langfuse observations; every `langfuse.*` attribute is written by the SDK. This is the non-semconv path: `langfuse.observation.type` instead of `gen_ai.operation.name`, `langfuse.observation.input` / `.output` instead of the message attributes, `langfuse.observation.usage_details` for token counts (cache reads included), and the run payload under `langfuse.trace.*` on the root span. Oodle resolves these onto the GenAI semconv attributes at ingest, so the trace reaches Agent Observability with a transcript, model, tokens and cost. OpenClaw's own `diagnostics-otel` exporter emits standard `gen_ai.*` spans instead — this demo is deliberately the other path.
+
+- Languages: JavaScript (OpenClaw plugin)
+- Infra: Docker Compose
+- Signals: Traces (LLM agent-specific)
+- Instrumentation: OpenClaw plugin + `@langfuse/tracing` / OTel Node SDK
+- Collector: OTel Collector exporting to Oodle via OTLP
+- Requires: Oodle credentials + a Gemini API key (OpenClaw calls the model for real)
+- Config files: `openclaw/openclaw.json`, `otel-collector-config.yaml`, `docker-compose.yml`
+- Spans emitted: `openclaw.agent_run` (root, observation type `span`), `openclaw.llm_generation` (type `generation`), `openclaw.tool_call` (type `tool`)
+- Gotcha: `plugins.entries.langfuse-tracer.hooks.allowConversationAccess` must be true, or OpenClaw withholds `llm_input` / `llm_output` / `agent_end` from the plugin
 
 ### k8s-otel-operator
 

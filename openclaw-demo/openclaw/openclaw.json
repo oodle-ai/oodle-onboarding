@@ -1,0 +1,26 @@
+{
+  "agents": {
+    "defaults": {
+      "model": "__MODEL__"
+    }
+  },
+  "plugins": {
+    "allow": [
+      "langfuse-tracer"
+    ],
+    "bundledDiscovery": "compat",
+    "entries": {
+      "langfuse-tracer": {
+        "enabled": true,
+        "config": {
+          "endpoint": "__OTEL_ENDPOINT__",
+          "serviceName": "openclaw",
+          "environment": "demo"
+        },
+        "hooks": {
+          "allowConversationAccess": true
+        }
+      }
+    }
+  }
+}

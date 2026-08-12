@@ -1,0 +1,18 @@
+{
+  "id": "langfuse-tracer",
+  "name": "Langfuse Tracer",
+  "description": "Traces OpenClaw agent runs as Langfuse observations and exports them over OTLP.",
+  "version": "0.1.0",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "endpoint": { "type": "string" },
+      "serviceName": { "type": "string" },
+      "environment": { "type": "string" }
+    }
+  }
+}
