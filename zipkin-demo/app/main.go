@@ -81,7 +81,22 @@ func initTracerProvider(_ context.Context) (*sdktrace.TracerProvider, error) {
 		serviceName = "zipkin-demo-service"
 	}
 
-	exporter, err := zipkin.New(endpoint)
+	var opts []zipkin.Option
+
+	apiKey := os.Getenv("OODLE_API_KEY")
+	instance := os.Getenv("OODLE_INSTANCE")
+	if apiKey != "" && instance != "" {
+		opts = append(opts, zipkin.WithClient(&http.Client{
+			Transport: &authTransport{
+				base:     http.DefaultTransport,
+				apiKey:   apiKey,
+				instance: instance,
+			},
+		}))
+		log.Printf("direct ingestion enabled → %s", endpoint)
+	}
+
+	exporter, err := zipkin.New(endpoint, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Zipkin exporter: %w", err)
 	}
@@ -102,6 +117,18 @@ func initTracerProvider(_ context.Context) (*sdktrace.TracerProvider, error) {
 
 	otel.SetTracerProvider(tp)
 	return tp, nil
+}
+
+type authTransport struct {
+	base     http.RoundTripper
+	apiKey   string
+	instance string
+}
+
+func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("X-API-KEY", t.apiKey)
+	req.Header.Set("X-OODLE-INSTANCE", t.instance)
+	return t.base.RoundTrip(req)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {

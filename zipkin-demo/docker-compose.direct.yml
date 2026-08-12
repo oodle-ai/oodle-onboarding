@@ -1,0 +1,13 @@
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: zipkin-demo-app
+    ports:
+      - "8080:8080"
+    environment:
+      - ZIPKIN_ENDPOINT=https://${OODLE_INSTANCE}.collector.oodle.ai/v1/zipkin/traces
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OTEL_SERVICE_NAME=zipkin-demo-service
