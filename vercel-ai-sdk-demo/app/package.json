@@ -1,0 +1,22 @@
+{
+  "name": "vercel-ai-sdk-demo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/server.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.53",
+    "@ai-sdk/otel": "^1.0.88",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/sdk-trace-node": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "ai": "^7.0.82",
+    "zod": "^4.1.8"
+  }
+}

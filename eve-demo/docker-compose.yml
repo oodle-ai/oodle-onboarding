@@ -1,0 +1,36 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: eve-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4327:4318"
+      - "13142:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - eve-net
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: eve-demo-agent
+    ports:
+      - "8098:8098"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_GATEWAY_URL=${OPENAI_GATEWAY_URL:-}
+      - MODEL=${MODEL:-gpt-4o-mini}
+      - OODLE_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8098
+    depends_on:
+      - otel-collector
+    networks:
+      - eve-net
+
+networks:
+  eve-net:
+    driver: bridge

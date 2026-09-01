@@ -19,11 +19,44 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [traceloop-demo](./traceloop-demo) | Traces | LLM observability using Traceloop's OpenLLMetry SDK with Google Gemini |
 | [llmops-otel-demo](./llmops-otel-demo) | Traces | LLM observability using official OpenTelemetry GenAI instrumentation with Google Gemini |
 | [pydantic-ai-demo](./pydantic-ai-demo) | Traces | AI agent observability using Pydantic AI with built-in OTel GenAI instrumentation |
+| [langfuse-demo](./langfuse-demo) | Traces | LLM observability through the Langfuse SDK, exported over OTLP |
+| [openlit-demo](./openlit-demo) | Traces | OpenLIT auto-instrumentation across LLMs, vector databases, MCP tools and GPU metrics |
+| [langchain-agent-demo](./langchain-agent-demo) | Traces | LangChain and LangGraph agents through the LangChain OTel instrumentor |
+| [openai-demo](./openai-demo) | Traces, logs | OpenAI SDK auto-instrumented with the official OpenTelemetry GenAI instrumentation |
+| [litellm-demo](./litellm-demo) | Traces, logs | One LiteLLM call routed to any provider, traced through its `otel` callback |
+| [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | Traces | Vercel AI SDK 7 agents, steps and tool calls through `@ai-sdk/otel` |
+| [eve-demo](./eve-demo) | Traces | Agents on Vercel's eve framework: durable sessions, tools and full transcripts |
 | [openclaw-demo](./openclaw-demo) | Traces | Real OpenClaw agent traced through the real Langfuse SDK: observations described in the `langfuse.*` namespace instead of the GenAI semconv one, exported over OTLP |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
 | [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
 | [cockroachdb-demo](./cockroachdb-demo) | Metrics | Three-node CockroachDB cluster under `movr` load; OTel Collector scrapes each node's built-in `/_status/vars` Prometheus endpoint; no database config changes |
 | [convox-demo](./convox-demo) | Logs | Deploy a Rails app on Convox v2 (AWS ECS) and route each app's logs to Oodle via a host-local Fluent Bit agent (per-app identity resolved from ECS introspection); dual-write to CloudWatch during migration, then single-write to Oodle — no app code changes |
+
+## Agent Observability demos
+
+Each tile on the Oodle **Integrations** page has a demo here that
+runs the setup the tile ships. Use these to show an instrumentation
+end to end without wiring one up first.
+
+| Oodle tile | Demo | Language |
+|---|---|---|
+| Langfuse | [langfuse-demo](./langfuse-demo) | Python, TypeScript |
+| Vercel AI SDK | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | TypeScript |
+| eve | [eve-demo](./eve-demo) | TypeScript |
+| OpenLIT | [openlit-demo](./openlit-demo) | Python |
+| OpenAI | [openai-demo](./openai-demo) | Python |
+| Pydantic AI | [pydantic-ai-demo](./pydantic-ai-demo) | Python |
+| Google Gemini | [llmops-otel-demo](./llmops-otel-demo) | Python |
+| LiteLLM | [litellm-demo](./litellm-demo) | Python |
+| LangChain | [langchain-agent-demo](./langchain-agent-demo) | Python |
+| Traceloop | [traceloop-demo](./traceloop-demo) | Python |
+
+Every one of them exports through an OTel Collector, so the same
+setup works whether the collector forwards to Oodle or somewhere
+else. Each demo's README names the settings that decide whether the
+transcript arrives, because most of them fail silently: the spans
+show correct token counts and cost against an empty transcript.
+
 
 ## Getting Started
 
