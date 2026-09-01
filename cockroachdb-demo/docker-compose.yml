@@ -1,0 +1,131 @@
+x-crdb-node: &crdb-node
+  image: &crdb-image cockroachdb/cockroach:latest-v25.3
+  entrypoint: ["/bin/bash", "-c"]
+  # Identical on every node: $HOSTNAME resolves to roach1/roach2/roach3 from
+  # the `hostname:` key below. --cache / --max-sql-memory are pinned to
+  # absolute sizes so three nodes fit comfortably on a laptop; production uses
+  # the recommended .25 fractions. max-sql-memory also backs the bulk-ingest
+  # monitor `workload init` uses, so it needs headroom beyond query memory.
+  command:
+    - >
+      exec ./cockroach start
+      --insecure
+      --advertise-addr=$${HOSTNAME}:26257
+      --join=roach1:26257,roach2:26257,roach3:26257
+      --listen-addr=0.0.0.0:26257
+      --http-addr=0.0.0.0:8080
+      --cache=128MiB
+      --max-sql-memory=512MiB
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8080/health?ready=1"]
+    interval: 5s
+    timeout: 3s
+    retries: 40
+    start_period: 20s
+  networks:
+    - crdb-net
+
+services:
+  roach1:
+    <<: *crdb-node
+    container_name: crdb-roach1
+    hostname: roach1
+    ports:
+      - "26257:26257"   # SQL
+      - "8080:8080"     # DB Console + /_status/vars
+    volumes:
+      - roach1-data:/cockroach/cockroach-data
+
+  roach2:
+    <<: *crdb-node
+    container_name: crdb-roach2
+    hostname: roach2
+    volumes:
+      - roach2-data:/cockroach/cockroach-data
+
+  roach3:
+    <<: *crdb-node
+    container_name: crdb-roach3
+    hostname: roach3
+    volumes:
+      - roach3-data:/cockroach/cockroach-data
+
+  # One-shot: forms the cluster out of the three nodes above. Exits 0 once the
+  # cluster is initialized, and is a no-op on restart.
+  crdb-init:
+    image: *crdb-image
+    container_name: crdb-init
+    command: ["init", "--insecure", "--host=roach1:26257"]
+    depends_on:
+      roach1:
+        condition: service_started
+      roach2:
+        condition: service_started
+      roach3:
+        condition: service_started
+    restart: on-failure
+    networks:
+      - crdb-net
+
+  # Continuous load so the SQL, transaction, and latency metrics have
+  # something to report. Load spreads across all three gateways.
+  workload:
+    image: *crdb-image
+    container_name: crdb-workload
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        until ./cockroach sql --insecure --host=roach1:26257 -e 'SELECT 1' >/dev/null 2>&1; do
+          echo "waiting for cluster..."; sleep 3
+        done
+        if ! ./cockroach sql --insecure --host=roach1:26257 \
+             -e 'SELECT 1 FROM movr.rides LIMIT 1' >/dev/null 2>&1; then
+          echo "seeding movr dataset..."
+          ./cockroach workload init movr "postgresql://root@roach1:26257/movr?sslmode=disable"
+        fi
+        echo "running movr workload (concurrency=${WORKLOAD_CONCURRENCY:-8}, max-rate=${WORKLOAD_MAX_RATE:-50})"
+        exec ./cockroach workload run movr \
+          --duration=0 \
+          --concurrency=${WORKLOAD_CONCURRENCY:-8} \
+          --max-rate=${WORKLOAD_MAX_RATE:-50} \
+          --tolerate-errors \
+          --display-every=30s \
+          "postgresql://root@roach1:26257/movr?sslmode=disable" \
+          "postgresql://root@roach2:26257/movr?sslmode=disable" \
+          "postgresql://root@roach3:26257/movr?sslmode=disable"
+    depends_on:
+      crdb-init:
+        condition: service_completed_successfully
+    restart: on-failure
+    networks:
+      - crdb-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: crdb-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - CRDB_CLUSTER_NAME=${CRDB_CLUSTER_NAME:-crdb-demo}
+      - CRDB_SCRAPE_INTERVAL=${CRDB_SCRAPE_INTERVAL:-15s}
+    ports:
+      - "13133:13133"   # health_check
+      - "8888:8888"     # the collector's own metrics
+    depends_on:
+      - roach1
+      - roach2
+      - roach3
+    networks:
+      - crdb-net
+
+volumes:
+  roach1-data:
+  roach2-data:
+  roach3-data:
+
+networks:
+  crdb-net:
+    driver: bridge

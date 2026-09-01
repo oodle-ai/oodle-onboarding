@@ -22,6 +22,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [openclaw-demo](./openclaw-demo) | Traces | Real OpenClaw agent traced through the real Langfuse SDK: observations described in the `langfuse.*` namespace instead of the GenAI semconv one, exported over OTLP |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
 | [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
+| [cockroachdb-demo](./cockroachdb-demo) | Metrics | Three-node CockroachDB cluster under `movr` load; OTel Collector scrapes each node's built-in `/_status/vars` Prometheus endpoint; no database config changes |
 | [convox-demo](./convox-demo) | Logs | Deploy a Rails app on Convox v2 (AWS ECS) and route each app's logs to Oodle via a host-local Fluent Bit agent (per-app identity resolved from ECS introspection); dual-write to CloudWatch during migration, then single-write to Oodle — no app code changes |
 
 ## Getting Started

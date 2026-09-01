@@ -1,0 +1,135 @@
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+
+receivers:
+  # CockroachDB exposes Prometheus-format metrics on every node's HTTP port
+  # at /_status/vars. Each node reports its own store/node metrics plus a
+  # cluster-wide view, so scrape all of them.
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "cockroachdb"
+          scrape_interval: ${env:CRDB_SCRAPE_INTERVAL}
+          metrics_path: "/_status/vars"
+          static_configs:
+            - targets: ["roach1:8080"]
+              labels:
+                crdb_node: "roach1"
+            - targets: ["roach2:8080"]
+              labels:
+                crdb_node: "roach2"
+            - targets: ["roach3:8080"]
+              labels:
+                crdb_node: "roach3"
+          relabel_configs:
+            # Stamp a logical cluster name on every series so multiple
+            # clusters can share one Oodle instance.
+            - target_label: "crdb_cluster"
+              replacement: "${env:CRDB_CLUSTER_NAME}"
+
+processors:
+  # Guard against the collector OOMing if Oodle is briefly unreachable and
+  # the retry queue grows.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  # The Prometheus receiver attaches scrape-target metadata as resource
+  # attributes, and Oodle turns every resource attribute into a metric label.
+  # Keep the useful ones (job, instance via service.instance.id) and drop the
+  # rest so ~2.4k CockroachDB series don't each carry six redundant labels.
+  resource:
+    attributes:
+      - key: service.name
+        value: "cockroachdb"
+        action: upsert
+      - key: db.system
+        value: "cockroachdb"
+        action: upsert
+      - key: net.host.name
+        action: delete
+      - key: net.host.port
+        action: delete
+      - key: server.address
+        action: delete
+      - key: server.port
+        action: delete
+      - key: http.scheme
+        action: delete
+      - key: url.scheme
+        action: delete
+
+  # Same idea for the instrumentation scope: the receiver's own package path
+  # is not useful as a label on every CockroachDB series.
+  transform/drop_scope:
+    metric_statements:
+      - context: scope
+        statements:
+          - set(name, "")
+          - set(version, "")
+
+  # Optional: CockroachDB publishes ~2,000 data points per node per scrape.
+  # Add filter/crdb to the metrics pipeline below to ship only the families the
+  # bundled dashboard uses, which cuts that to 28 per node.
+  #
+  # Match histograms by their bare name (sql_service_latency), not the
+  # Prometheus-style sql_service_latency_bucket. The receiver has already
+  # folded the exposition's _bucket/_sum/_count lines into one OTLP histogram
+  # by the time the filter runs; Oodle re-expands it on the query side.
+  filter/crdb:
+    metrics:
+      include:
+        match_type: regexp
+        metric_names:
+          - "^sql_(query|select|insert|update|delete|failure|full_scan)_count$"
+          - "^sql_conns$"
+          - "^sql_(exec|service)_latency$"
+          - "^liveness_livenodes$"
+          - "^ranges(_underreplicated|_unavailable)?$"
+          - "^replicas(_leaders|_leaseholders)?$"
+          - "^capacity(_used|_available)?$"
+          - "^livebytes$"
+          - "^rocksdb_read_amplification$"
+          - "^clock_offset_meannanos$"
+          - "^sys_(cpu_combined_percent_normalized|rss|uptime)$"
+          - "^txn_(commits|aborts)$"
+
+exporters:
+  otlphttp/oodle:
+    endpoint: "https://${env:OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      "X-OODLE-INSTANCE": "${env:OODLE_INSTANCE}"
+      "X-API-KEY": "${env:OODLE_API_KEY}"
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+
+  debug:
+    verbosity: basic
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      # Insert filter/crdb after `resource` to trim what is shipped.
+      processors: [memory_limiter, resource, transform/drop_scope, batch]
+      exporters: [otlphttp/oodle, debug]
