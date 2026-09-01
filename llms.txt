@@ -26,6 +26,7 @@ Pick by your current stack and what you want to send:
 | OpenClaw + Langfuse SDK | Traces | Real agent traced through the Langfuse SDK — `langfuse.*` attributes instead of GenAI semconv | [openclaw-demo](openclaw-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
+| None (CockroachDB) | Metrics | Scrape each node's built-in `/_status/vars` Prometheus endpoint | [cockroachdb-demo](cockroachdb-demo/README.md) |
 | Convox (AWS ECS) | Logs | Dual-write app logs to CloudWatch + Oodle via host-local OTel agent (no app changes) | [convox-demo](convox-demo/oodle-log-agent/README.md) |
 
 ## Log Collection Agents
@@ -218,6 +219,19 @@ Self-hosted Temporal with an order processing workflow in Python, fully instrume
 - Collector: OTel Collector with otlp + prometheus receivers, exporting to Oodle via OTLP
 - Dashboards: temporal-server.json (server metrics), temporal-sdk.json (SDK metrics) — from github.com/temporalio/dashboards
 - Oodle onboarding guide: [OODLE_ONBOARDING.md](temporal-demo/OODLE_ONBOARDING.md)
+
+### cockroachdb-demo
+
+Three-node CockroachDB cluster (insecure) under continuous `cockroach workload run movr` load, with an OTel Collector scraping every node's built-in Prometheus endpoint at `/_status/vars` (HTTP port 8080) and exporting to Oodle over OTLP. No CockroachDB configuration changes are needed -- the endpoint is enabled by default. Ships ~2,400 metric families per node covering SQL, KV, storage, replication, admission control, and process health. Series are labeled `crdb_cluster` (via `relabel_configs` from `CRDB_CLUSTER_NAME`) and `crdb_node` (per-target label), so multiple clusters can share one Oodle instance; prefer `crdb_node` over CockroachDB's own `node_id`, which is assigned in join order and is not stable across restarts. `resource` + `transform` processors delete the Prometheus receiver's scrape-target resource attributes (`net_host_name`, `server_address`, `http_scheme`, `otel_scope_name`, ...) that Oodle would otherwise materialize as labels on every series.
+
+- Languages: none (no application code)
+- Infra: Docker Compose (roach1/roach2/roach3 + one-shot `cockroach init` + `movr` workload + OTel Collector)
+- Signals: Metrics
+- Mechanism: `prometheus` receiver scraping `/_status/vars` on all nodes -> `otlphttp` exporter -> Oodle
+- Config files: `cockroachdb-demo/otel-collector-config.yaml`, `cockroachdb-demo/docker-compose.yml`
+- Dashboards: `cockroachdb-demo/dashboards/cockroachdb.json` (22 panels; `$cluster` / `$node` template variables)
+- Gotchas: CockroachDB latency histograms are in **nanoseconds**; `sql_txn_commit_count` only counts explicit `COMMIT` statements, so use KV-layer `txn_commits` / `txn_aborts` for real transaction throughput; secure clusters require `scheme: https` plus client certs in the scrape config
+- Oodle onboarding guide: [OODLE_ONBOARDING.md](cockroachdb-demo/OODLE_ONBOARDING.md)
 
 ### convox-demo
 
