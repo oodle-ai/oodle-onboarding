@@ -1,0 +1,36 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: vercel-ai-sdk-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4326:4318"
+      - "13141:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - vercel-ai-sdk-net
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: vercel-ai-sdk-demo-app
+    ports:
+      - "8097:8097"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_GATEWAY_URL=${OPENAI_GATEWAY_URL:-}
+      - MODEL=${MODEL:-gpt-4o-mini}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - PORT=8097
+    depends_on:
+      - otel-collector
+    networks:
+      - vercel-ai-sdk-net
+
+networks:
+  vercel-ai-sdk-net:
+    driver: bridge
