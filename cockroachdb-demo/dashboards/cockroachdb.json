@@ -74,7 +74,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "max(liveness_livenodes{crdb_cluster=~\"$cluster\"})",
+            "expr": "max(crdb_liveness_livenodes{crdb_cluster=~\"$cluster\"})",
             "legendFormat": "Live Nodes",
             "range": true,
             "refId": "A"
@@ -135,7 +135,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(ranges_underreplicated{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum(crdb_ranges_underreplicated{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "Under-replicated Ranges",
             "range": true,
             "refId": "A"
@@ -196,7 +196,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(ranges_unavailable{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum(crdb_ranges_unavailable{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "Unavailable Ranges",
             "range": true,
             "refId": "A"
@@ -258,7 +258,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_query_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_query_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "SQL Statements/sec",
             "range": true,
             "refId": "A"
@@ -319,7 +319,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "histogram_quantile(0.99, sum by (le) (rate(sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
+            "expr": "histogram_quantile(0.99, sum by (le) (rate(crdb_sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
             "legendFormat": "SQL Service Latency p99",
             "range": true,
             "refId": "A"
@@ -380,7 +380,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(sql_conns{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum(crdb_sql_conns{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "Open SQL Connections",
             "range": true,
             "refId": "A"
@@ -485,7 +485,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_select_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_select_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "select",
             "range": true,
             "refId": "A"
@@ -496,7 +496,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_insert_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_insert_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "insert",
             "range": true,
             "refId": "B"
@@ -507,7 +507,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_update_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_update_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "update",
             "range": true,
             "refId": "C"
@@ -518,7 +518,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_delete_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_delete_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "delete",
             "range": true,
             "refId": "D"
@@ -610,7 +610,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "histogram_quantile(0.50, sum by (le) (rate(sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
+            "expr": "histogram_quantile(0.50, sum by (le) (rate(crdb_sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
             "legendFormat": "p50",
             "range": true,
             "refId": "A"
@@ -621,7 +621,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "histogram_quantile(0.95, sum by (le) (rate(sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(crdb_sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
             "legendFormat": "p95",
             "range": true,
             "refId": "B"
@@ -632,7 +632,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "histogram_quantile(0.99, sum by (le) (rate(sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
+            "expr": "histogram_quantile(0.99, sum by (le) (rate(crdb_sql_service_latency_bucket{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval])))",
             "legendFormat": "p99",
             "range": true,
             "refId": "C"
@@ -724,7 +724,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (rate(sql_query_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum by (crdb_node) (rate(crdb_sql_query_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -816,7 +816,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_failure_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_failure_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "statement errors",
             "range": true,
             "refId": "A"
@@ -827,7 +827,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(sql_full_scan_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_sql_full_scan_count{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "full table scans",
             "range": true,
             "refId": "B"
@@ -932,7 +932,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(txn_commits{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_txn_commits{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "commits",
             "range": true,
             "refId": "A"
@@ -943,7 +943,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum(rate(txn_aborts{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
+            "expr": "sum(rate(crdb_txn_aborts{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"}[$__rate_interval]))",
             "legendFormat": "aborts",
             "range": true,
             "refId": "B"
@@ -1035,7 +1035,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (ranges{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_ranges{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}} ranges",
             "range": true,
             "refId": "A"
@@ -1046,7 +1046,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (replicas{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_replicas{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}} replicas",
             "range": true,
             "refId": "B"
@@ -1151,7 +1151,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (capacity_used{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_capacity_used{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1243,7 +1243,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (sys_cpu_combined_percent_normalized{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_sys_cpu_combined_percent_normalized{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1335,7 +1335,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (sys_rss{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_sys_rss{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1427,7 +1427,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "max by (crdb_node) (rocksdb_read_amplification{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "max by (crdb_node) (crdb_rocksdb_read_amplification{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1519,7 +1519,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "sum by (crdb_node) (livebytes{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "sum by (crdb_node) (crdb_livebytes{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1611,7 +1611,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "max by (crdb_node) (clock_offset_meannanos{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
+            "expr": "max by (crdb_node) (crdb_clock_offset_meannanos{crdb_cluster=~\"$cluster\", crdb_node=~\"$node\"})",
             "legendFormat": "{{crdb_node}}",
             "range": true,
             "refId": "A"
@@ -1654,7 +1654,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "definition": "label_values(liveness_livenodes, crdb_cluster)",
+          "definition": "label_values(crdb_liveness_livenodes, crdb_cluster)",
           "includeAll": true,
           "label": "Cluster",
           "multi": true,
@@ -1662,7 +1662,7 @@
           "options": [],
           "query": {
             "qryType": 1,
-            "query": "label_values(liveness_livenodes, crdb_cluster)",
+            "query": "label_values(crdb_liveness_livenodes, crdb_cluster)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           },
           "refresh": 2,
@@ -1679,7 +1679,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "definition": "label_values(liveness_livenodes{crdb_cluster=~\"$cluster\"}, crdb_node)",
+          "definition": "label_values(crdb_liveness_livenodes{crdb_cluster=~\"$cluster\"}, crdb_node)",
           "includeAll": true,
           "label": "Node",
           "multi": true,
@@ -1687,7 +1687,7 @@
           "options": [],
           "query": {
             "qryType": 1,
-            "query": "label_values(liveness_livenodes{crdb_cluster=~\"$cluster\"}, crdb_node)",
+            "query": "label_values(crdb_liveness_livenodes{crdb_cluster=~\"$cluster\"}, crdb_node)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           },
           "refresh": 2,

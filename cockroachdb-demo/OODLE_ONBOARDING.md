@@ -12,7 +12,7 @@ Shipping a CockroachDB cluster's metrics to Oodle with no changes to CockroachDB
 
 3. A **`relabel_configs`** rule stamps `crdb_cluster` on every series from the `CRDB_CLUSTER_NAME` environment variable, so several clusters can share one Oodle instance without their series colliding.
 
-4. The **`resource` and `transform` processors** drop scrape-target metadata that Oodle would otherwise turn into labels on all ~2,400 series (see "Label Hygiene" below).
+4. The **`transform/crdb` processor** prefixes the metric names and drops scrape-target metadata that Oodle would otherwise turn into labels on all ~2,400 series. Every statement is conditioned on the scrape job, so other jobs sharing the pipeline are untouched.
 
 5. The **`otlphttp/oodle` exporter** forwards everything to the `-otlp` subdomain endpoint.
 
@@ -47,28 +47,67 @@ receivers:
               replacement: "${env:CRDB_CLUSTER_NAME}"
 ```
 
-One pipeline: `prometheus` receiver → `memory_limiter`, `resource`, `transform`, `batch` → `otlphttp/oodle`.
+One pipeline: `prometheus` receiver → `memory_limiter`, `transform/crdb`, `batch` → `otlphttp/oodle`.
+
+## Scoping Every Rewrite to the Job
+
+Each rewrite below is CockroachDB-specific, so each one is conditioned on the scrape job. The Prometheus receiver maps `job_name` to the `service.name` resource attribute, which is also what Oodle renders as the `job` label:
+
+```yaml
+- context: metric
+  conditions:
+    - resource.attributes["service.name"] == "cockroachdb"
+```
+
+This matters as soon as the collector scrapes anything else. Without the condition, adding a second scrape job to this pipeline renames that job's metrics to `crdb_*`, overwrites its `job` label with `cockroachdb`, and strips its instrumentation scope. All three are silent: the metrics still arrive, under the wrong identity.
+
+## Metric Namespacing
+
+CockroachDB's exposition uses bare names: `ranges`, `replicas`, `capacity_used`, `livebytes`. In a shared Oodle instance those collide with anything else emitting generic names. `transform/crdb` renames them on the way out, so the entire cluster is one `crdb_*` search away:
+
+```yaml
+processors:
+  transform/crdb:
+    metric_statements:
+      - context: metric
+        conditions:
+          - resource.attributes["service.name"] == "cockroachdb"
+        statements:
+          - set(name, Concat(["crdb_", name], ""))
+              where not IsMatch(name, "^crdb_")
+              and not IsMatch(name, "^(up|scrape_.*)$")
+```
+
+The `^crdb_` guard makes the rename idempotent. Names on `/_status/vars` stay unprefixed, so `make scrape` and the CockroachDB DB Console still show `sql_query_count`, while Oodle stores `crdb_sql_query_count`.
+
+`up` and `scrape_*` are excluded. The Prometheus receiver synthesizes those about the scrape itself rather than reading them from CockroachDB, and `up` is a cross-ecosystem convention that alerting expects under that exact name: the integration's "Node Down" monitor reads `up{job="cockroachdb"}`.
 
 ## Label Hygiene
 
 Oodle turns every OTLP **resource attribute** into a metric label. The Prometheus receiver attaches scrape-target metadata as resource attributes, so without intervention each of the ~2,400 CockroachDB series carries six redundant labels: `net_host_name`, `net_host_port`, `server_address`, `server_port`, `http_scheme`, `url_scheme`, all of which restate `instance`. The instrumentation scope adds a seventh, `otel_scope_name`, holding the receiver's Go package path.
 
-The `resource` processor deletes the six, and a `transform` processor blanks the scope name:
+The same `transform/crdb` processor deletes the six and blanks the scope, both under the same job condition:
 
 ```yaml
 processors:
-  resource:
-    attributes:
-      - key: net.host.name
-        action: delete
-      # ...and the rest
-  transform/drop_scope:
+  transform/crdb:
     metric_statements:
+      - context: resource
+        conditions:
+          - attributes["service.name"] == "cockroachdb"
+        statements:
+          - set(attributes["db.system"], "cockroachdb")
+          - delete_key(attributes, "net.host.name")
+          # ...and the rest
       - context: scope
+        conditions:
+          - resource.attributes["service.name"] == "cockroachdb"
         statements:
           - set(name, "")
           - set(version, "")
 ```
+
+`service.name` is deliberately left alone. The receiver already set it to the job name, and overwriting it with a literal `cockroachdb` would relabel every other job's metrics as if they came from the database.
 
 Resulting label set on every series:
 
@@ -98,20 +137,20 @@ oodle dashboards create -f dashboards/cockroachdb.json
 ## Verifying with Oodle CLI
 
 ```bash
-# Metric families arriving
-oodle metrics names -o csv | grep -E '^(sql_|txn_|ranges|replicas|liveness_|capacity)'
+# Metric families arriving (every CockroachDB series is crdb_ prefixed)
+oodle metrics names -o csv | grep '^crdb_'
 
 # Cluster is whole
-oodle metrics query --query 'max(liveness_livenodes{crdb_cluster="crdb-demo"})' -o table
+oodle metrics query --query 'max(crdb_liveness_livenodes{crdb_cluster="crdb-demo"})' -o table
 
 # Throughput per gateway node
-oodle metrics query --query 'sum by (crdb_node) (rate(sql_query_count{crdb_cluster="crdb-demo"}[5m]))' -o table
+oodle metrics query --query 'sum by (crdb_node) (rate(crdb_sql_query_count{crdb_cluster="crdb-demo"}[5m]))' -o table
 
 # p99 statement latency (nanoseconds)
-oodle metrics query --query 'histogram_quantile(0.99, sum by (le) (rate(sql_service_latency_bucket{crdb_cluster="crdb-demo"}[5m])))' -o table
+oodle metrics query --query 'histogram_quantile(0.99, sum by (le) (rate(crdb_sql_service_latency_bucket{crdb_cluster="crdb-demo"}[5m])))' -o table
 
 # Replication health
-oodle metrics query --query 'sum(ranges_underreplicated{crdb_cluster="crdb-demo"})' -o table
+oodle metrics query --query 'sum(crdb_ranges_underreplicated{crdb_cluster="crdb-demo"})' -o table
 ```
 
 `make verify` runs the same checks, plus the collector's own export counters.
@@ -120,9 +159,15 @@ oodle metrics query --query 'sum(ranges_underreplicated{crdb_cluster="crdb-demo"
 
 | Condition | Expression |
 |-----------|------------|
-| Node down | `max(liveness_livenodes{crdb_cluster="..."}) < 3` |
-| Ranges lost quorum | `sum(ranges_unavailable{crdb_cluster="..."}) > 0` |
-| Under-replication persists | `sum(ranges_underreplicated{crdb_cluster="..."}) > 0` for 15m |
-| Statement latency regression | `histogram_quantile(0.99, sum by (le) (rate(sql_service_latency_bucket{...}[5m]))) > 1e9` (1s, in ns) |
-| Disk filling | `max by (crdb_node) (capacity_used{...} / capacity{...}) > 0.8` |
-| Compaction falling behind | `max by (crdb_node) (rocksdb_read_amplification{...}) > 20` |
+| Node down | `max(crdb_liveness_livenodes{crdb_cluster="..."}) < 3` |
+| Ranges lost quorum | `sum(crdb_ranges_unavailable{crdb_cluster="..."}) > 0` |
+| Under-replication persists | `sum(crdb_ranges_underreplicated{crdb_cluster="..."}) > 0` for 15m |
+| Statement latency regression | `histogram_quantile(0.99, sum by (le) (rate(crdb_sql_service_latency_bucket{...}[5m]))) > 1e9` (1s, in ns) |
+| Disk filling | `max by (crdb_node) (crdb_capacity_used{...} / crdb_capacity{...}) > 0.8` |
+| Compaction falling behind | `max by (crdb_node) (crdb_rocksdb_read_amplification{...}) > 20` |
+
+## Prefix and the Built-in Integration
+
+Oodle's CockroachDB integration dashboards (the `CockroachDB - Oodle Integration` folder) and its twelve recommended monitors query the `crdb_` prefixed names, so the pipeline in this demo feeds them without further changes. The integration tile publishes the same `transform/crdb` processor in its setup instructions.
+
+An existing collector that predates the prefix must add `transform/crdb`, otherwise the integration dashboards and monitors read metrics that no longer arrive.
