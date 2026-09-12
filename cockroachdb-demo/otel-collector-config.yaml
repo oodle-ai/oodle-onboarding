@@ -74,9 +74,29 @@ processors:
           - set(name, "")
           - set(version, "")
 
+  # CockroachDB's exposition uses bare names (sql_query_count, ranges,
+  # capacity_used) that collide with anything else landing in the same Oodle
+  # instance. Namespace every series with crdb_ so the whole cluster is one
+  # `crdb_*` prefix search away.
+  #
+  # `up` and `scrape_*` are excluded: the Prometheus receiver synthesizes those
+  # about the scrape itself rather than reading them from CockroachDB, and `up`
+  # is a cross-ecosystem convention that alerting expects under that exact
+  # name. The ^crdb_ guard keeps the rename idempotent.
+  transform/prefix:
+    metric_statements:
+      - context: metric
+        statements:
+          - set(name, Concat(["crdb_", name], ""))
+              where not IsMatch(name, "^crdb_")
+              and not IsMatch(name, "^(up|scrape_.*)$")
+
   # Optional: CockroachDB publishes ~2,000 data points per node per scrape.
   # Add filter/crdb to the metrics pipeline below to ship only the families the
   # bundled dashboard uses, which cuts that to 28 per node.
+  #
+  # These patterns match the pre-prefix names, so keep filter/crdb ahead of
+  # transform/prefix in the pipeline.
   #
   # Match histograms by their bare name (sql_service_latency), not the
   # Prometheus-style sql_service_latency_bucket. The receiver has already
@@ -130,6 +150,6 @@ service:
   pipelines:
     metrics:
       receivers: [prometheus]
-      # Insert filter/crdb after `resource` to trim what is shipped.
-      processors: [memory_limiter, resource, transform/drop_scope, batch]
+      # Insert filter/crdb before transform/prefix to trim what is shipped.
+      processors: [memory_limiter, resource, transform/drop_scope, transform/prefix, batch]
       exporters: [otlphttp/oodle, debug]

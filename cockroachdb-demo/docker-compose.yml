@@ -55,7 +55,17 @@ services:
   crdb-init:
     image: *crdb-image
     container_name: crdb-init
-    command: ["init", "--insecure", "--host=roach1:26257"]
+    entrypoint: ["/bin/bash", "-c"]
+    # `init` exits non-zero on an already-initialized cluster, which with
+    # `restart: on-failure` would loop forever and keep the workload (which
+    # waits on service_completed_successfully) from ever starting. Treat an
+    # already-formed cluster as success so `make down && make up` works
+    # without `make clean`.
+    command:
+      - |
+        ./cockroach init --insecure --host=roach1:26257 2>&1 | tee /tmp/init.log
+        grep -q "already been initialized" /tmp/init.log && echo "cluster already initialized" && exit 0
+        grep -q "Cluster successfully initialized" /tmp/init.log
     depends_on:
       roach1:
         condition: service_started

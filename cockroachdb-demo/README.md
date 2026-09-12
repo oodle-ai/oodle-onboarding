@@ -67,24 +67,38 @@ Run `make help` for the full target list.
 
 CockroachDB exposes roughly 2,400 distinct metric families per node covering SQL, KV, storage, replication, admission control, and process health. This demo ships all of them, which works out to ~2,000 OTLP data points per node per scrape.
 
+Every series is namespaced with a `crdb_` prefix by the collector's
+`transform/prefix` processor, so CockroachDB's generic exposition names
+(`ranges`, `capacity_used`, `livebytes`) cannot collide with anything else in
+the same Oodle instance. The raw exposition on `/_status/vars` is unprefixed;
+the prefix is added on the way out.
+
+`up` and `scrape_*` keep their standard names. The Prometheus receiver reports
+those about the scrape rather than reading them from CockroachDB, and `up` is a
+convention that alerting expects under that exact name.
+
+Oodle's built-in CockroachDB integration dashboards and monitors query the same
+`crdb_` names, so this pipeline feeds them as well as the bundled
+`dashboards/cockroachdb.json`.
+
 Metrics worth knowing:
 
 | Metric | What it tells you |
 |--------|-------------------|
-| `liveness_livenodes` | Nodes the cluster considers live. Alert if it drops below your node count. |
-| `ranges_underreplicated` | Ranges below the configured replication factor. Sustained non-zero means rebalancing is stuck. |
-| `ranges_unavailable` | Ranges that lost quorum. Any non-zero value means part of the keyspace is unreadable. |
-| `sql_query_count` | Total SQL statements. Split by `crdb_node` to check gateway balance. |
-| `sql_select_count` / `sql_insert_count` / `sql_update_count` / `sql_delete_count` | Statement mix. |
-| `sql_service_latency_bucket` | Full server-side statement latency histogram, in **nanoseconds**. |
-| `sql_exec_latency_bucket` | Execution-only latency. The gap versus service latency is planning and parsing. |
-| `sql_failure_count` | Statements that returned an error. |
-| `sql_full_scan_count` | Full table scans, the usual first suspect when p99 climbs without a traffic change. |
-| `txn_commits` / `txn_aborts` | KV-layer transaction outcomes. |
-| `capacity_used` / `capacity` | Per-store disk usage. |
-| `rocksdb_read_amplification` | SSTs read per lookup. Above ~20 means compaction is falling behind. |
-| `sys_cpu_combined_percent_normalized` | CPU, already normalized to core count (1.0 = saturated). |
-| `clock_offset_meannanos` | Clock skew against peers. A node self-terminates as this approaches half of `--max-offset`. |
+| `crdb_liveness_livenodes` | Nodes the cluster considers live. Alert if it drops below your node count. |
+| `crdb_ranges_underreplicated` | Ranges below the configured replication factor. Sustained non-zero means rebalancing is stuck. |
+| `crdb_ranges_unavailable` | Ranges that lost quorum. Any non-zero value means part of the keyspace is unreadable. |
+| `crdb_sql_query_count` | Total SQL statements. Split by `crdb_node` to check gateway balance. |
+| `crdb_sql_select_count` / `crdb_sql_insert_count` / `crdb_sql_update_count` / `crdb_sql_delete_count` | Statement mix. |
+| `crdb_sql_service_latency_bucket` | Full server-side statement latency histogram, in **nanoseconds**. |
+| `crdb_sql_exec_latency_bucket` | Execution-only latency. The gap versus service latency is planning and parsing. |
+| `crdb_sql_failure_count` | Statements that returned an error. |
+| `crdb_sql_full_scan_count` | Full table scans, the usual first suspect when p99 climbs without a traffic change. |
+| `crdb_txn_commits` / `crdb_txn_aborts` | KV-layer transaction outcomes. |
+| `crdb_capacity_used` / `crdb_capacity` | Per-store disk usage. |
+| `crdb_rocksdb_read_amplification` | SSTs read per lookup. Above ~20 means compaction is falling behind. |
+| `crdb_sys_cpu_combined_percent_normalized` | CPU, already normalized to core count (1.0 = saturated). |
+| `crdb_clock_offset_meannanos` | Clock skew against peers. A node self-terminates as this approaches half of `--max-offset`. |
 
 Inspect the raw exposition directly:
 
@@ -109,15 +123,17 @@ Prefer `crdb_node` over `node_id` for grouping. CockroachDB assigns node IDs in 
 
 ## Why Transactions Look Idle
 
-`sql_txn_commit_count` counts explicit `COMMIT` statements only. The `movr` workload uses implicit transactions, so that metric sits at zero while the cluster is clearly busy. Use the KV-layer counters `txn_commits` and `txn_aborts` for real transaction throughput.
+`crdb_sql_txn_commit_count` counts explicit `COMMIT` statements only. The `movr` workload uses implicit transactions, so that metric sits at zero while the cluster is clearly busy. Use the KV-layer counters `crdb_txn_commits` and `crdb_txn_aborts` for real transaction throughput.
 
 ## Trimming Ingest Volume
 
 Three nodes at a 15s scrape interval is roughly 400 data points per second. `otel-collector-config.yaml` defines a `filter/crdb` processor that keeps only the families this dashboard uses. Add it to the metrics pipeline to drop from ~2,000 data points per node per scrape to 28:
 
 ```yaml
-processors: [memory_limiter, resource, filter/crdb, transform/drop_scope, batch]
+processors: [memory_limiter, resource, transform/drop_scope, filter/crdb, transform/prefix, batch]
 ```
+
+`filter/crdb` matches the raw CockroachDB names, so it has to sit **before** `transform/prefix`.
 
 Raising `CRDB_SCRAPE_INTERVAL` in `.env` is the other lever.
 
