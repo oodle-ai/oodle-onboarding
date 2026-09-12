@@ -22,7 +22,7 @@ roach1        roach2        roach3          <- 3-node CockroachDB cluster
                   v
         OTel Collector
           prometheus receiver
-          resource + transform processors (label hygiene)
+          transform/crdb (prefix + label hygiene, scoped to the job)
           batch processor
                   |
                   v OTLP/HTTP
@@ -68,7 +68,7 @@ Run `make help` for the full target list.
 CockroachDB exposes roughly 2,400 distinct metric families per node covering SQL, KV, storage, replication, admission control, and process health. This demo ships all of them, which works out to ~2,000 OTLP data points per node per scrape.
 
 Every series is namespaced with a `crdb_` prefix by the collector's
-`transform/prefix` processor, so CockroachDB's generic exposition names
+`transform/crdb` processor, so CockroachDB's generic exposition names
 (`ranges`, `capacity_used`, `livebytes`) cannot collide with anything else in
 the same Oodle instance. The raw exposition on `/_status/vars` is unprefixed;
 the prefix is added on the way out.
@@ -76,6 +76,13 @@ the prefix is added on the way out.
 `up` and `scrape_*` keep their standard names. The Prometheus receiver reports
 those about the scrape rather than reading them from CockroachDB, and `up` is a
 convention that alerting expects under that exact name.
+
+Every rewrite is conditioned on `resource.attributes["service.name"] ==
+"cockroachdb"`, which the Prometheus receiver sets from `job_name`. Add another
+scrape job to this pipeline and its metrics pass through untouched: they keep
+their own names, their own `job` label, and their own scope. Without that
+guard, a second job's metrics would be renamed to `crdb_*` and relabelled as
+`job="cockroachdb"`.
 
 Oodle's built-in CockroachDB integration dashboards and monitors query the same
 `crdb_` names, so this pipeline feeds them as well as the bundled
@@ -130,10 +137,10 @@ Prefer `crdb_node` over `node_id` for grouping. CockroachDB assigns node IDs in 
 Three nodes at a 15s scrape interval is roughly 400 data points per second. `otel-collector-config.yaml` defines a `filter/crdb` processor that keeps only the families this dashboard uses. Add it to the metrics pipeline to drop from ~2,000 data points per node per scrape to 28:
 
 ```yaml
-processors: [memory_limiter, resource, transform/drop_scope, filter/crdb, transform/prefix, batch]
+processors: [memory_limiter, filter/crdb, transform/crdb, batch]
 ```
 
-`filter/crdb` matches the raw CockroachDB names, so it has to sit **before** `transform/prefix`.
+`filter/crdb` matches the raw CockroachDB names, so it has to sit **before** `transform/crdb`. Its condition is scoped to the `cockroachdb` job and drops only what that job emits outside the keep list, so other jobs sharing the pipeline pass through. An include-style filter would drop them all. `up` stays in the keep list because the recommended "Node Down" monitor reads it.
 
 Raising `CRDB_SCRAPE_INTERVAL` in `.env` is the other lever.
 

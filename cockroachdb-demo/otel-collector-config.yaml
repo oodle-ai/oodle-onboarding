@@ -40,85 +40,79 @@ processors:
     timeout: 5s
     send_batch_size: 1024
 
-  # The Prometheus receiver attaches scrape-target metadata as resource
-  # attributes, and Oodle turns every resource attribute into a metric label.
-  # Keep the useful ones (job, instance via service.instance.id) and drop the
-  # rest so ~2.4k CockroachDB series don't each carry six redundant labels.
-  resource:
-    attributes:
-      - key: service.name
-        value: "cockroachdb"
-        action: upsert
-      - key: db.system
-        value: "cockroachdb"
-        action: upsert
-      - key: net.host.name
-        action: delete
-      - key: net.host.port
-        action: delete
-      - key: server.address
-        action: delete
-      - key: server.port
-        action: delete
-      - key: http.scheme
-        action: delete
-      - key: url.scheme
-        action: delete
-
-  # Same idea for the instrumentation scope: the receiver's own package path
-  # is not useful as a label on every CockroachDB series.
-  transform/drop_scope:
+  # Every rewrite below is CockroachDB-specific, so each one is guarded on the
+  # scrape job. The Prometheus receiver maps job_name to the service.name
+  # resource attribute, which is also what Oodle renders as the `job` label.
+  # Without the guard, adding any other scrape job to this pipeline would
+  # rename that job's metrics, restamp its job label, and strip its scope.
+  transform/crdb:
     metric_statements:
-      - context: scope
-        statements:
-          - set(name, "")
-          - set(version, "")
-
-  # CockroachDB's exposition uses bare names (sql_query_count, ranges,
-  # capacity_used) that collide with anything else landing in the same Oodle
-  # instance. Namespace every series with crdb_ so the whole cluster is one
-  # `crdb_*` prefix search away.
-  #
-  # `up` and `scrape_*` are excluded: the Prometheus receiver synthesizes those
-  # about the scrape itself rather than reading them from CockroachDB, and `up`
-  # is a cross-ecosystem convention that alerting expects under that exact
-  # name. The ^crdb_ guard keeps the rename idempotent.
-  transform/prefix:
-    metric_statements:
+      # CockroachDB's exposition uses bare names (sql_query_count, ranges,
+      # capacity_used) that collide with anything else landing in the same
+      # Oodle instance. Namespace them so the whole cluster is one `crdb_*`
+      # prefix search away.
+      #
+      # `up` and `scrape_*` are excluded: the receiver synthesizes those about
+      # the scrape itself rather than reading them from CockroachDB, and `up`
+      # is a cross-ecosystem convention that alerting expects under that exact
+      # name. The ^crdb_ guard keeps the rename idempotent.
       - context: metric
+        conditions:
+          - resource.attributes["service.name"] == "cockroachdb"
         statements:
           - set(name, Concat(["crdb_", name], ""))
               where not IsMatch(name, "^crdb_")
               and not IsMatch(name, "^(up|scrape_.*)$")
 
+      # Oodle turns every OTLP resource attribute into a metric label. The
+      # Prometheus receiver attaches scrape-target metadata as resource
+      # attributes, all of which restate `instance`, so drop them rather than
+      # carry six redundant labels on every one of ~2.4k series.
+      #
+      # service.name is left alone: the receiver already set it to the job
+      # name, and overwriting it would relabel other jobs as `cockroachdb`.
+      - context: resource
+        conditions:
+          - attributes["service.name"] == "cockroachdb"
+        statements:
+          - set(attributes["db.system"], "cockroachdb")
+          - delete_key(attributes, "net.host.name")
+          - delete_key(attributes, "net.host.port")
+          - delete_key(attributes, "server.address")
+          - delete_key(attributes, "server.port")
+          - delete_key(attributes, "http.scheme")
+          - delete_key(attributes, "url.scheme")
+
+      # Same idea for the instrumentation scope: the receiver's own package
+      # path is not useful as a label on every CockroachDB series.
+      - context: scope
+        conditions:
+          - resource.attributes["service.name"] == "cockroachdb"
+        statements:
+          - set(name, "")
+          - set(version, "")
+
   # Optional: CockroachDB publishes ~2,000 data points per node per scrape.
   # Add filter/crdb to the metrics pipeline below to ship only the families the
   # bundled dashboard uses, which cuts that to 28 per node.
   #
-  # These patterns match the pre-prefix names, so keep filter/crdb ahead of
-  # transform/prefix in the pipeline.
+  # The condition drops a data point only when it came from the cockroachdb
+  # job and is not in the keep list, so other jobs sharing the pipeline pass
+  # through untouched. An include-style filter would drop them all.
+  #
+  # The patterns match the pre-prefix names, so keep filter/crdb ahead of
+  # transform/crdb in the pipeline. `up` is in the keep list because the
+  # recommended "Node Down" monitor reads it.
   #
   # Match histograms by their bare name (sql_service_latency), not the
   # Prometheus-style sql_service_latency_bucket. The receiver has already
   # folded the exposition's _bucket/_sum/_count lines into one OTLP histogram
   # by the time the filter runs; Oodle re-expands it on the query side.
   filter/crdb:
+    error_mode: ignore
     metrics:
-      include:
-        match_type: regexp
-        metric_names:
-          - "^sql_(query|select|insert|update|delete|failure|full_scan)_count$"
-          - "^sql_conns$"
-          - "^sql_(exec|service)_latency$"
-          - "^liveness_livenodes$"
-          - "^ranges(_underreplicated|_unavailable)?$"
-          - "^replicas(_leaders|_leaseholders)?$"
-          - "^capacity(_used|_available)?$"
-          - "^livebytes$"
-          - "^rocksdb_read_amplification$"
-          - "^clock_offset_meannanos$"
-          - "^sys_(cpu_combined_percent_normalized|rss|uptime)$"
-          - "^txn_(commits|aborts)$"
+      metric:
+        - 'resource.attributes["service.name"] == "cockroachdb" and not IsMatch(name, "^(sql_(query|select|insert|update|delete|failure|full_scan)_count|sql_conns|sql_(exec|service)_latency|liveness_livenodes|ranges(_underreplicated|_unavailable)?|replicas(_leaders|_leaseholders)?|capacity(_used|_available)?|livebytes|rocksdb_read_amplification|clock_offset_meannanos|sys_(cpu_combined_percent_normalized|rss|uptime)|txn_(commits|aborts)|up)$")'
 
 exporters:
   otlphttp/oodle:
@@ -150,6 +144,6 @@ service:
   pipelines:
     metrics:
       receivers: [prometheus]
-      # Insert filter/crdb before transform/prefix to trim what is shipped.
-      processors: [memory_limiter, resource, transform/drop_scope, transform/prefix, batch]
+      # Insert filter/crdb before transform/crdb to trim what is shipped.
+      processors: [memory_limiter, transform/crdb, batch]
       exporters: [otlphttp/oodle, debug]
