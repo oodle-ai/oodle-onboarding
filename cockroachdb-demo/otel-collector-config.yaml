@@ -92,28 +92,6 @@ processors:
           - set(name, "")
           - set(version, "")
 
-  # Optional: CockroachDB publishes ~2,000 data points per node per scrape.
-  # Add filter/crdb to the metrics pipeline below to ship only the families the
-  # bundled dashboard uses, which cuts that to 28 per node.
-  #
-  # The condition drops a data point only when it came from the cockroachdb
-  # job and is not in the keep list, so other jobs sharing the pipeline pass
-  # through untouched. An include-style filter would drop them all.
-  #
-  # The patterns match the pre-prefix names, so keep filter/crdb ahead of
-  # transform/crdb in the pipeline. `up` is in the keep list because the
-  # recommended "Node Down" monitor reads it.
-  #
-  # Match histograms by their bare name (sql_service_latency), not the
-  # Prometheus-style sql_service_latency_bucket. The receiver has already
-  # folded the exposition's _bucket/_sum/_count lines into one OTLP histogram
-  # by the time the filter runs; Oodle re-expands it on the query side.
-  filter/crdb:
-    error_mode: ignore
-    metrics:
-      metric:
-        - 'resource.attributes["service.name"] == "cockroachdb" and not IsMatch(name, "^(sql_(query|select|insert|update|delete|failure|full_scan)_count|sql_conns|sql_(exec|service)_latency|liveness_livenodes|ranges(_underreplicated|_unavailable)?|replicas(_leaders|_leaseholders)?|capacity(_used|_available)?|livebytes|rocksdb_read_amplification|clock_offset_meannanos|sys_(cpu_combined_percent_normalized|rss|uptime)|txn_(commits|aborts)|up)$")'
-
 exporters:
   otlphttp/oodle:
     endpoint: "https://${env:OODLE_INSTANCE}-otlp.collector.oodle.ai"
@@ -144,6 +122,5 @@ service:
   pipelines:
     metrics:
       receivers: [prometheus]
-      # Insert filter/crdb before transform/crdb to trim what is shipped.
       processors: [memory_limiter, transform/crdb, batch]
       exporters: [otlphttp/oodle, debug]

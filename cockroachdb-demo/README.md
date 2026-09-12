@@ -132,17 +132,11 @@ Prefer `crdb_node` over `node_id` for grouping. CockroachDB assigns node IDs in 
 
 `crdb_sql_txn_commit_count` counts explicit `COMMIT` statements only. The `movr` workload uses implicit transactions, so that metric sits at zero while the cluster is clearly busy. Use the KV-layer counters `crdb_txn_commits` and `crdb_txn_aborts` for real transaction throughput.
 
-## Trimming Ingest Volume
+## Ingest Volume
 
-Three nodes at a 15s scrape interval is roughly 400 data points per second. `otel-collector-config.yaml` defines a `filter/crdb` processor that keeps only the families this dashboard uses. Add it to the metrics pipeline to drop from ~2,000 data points per node per scrape to 28:
+Three nodes at a 15s scrape interval is roughly 400 data points per second. Every family CockroachDB publishes is shipped, so the metric you want is already in Oodle when you go looking for it, and the integration's dashboards and monitors all resolve.
 
-```yaml
-processors: [memory_limiter, filter/crdb, transform/crdb, batch]
-```
-
-`filter/crdb` matches the raw CockroachDB names, so it has to sit **before** `transform/crdb`. Its condition is scoped to the `cockroachdb` job and drops only what that job emits outside the keep list, so other jobs sharing the pipeline pass through. An include-style filter would drop them all. `up` stays in the keep list because the recommended "Node Down" monitor reads it.
-
-Raising `CRDB_SCRAPE_INTERVAL` in `.env` is the other lever.
+`CRDB_SCRAPE_INTERVAL` in `.env` is the lever if that volume matters.
 
 ## Applying This to a Real Cluster
 
