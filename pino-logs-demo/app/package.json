@@ -1,0 +1,22 @@
+{
+  "name": "pino-logs-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pino logs shipped to Oodle over OTLP, correlated with traces",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --require ./instrumentation.js server.js"
+  },
+  "dependencies": {
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.220.0",
+    "@opentelemetry/instrumentation": "^0.220.0",
+    "@opentelemetry/instrumentation-http": "^0.220.0",
+    "@opentelemetry/instrumentation-pino": "^0.68.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
+    "@opentelemetry/sdk-trace-node": "^2.8.0",
+    "@opentelemetry/semantic-conventions": "^1.38.0",
+    "pino": "^10.0.0",
+    "pino-opentelemetry-transport": "^4.0.0"
+  }
+}

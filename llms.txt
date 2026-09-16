@@ -23,6 +23,8 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | LLM observability (Traceloop + Gemini) | [traceloop-demo](traceloop-demo/README.md) |
 | None (greenfield) | Traces, logs | LLM observability (Official OTel GenAI + Gemini) | [llmops-otel-demo](llmops-otel-demo/README.md) |
 | None (greenfield) | Traces | AI agent observability (Pydantic AI + any LLM) | [pydantic-ai-demo](pydantic-ai-demo/README.md) |
+| None (greenfield) | Traces | AI agent observability (LangGraph StateGraph + LangChain OTel instrumentor) | [langgraph-agent-demo](langgraph-agent-demo/README.md) |
+| None (Node.js) | Logs, traces | Pino logs over OTLP with the request trace id on every line | [pino-logs-demo](pino-logs-demo/README.md) |
 | OpenClaw + Langfuse SDK | Traces | Real agent traced through the Langfuse SDK — `langfuse.*` attributes instead of GenAI semconv | [openclaw-demo](openclaw-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
@@ -184,6 +186,32 @@ AI agent observability using Pydantic AI with built-in OpenTelemetry instrumenta
 - Config files: `otel-collector-config.yaml`, `docker-compose.yml`
 - Spans emitted: `invoke_agent` (agent run), `chat` (model request), `execute_tool` (tool execution)
 
+### langgraph-agent-demo
+
+AI agent observability for graphs built directly on LangGraph's `StateGraph`. A Python FastAPI app runs a ReAct loop (`ToolNode` + `tools_condition`) and a two-node research-then-plan pipeline, traced through `opentelemetry-instrumentation-langchain`: LangGraph drives every node through LangChain's callback system, so one `LangchainInstrumentor().instrument()` call traces the graph run, each node, every model call and every tool call. No LangGraph-specific instrumentor and no manual spans. A second container runs the same ReAct graph on LangGraph.js with `@traceloop/instrumentation-langchain`; that package starts every span under the active span and reads no `parentRunId`, so it runs beside `@opentelemetry/instrumentation-http` and the request span keeps one request to one trace.
+
+- Languages: Python, JavaScript (Node.js 22)
+- Infra: Docker Compose
+- Signals: Traces (LLM agent-specific)
+- Instrumentation: `opentelemetry-instrumentation-langchain` (Python), `@traceloop/instrumentation-langchain` + `@opentelemetry/instrumentation-http` (Node)
+- Collector: OTel Collector exporting to Oodle via OTLP (gzip)
+- Requires: OpenAI API key (or `OPENAI_GATEWAY_URL` for an OpenAI-compatible gateway) + Oodle credentials
+- Config files: `otel-collector-config.yaml`, `docker-compose.yml`
+- Spans emitted: `invoke_agent` (graph run, agent `LangGraph`), `execute_task` (each node), `chat` (model request), `execute_tool` (tool execution)
+
+### pino-logs-demo
+
+Pino logs from a Node.js HTTP app shipped to Oodle over OTLP. `pino-opentelemetry-transport` turns every line into an OTLP log record (level to severity, message to body, other fields to attributes); `@opentelemetry/instrumentation-pino` writes the active span's `trace_id` and `span_id` on each line, which the transport lifts into the record's trace context, and `@opentelemetry/instrumentation-http` opens that span per request. The instrumentation runs with `disableLogSending: true` so the transport is the only sender.
+
+- Languages: JavaScript (Node.js 22)
+- Infra: Docker Compose
+- Signals: Logs, traces
+- Instrumentation: `pino-opentelemetry-transport`, `@opentelemetry/instrumentation-pino`, `@opentelemetry/instrumentation-http`
+- Collector: OTel Collector with `logs` and `traces` pipelines exporting to Oodle via OTLP
+- Requires: Oodle credentials only
+- Config files: `otel-collector-config.yaml`, `docker-compose.yml`, `app/logger.js`, `app/instrumentation.js`
+- Fields in Oodle: `service`, `message`, `norm_level`, `log.attributes.*`, `trace_id`, `span_id`
+
 ### openclaw-demo
 
 The real OpenClaw agent (npm `openclaw`, run as `openclaw agent --local`) traced by an OpenClaw plugin that records observations through the real Langfuse SDK (`@langfuse/tracing`) and exports them over OTLP. The plugin maps OpenClaw's typed hooks (`before_agent_start`, `llm_input`, `llm_output`, `after_tool_call`, `agent_end`) onto Langfuse observations; every `langfuse.*` attribute is written by the SDK. This is the non-semconv path: `langfuse.observation.type` instead of `gen_ai.operation.name`, `langfuse.observation.input` / `.output` instead of the message attributes, `langfuse.observation.usage_details` for token counts (cache reads included), and the run payload under `langfuse.trace.*` on the root span. Oodle resolves these onto the GenAI semconv attributes at ingest, so the trace reaches Agent Observability with a transcript, model, tokens and cost. OpenClaw's own `diagnostics-otel` exporter emits standard `gen_ai.*` spans instead — this demo is deliberately the other path.
@@ -263,6 +291,7 @@ Get these from the Oodle UI: Settings > API Keys.
 | Logs | HTTP/JSON | `https://{INSTANCE}-logs.collector.oodle.ai/ingest/v1/logs` |
 | Logs | OTLP/HTTP | `https://{INSTANCE}-logs.collector.oodle.ai/ingest/otel/v1/logs` |
 | Traces | OTLP/HTTP | `https://{INSTANCE}-otlp.collector.oodle.ai/v1/traces` |
+| Logs | OTLP/HTTP | `https://{INSTANCE}-otlp.collector.oodle.ai/v1/logs` |
 | Metrics (Datadog) | Datadog API | `https://{COLLECTOR}/v1/datadog/{INSTANCE}` |
 
 ### Authentication Headers

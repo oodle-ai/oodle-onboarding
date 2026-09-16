@@ -22,6 +22,8 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [langfuse-demo](./langfuse-demo) | Traces | LLM observability through the Langfuse SDK, exported over OTLP |
 | [openlit-demo](./openlit-demo) | Traces | OpenLIT auto-instrumentation across LLMs, vector databases, MCP tools and GPU metrics |
 | [langchain-agent-demo](./langchain-agent-demo) | Traces | LangChain and LangGraph agents through the LangChain OTel instrumentor |
+| [langgraph-agent-demo](./langgraph-agent-demo) | Traces | Graphs built directly on LangGraph's `StateGraph`, traced node by node through the LangChain OTel instrumentor |
+| [pino-logs-demo](./pino-logs-demo) | Logs, traces | Pino logs from a Node.js app over OTLP, with the request trace id on every line |
 | [openai-demo](./openai-demo) | Traces, logs | OpenAI SDK auto-instrumented with the official OpenTelemetry GenAI instrumentation |
 | [litellm-demo](./litellm-demo) | Traces, logs | One LiteLLM call routed to any provider, traced through its `otel` callback |
 | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | Traces | Vercel AI SDK 7 agents, steps and tool calls through `@ai-sdk/otel` |
@@ -49,6 +51,7 @@ end to end without wiring one up first.
 | Google Gemini | [llmops-otel-demo](./llmops-otel-demo) | Python |
 | LiteLLM | [litellm-demo](./litellm-demo) | Python |
 | LangChain | [langchain-agent-demo](./langchain-agent-demo) | Python |
+| LangGraph | [langgraph-agent-demo](./langgraph-agent-demo) | Python, TypeScript |
 | Traceloop | [traceloop-demo](./traceloop-demo) | Python |
 
 Every one of them exports through an OTel Collector, so the same
