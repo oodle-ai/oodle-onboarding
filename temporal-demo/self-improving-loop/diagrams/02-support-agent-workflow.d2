@@ -1,0 +1,51 @@
+...@_style
+
+# Connect stage boundaries. Keep the model/tool exchange inside its stage.
+grid-rows: 1
+horizontal-gap: 60
+
+title: Inside the support agent {class: title}
+
+pin: {
+  class: card
+  label: 01 / ACTIVITY
+  label.near: top-center
+  width: 224
+  height: 292
+  style: {font-size: 14; bold: true; font-color: "#3D6397"}
+  heading: Pin the prompt {class: heading}
+  body: "Oodle Prompts\nproduction → vN" {class: body}
+  detail: "resolve_prompt\nFixed for this run" {class: detail}
+}
+
+run: {
+  class: card
+  label: 02 / ACTIVITIES
+  label.near: top-center
+  width: 224
+  height: 292
+  grid-gap: 64
+  horizontal-gap: 20
+  style: {font-size: 14; bold: true; font-color: "#3D6397"}
+
+  model: "Ask Gemini\nagent_turn" {class: activity}
+  tool: "Run tools\nagent_tool" {class: activity}
+  model <-> tool: calls / results {class: flow}
+}
+
+reply: {
+  class: card
+  label: 03 / RESULT
+  label.near: top-center
+  width: 224
+  height: 292
+  style: {font-size: 14; bold: true; font-color: "#3D6397"}
+  heading: Return the reply {class: heading}
+  body: "Finish when the model\nhas no more tool calls" {class: body}
+  detail: "Same prompt version\nfrom start to finish" {class: detail}
+}
+
+pin -> run: vN {class: flow}
+run -> reply: done {class: flow}
+
+caption: "One ticket → one trace in Oodle, tagged with the prompt version.\nTool errors go back to the model so it can correct its arguments." {class: caption}

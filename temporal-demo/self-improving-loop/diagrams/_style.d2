@@ -1,0 +1,82 @@
+# Shared visual language for the blog figures. Keep all assets native to D2.
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+    pad: 32
+  }
+}
+
+style.fill: "#FFFFFF"
+
+classes: {
+  title: {
+    shape: text
+    near: top-center
+    style: {font-size: 30; bold: true; font-color: "#173541"}
+  }
+  caption: {
+    shape: text
+    near: bottom-center
+    style: {font-size: 18; font-color: "#566A75"}
+  }
+  card: {
+    label: ""
+    width: 320
+    height: 180
+    grid-columns: 1
+    grid-gap: 12
+    style: {
+      fill: "#EFF5FD"
+      stroke: "#B7CDE8"
+      stroke-width: 1
+      border-radius: 14
+    }
+  }
+  oodle: {
+    style: {fill: "#EBF7F3"; stroke: "#9ACDBE"}
+  }
+  gate: {
+    style: {fill: "#FFF6E6"; stroke: "#E7C17D"}
+  }
+  human: {
+    style: {fill: "#F5F0FB"; stroke: "#CAB8E4"}
+  }
+  tag: {
+    shape: text
+    style: {font-size: 14; bold: true; font-color: "#3D6397"}
+  }
+  heading: {
+    shape: text
+    style: {font-size: 24; bold: true; font-color: "#173541"}
+  }
+  body: {
+    shape: text
+    style: {font-size: 19; font-color: "#3E5665"}
+  }
+  detail: {
+    shape: text
+    style: {font-size: 17; font-color: "#566A75"}
+  }
+  activity: {
+    width: 184
+    height: 66
+    style: {
+      fill: "#FFFFFF"
+      stroke: "#B7CDE8"
+      stroke-width: 1
+      border-radius: 8
+      font-size: 20
+      font-color: "#234B7C"
+    }
+  }
+  flow: {
+    style: {stroke: "#718693"; stroke-width: 2; font-size: 17; font-color: "#566A75"}
+  }
+  success: {
+    style: {stroke: "#23836C"; stroke-width: 2; font-size: 17; font-color: "#1C715D"}
+  }
+  approval: {
+    style: {stroke: "#8763AE"; stroke-width: 2; stroke-dash: 4; font-size: 17; font-color: "#79579E"}
+  }
+}
