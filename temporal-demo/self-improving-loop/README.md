@@ -43,7 +43,7 @@ to configure.
 
 ## What Oodle found
 
-After about 44 traces, Oodle reported this without being asked:
+Oodle reported this without being asked:
 
 > **Invalid tool arguments: `lookup_order`.** Calls were rejected for malformed or
 > missing arguments, on at least 100 calls in the sampled traces.
