@@ -30,7 +30,7 @@ run: {
 
   model: "Ask Gemini\nagent_turn" {class: activity}
   tool: "Run tools\nagent_tool" {class: activity}
-  model <-> tool: calls / results {class: flow}
+  model <-> tool: calls / results {class: flow; style.fill: "#EFF5FD"}
 }
 
 reply: {

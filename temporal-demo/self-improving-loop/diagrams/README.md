@@ -35,16 +35,23 @@ to keep the successful path easy to follow.
 ## Rebuilding
 
 ```bash
-brew install d2
+brew install d2 librsvg
 cd diagrams
 d2 fmt --check _style.d2 0*.d2
-for f in 0*.d2; do d2 "$f" "${f%.d2}.svg" || exit; done
+for f in 0*.d2; do
+  d2 "$f" "${f%.d2}.svg" || exit
+  rsvg-convert --zoom 2 "${f%.d2}.svg" -o "${f%.d2}.png" || exit
+done
 ```
 
 Verified with D2 0.7.1. [`_style.d2`](_style.d2) sets the ELK layout, shared colors,
 type sizes, and spacing. Blue identifies workflow work, green identifies Oodle
 and promotion, amber marks validation, and purple marks human approval. The
 dashed purple arrow is the approval signal.
+
+Arrow-label fills match their background to add padding between the text and
+connecting lines. Keep these fills when adding labels; plain surrounding spaces
+do not widen D2's label masks.
 
 The figures use grids with connections only between adjacent cells. D2's free
 layout engines draw straight connections inside grids, so keep distant service
