@@ -1,0 +1,44 @@
+...@_style
+
+# Follow the successful path clockwise. Failure outcomes are a compact note,
+# so retry and rejection arrows never cross the promotion path.
+grid-rows: 2
+grid-columns: 2
+horizontal-gap: 112
+vertical-gap: 84
+
+title: From finding to live prompt {class: title}
+
+draft: {
+  class: card
+  tag: 01 / DRAFT {class: tag}
+  heading: Use Oodle findings {class: heading}
+  body: "Rewrite the prompt and\ntool declarations together" {class: body}
+}
+
+test: {
+  class: [card; gate]
+  tag: 02 / VALIDATE {class: tag; style.font-color: "#98651C"}
+  heading: Replay tickets {class: heading}
+  body: "The candidate must make\nzero bad tool calls" {class: body}
+}
+
+promote: {
+  class: [card; oodle]
+  tag: 04 / PROMOTE {class: tag; style.font-color: "#23765F"}
+  heading: Move the live label {class: heading}
+  body: "Point production at the\napproved version in Oodle" {class: body}
+}
+
+approve: {
+  class: [card; human]
+  tag: 03 / HUMAN APPROVAL {class: tag; style.font-color: "#79579E"}
+  heading: Save & wait {class: heading}
+  body: "Save a candidate in Oodle.\nTemporal waits for a decision." {class: body}
+}
+
+draft -> test: candidate {class: flow}
+test -> approve: passes {class: success}
+approve -> promote: approve {class: approval}
+
+caption: "Failed test → cool down & retry (3 attempts by default).\nRejected → keep the live version. Approved → used on the next run." {class: caption}
