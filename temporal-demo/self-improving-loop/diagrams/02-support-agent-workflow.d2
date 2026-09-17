@@ -2,7 +2,8 @@
 
 # Connect stage boundaries. Keep the model/tool exchange inside its stage.
 grid-rows: 1
-horizontal-gap: 60
+# Wide enough for the spelled-out "version N" arrow label.
+horizontal-gap: 124
 
 title: Inside the support agent {class: title}
 
@@ -14,8 +15,8 @@ pin: {
   height: 292
   style: {font-size: 14; bold: true; font-color: "#3D6397"}
   heading: Pin the prompt {class: heading}
-  body: "Oodle Prompts\nproduction → vN" {class: body}
-  detail: "resolve_prompt\nFixed for this run" {class: detail}
+  body: "Oodle Prompts\nproduction → version N" {class: body}
+  detail: "resolve_prompt\nResolved once, then pinned" {class: detail}
 }
 
 run: {
@@ -45,7 +46,7 @@ reply: {
   detail: "Same prompt version\nfrom start to finish" {class: detail}
 }
 
-pin -> run: vN {class: flow}
+pin -> run: version N {class: flow}
 run -> reply: done {class: flow}
 
 caption: "One ticket → one trace in Oodle, tagged with the prompt version.\nTool errors go back to the model so it can correct its arguments." {class: caption}
