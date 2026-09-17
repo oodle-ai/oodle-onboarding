@@ -53,6 +53,14 @@ Arrow-label fills match their background to add padding between the text and
 connecting lines. Keep these fills when adding labels; plain surrounding spaces
 do not widen D2's label masks.
 
+Figure 1 names the two products with their logos from [`assets/`](assets) rather
+than the words TEMPORAL and OODLE. D2 resolves the `icon:` paths in
+[`_style.d2`](_style.d2) relative to the source file, not the working directory,
+and base64-embeds the result, so the SVGs stay self-contained and the build works
+from anywhere. A logo tag is a one-row grid holding the step number and the mark;
+it needs an explicit `label: ""` and a fixed size, otherwise the container label
+renders as text and the enclosing card grid overflows.
+
 The figures use grids with connections only between adjacent cells. D2's free
 layout engines draw straight connections inside grids, so keep distant service
 dependencies in labels rather than adding arrows across intervening cells. See
