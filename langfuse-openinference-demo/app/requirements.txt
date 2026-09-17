@@ -1,0 +1,5 @@
+langfuse>=3.0
+openai>=1.0
+openinference-instrumentation-openai
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http

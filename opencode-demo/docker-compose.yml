@@ -1,0 +1,63 @@
+services:
+  # The setup the Oodle tile ships: the Langfuse OpenCode plugin
+  # exporting straight to Oodle's Langfuse-compatible endpoint.
+  opencode:
+    build:
+      context: .
+      dockerfile: opencode/Dockerfile
+      args:
+        OPENCODE_CONFIG_DIR: opencode
+    container_name: opencode-demo
+    environment:
+      - LANGFUSE_BASE_URL=https://${OODLE_API_DOMAIN:-us1.oodle.ai}/v1/api/instance/${OODLE_INSTANCE}/langfuse
+      - LANGFUSE_PUBLIC_KEY=default
+      - LANGFUSE_SECRET_KEY=${OODLE_API_KEY}
+      - LANGFUSE_SERVICE_NAME=${OTEL_SERVICE_NAME:-opencode}
+      - LANGFUSE_ENVIRONMENT=${LANGFUSE_ENVIRONMENT:-development}
+      - LANGFUSE_USER_ID=${LANGFUSE_USER_ID:-demo-user}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./workspace:/workspace
+      - opencode_state:/root/.local/share/opencode
+    # Nothing to serve: the container stays up so `make ask` can
+    # run turns inside it.
+    command: ["sleep", "infinity"]
+
+  # The repro: OpenCode's own OTLP export, through a collector
+  # whose debug exporter prints every span it receives.
+  otel-collector:
+    profiles: ["native"]
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: opencode-demo-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4324:4318"
+      - "13139:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+
+  opencode-native:
+    profiles: ["native"]
+    build:
+      context: .
+      dockerfile: opencode/Dockerfile
+      args:
+        OPENCODE_CONFIG_DIR: opencode-native
+    container_name: opencode-demo-native
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./workspace:/workspace
+      - opencode_native_state:/root/.local/share/opencode
+    depends_on:
+      - otel-collector
+    command: ["sleep", "infinity"]
+
+volumes:
+  opencode_state:
+    driver: local
+  opencode_native_state:
+    driver: local

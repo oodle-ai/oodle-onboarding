@@ -20,6 +20,8 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [llmops-otel-demo](./llmops-otel-demo) | Traces | LLM observability using official OpenTelemetry GenAI instrumentation with Google Gemini |
 | [pydantic-ai-demo](./pydantic-ai-demo) | Traces | AI agent observability using Pydantic AI with built-in OTel GenAI instrumentation |
 | [langfuse-demo](./langfuse-demo) | Traces | LLM observability through the Langfuse SDK, exported over OTLP |
+| [langfuse-native-demo](./langfuse-native-demo) | Traces | The Langfuse SDK's own exporter pointed at Oodle's Langfuse-compatible endpoint: three env vars, no OTel SDK, no collector |
+| [langfuse-openinference-demo](./langfuse-openinference-demo) | Traces | Langfuse SDK observations around an OpenInference-instrumented OpenAI call with hidden payloads: the messages on one span, the tokens on the other |
 | [openlit-demo](./openlit-demo) | Traces | OpenLIT auto-instrumentation across LLMs, vector databases, MCP tools and GPU metrics |
 | [langchain-agent-demo](./langchain-agent-demo) | Traces | LangChain and LangGraph agents through the LangChain OTel instrumentor |
 | [langgraph-agent-demo](./langgraph-agent-demo) | Traces | Graphs built directly on LangGraph's `StateGraph`, traced node by node through the LangChain OTel instrumentor |
@@ -29,6 +31,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | Traces | Vercel AI SDK 7 agents, steps and tool calls through `@ai-sdk/otel` |
 | [eve-demo](./eve-demo) | Traces | Agents on Vercel's eve framework: durable sessions, tools and full transcripts |
 | [openclaw-demo](./openclaw-demo) | Traces | Real OpenClaw agent traced through the real Langfuse SDK: observations described in the `langfuse.*` namespace instead of the GenAI semconv one, exported over OTLP |
+| [opencode-demo](./opencode-demo) | Traces | Real OpenCode CLI traced through the Langfuse OpenCode plugin into Oodle's Langfuse-compatible endpoint: turns, model steps, tool calls, sub-agents, sessions. Keeps OpenCode's native OTLP export as a repro of why the plugin is used |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
 | [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
 | [cockroachdb-demo](./cockroachdb-demo) | Metrics | Three-node CockroachDB cluster under `movr` load; OTel Collector scrapes each node's built-in `/_status/vars` Prometheus endpoint; no database config changes |
@@ -42,7 +45,7 @@ end to end without wiring one up first.
 
 | Oodle tile | Demo | Language |
 |---|---|---|
-| Langfuse | [langfuse-demo](./langfuse-demo) | Python, TypeScript |
+| Langfuse | [langfuse-demo](./langfuse-demo), [langfuse-native-demo](./langfuse-native-demo) | Python, TypeScript |
 | Vercel AI SDK | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | TypeScript |
 | eve | [eve-demo](./eve-demo) | TypeScript |
 | OpenLIT | [openlit-demo](./openlit-demo) | Python |
@@ -53,6 +56,7 @@ end to end without wiring one up first.
 | LangChain | [langchain-agent-demo](./langchain-agent-demo) | Python |
 | LangGraph | [langgraph-agent-demo](./langgraph-agent-demo) | Python, TypeScript |
 | Traceloop | [traceloop-demo](./traceloop-demo) | Python |
+| OpenCode | [opencode-demo](./opencode-demo) | OpenCode config |
 
 Every one of them exports through an OTel Collector, so the same
 setup works whether the collector forwards to Oodle or somewhere

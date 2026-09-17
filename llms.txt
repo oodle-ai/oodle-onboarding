@@ -26,6 +26,9 @@ Pick by your current stack and what you want to send:
 | None (greenfield) | Traces | AI agent observability (LangGraph StateGraph + LangChain OTel instrumentor) | [langgraph-agent-demo](langgraph-agent-demo/README.md) |
 | None (Node.js) | Logs, traces | Pino logs over OTLP with the request trace id on every line | [pino-logs-demo](pino-logs-demo/README.md) |
 | OpenClaw + Langfuse SDK | Traces | Real agent traced through the Langfuse SDK — `langfuse.*` attributes instead of GenAI semconv | [openclaw-demo](openclaw-demo/README.md) |
+| Langfuse SDK native export | Traces | The Langfuse SDK's own exporter pointed at Oodle's Langfuse-compatible endpoint; env vars only, no OTel SDK, no collector | [langfuse-native-demo](langfuse-native-demo/README.md) |
+| Langfuse SDK + OpenInference | Traces | Langfuse `generation` around an OpenInference-instrumented OpenAI call with hidden payloads; tokens on the child, messages on the wrapper | [langfuse-openinference-demo](langfuse-openinference-demo/README.md) |
+| OpenCode + Langfuse OpenCode plugin | Traces | Real OpenCode CLI traced into Oodle's Langfuse-compatible endpoint; native OTLP export kept as a repro | [opencode-demo](opencode-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
 | None (CockroachDB) | Metrics | Scrape each node's built-in `/_status/vars` Prometheus endpoint | [cockroachdb-demo](cockroachdb-demo/README.md) |
@@ -225,6 +228,32 @@ The real OpenClaw agent (npm `openclaw`, run as `openclaw agent --local`) traced
 - Config files: `openclaw/openclaw.json`, `otel-collector-config.yaml`, `docker-compose.yml`
 - Spans emitted: `openclaw.agent_run` (root, observation type `span`), `openclaw.llm_generation` (type `generation`), `openclaw.tool_call` (type `tool`)
 - Gotcha: `plugins.entries.langfuse-tracer.hooks.allowConversationAccess` must be true, or OpenClaw withholds `llm_input` / `llm_output` / `agent_end` from the plugin
+
+### langfuse-native-demo
+
+The Langfuse Python SDK with its own exporter, pointed at Oodle's Langfuse-compatible endpoint (`https://<API_DOMAIN>/v1/api/instance/<INSTANCE>/langfuse`, public key `default`, secret key = Oodle API key). This is the Native SDK export tab of the Langfuse tile on the Oodle Integrations page. There is no OpenTelemetry SDK in the app and no collector: the client is configured with `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`, and nothing in the code names Oodle, so an app already on Langfuse moves by changing those three variables. `@observe()` opens the trace and the `langfuse.openai` drop-in records the generation with its model, messages and token counts. Only the spans the Langfuse SDK writes are sent; an app whose other instrumentation (HTTP, database) should arrive too uses `langfuse-demo`, where the SDK writes into a tracer provider the app owns.
+
+- Languages: Python
+- Infra: Docker Compose (one container)
+- Signals: Traces (LLM-specific)
+- Instrumentation: Langfuse SDK (`langfuse`), direct to Oodle
+- Requires: Oodle credentials (instance, API key, API domain) + an OpenAI API key
+- Config files: `docker-compose.yml`, `app/main.py`
+- Spans emitted: `chat` (observation type `span`, root), `OpenAI-generation` (type `generation`, model, messages, `usage_details`)
+- Env: `OTEL_SERVICE_NAME` names the service; `LANGFUSE_TRACING_ENVIRONMENT` sets the environment
+
+### opencode-demo
+
+The real OpenCode CLI (npm `opencode-ai`, run as `opencode run`) traced by the Langfuse OpenCode plugin (`@langfuse/opencode-observability-plugin`), pointed at Oodle's Langfuse-compatible endpoint (`https://<API_DOMAIN>/v1/api/instance/<INSTANCE>/langfuse`, public key `default`, secret key = Oodle API key). This is the setup the OpenCode tile on the Oodle Integrations page ships. The plugin rebuilds each turn from OpenCode's plugin events: `opencode.turn` (type `agent`, root, the agent in metadata), `opencode.generation` (type `generation`, `usage_details` with `input`/`output`/`reasoning`/`cache_read`/`cache_write`, `cost_details`), one `tool` observation per tool call named after the tool, and `event` observations for retries and compaction. A sub-agent (`task` tool) turn is parented into the same trace. Oodle resolves the `langfuse.*` attributes at ingest, including the agent and tool names, so the trace reaches Agent Observability, Sessions and the Agent Graph. A second compose profile (`native`) runs OpenCode's own OTLP export through a collector with a debug exporter, as the repro of why that path is not used: ~1,000 runtime-internal spans per turn in one never-ending trace, no tool-call spans, session id on no semconv attribute, and one-shot runs exiting before the batch processor flushes.
+
+- Languages: none (OpenCode config only)
+- Infra: Docker Compose (profile `native` adds an OTel Collector)
+- Signals: Traces (LLM agent-specific)
+- Instrumentation: `@langfuse/opencode-observability-plugin`, direct to Oodle (no collector in the plugin path)
+- Requires: Oodle credentials (instance, API key, API domain) + a Gemini API key (OpenCode calls the model for real)
+- Config files: `opencode/opencode.json`, `opencode-native/opencode.json`, `otel-collector-config.yaml`, `docker-compose.yml`
+- Env: `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY=default`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_SERVICE_NAME=opencode`, `LANGFUSE_ENVIRONMENT`, `LANGFUSE_USER_ID`
+- Gotcha: without `LANGFUSE_SERVICE_NAME` (or `serviceName` in `opencode-langfuse.json`) traces land under `unknown_service:opencode`; keep `experimental.openTelemetry: true`, the plugin warns without it
 
 ### k8s-otel-operator
 

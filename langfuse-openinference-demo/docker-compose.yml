@@ -1,0 +1,12 @@
+services:
+  app:
+    build: ./app
+    container_name: langfuse-openinference-demo
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_API_DOMAIN=${OODLE_API_DOMAIN:-us1.oodle.ai}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-qa-planner}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_GATEWAY_URL:-https://api.openai.com/v1}
+      - MODEL=${MODEL:-gpt-4o-mini}
