@@ -46,28 +46,22 @@ classes: {
     shape: text
     style: {font-size: 14; bold: true; font-color: "#3D6397"}
   }
-  # A tag that ends in a product logo instead of the product name. The
-  # container is invisible so only the number and the mark read as the tag.
-  logo-tag: {
-    label: ""
-    grid-rows: 1
-    grid-gap: 0
-    horizontal-gap: 8
-    width: 168
-    height: 28
-    style: {fill: transparent; stroke: transparent}
+  # The product mark sits in the card's top-right corner; the tag still
+  # spells out the product name. D2 always draws an icon at 64x64 and
+  # reserves that space at the top of the container's content flow, so a
+  # marked card needs the extra height or the body text spills out the
+  # bottom. The padding inside the asset files is what sets the apparent
+  # size and the inset from the corner.
+  marked: {
+    height: 248
   }
-  temporal-logo: {
-    shape: image
+  temporal-mark: {
     icon: assets/temporal.svg
-    width: 24
-    height: 24
+    icon.near: top-right
   }
-  oodle-logo: {
-    shape: image
+  oodle-mark: {
     icon: assets/oodle.svg
-    width: 21
-    height: 26
+    icon.near: top-right
   }
   heading: {
     shape: text
