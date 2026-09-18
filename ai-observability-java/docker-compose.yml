@@ -1,0 +1,67 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: java-genai-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4328:4318"
+      - "13138:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks: [java-genai-net]
+
+  # 1. Raw HTTP client + a hand-written wrapper that adds the gen_ai.* spans.
+  java-raw:
+    build: ./java-raw
+    container_name: java-genai-raw
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
+      - OTEL_SERVICE_NAME=java-raw
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - ITERATIONS=0
+      - INTERVAL_MS=20000
+    depends_on: [otel-collector]
+    networks: [java-genai-net]
+
+  # 2. LangChain4j — the framework emits the gen_ai.* attributes.
+  java-langchain4j:
+    build: ./java-langchain4j
+    container_name: java-genai-langchain4j
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
+      - OTEL_SERVICE_NAME=java-langchain4j
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - ITERATIONS=0
+      - INTERVAL_MS=20000
+    depends_on: [otel-collector]
+    networks: [java-genai-net]
+
+  # 3. Spring Boot + Spring AI — Boot autoconfiguration emits them.
+  java-spring-ai:
+    build: ./java-spring-ai
+    container_name: java-genai-spring-ai
+    ports:
+      - "8094:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5}
+      - OTEL_SERVICE_NAME=java-spring-ai
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - DEMO_LOADGEN_ENABLED=true
+      - DEMO_LOADGEN_INTERVAL_MS=20000
+    depends_on: [otel-collector]
+    networks: [java-genai-net]
+
+networks:
+  java-genai-net:
+    driver: bridge
