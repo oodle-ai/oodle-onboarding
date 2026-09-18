@@ -1,0 +1,28 @@
+spring:
+  application:
+    # Becomes service.name on every exported span.
+    name: ${OTEL_SERVICE_NAME:java-spring-ai}
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        options:
+          model: ${ANTHROPIC_MODEL:claude-sonnet-5}
+          max-tokens: 1024
+    chat:
+      observations:
+        # Off by default because prompts and completions can be large and
+        # sensitive. Oodle shows them on the span when enabled.
+        log-prompt: true
+        log-completion: true
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://otel-collector:4318}/v1/traces
+
+server:
+  port: 8080
