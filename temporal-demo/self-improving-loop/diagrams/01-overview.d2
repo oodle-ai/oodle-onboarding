@@ -12,14 +12,14 @@ agent: {
   class: [card; marked; temporal-mark]
   tag: 01 / TEMPORAL {class: tag}
   heading: Support agent {class: heading}
-  body: "Answer tickets with\nthe production prompt" {class: body}
+  body: "Answer tickets" {class: body}
 }
 
 observe: {
   class: [card; oodle; marked; oodle-mark]
   tag: 02 / OODLE {class: tag; style.font-color: "#23765F"}
   heading: Find the failures {class: heading}
-  body: "Find tool-call errors\nin production traces" {class: body}
+  body: "Find agent failures\nin production" {class: body}
 }
 
 promote: {
@@ -33,12 +33,10 @@ improve: {
   class: [card; marked; temporal-mark]
   tag: 03 / TEMPORAL {class: tag}
   heading: Prompt improver {class: heading}
-  body: "Draft a prompt; replay tickets.\nRequire zero bad tool calls." {class: body}
+  body: "Draft a prompt; replay tickets" {class: body}
 }
 
 agent -> observe: traces {class: flow}
 observe -> improve: findings {class: flow}
 improve -> promote: passes {class: success}
 promote -> agent: next run {class: success}
-
-caption: "A new prompt version. A label moves. No deploy." {class: caption}
