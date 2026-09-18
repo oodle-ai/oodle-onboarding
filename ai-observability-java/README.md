@@ -71,8 +71,11 @@ AnthropicChatModel.builder()
 
 That listener is the entire LLM instrumentation. It implements LangChain4j's
 `ChatModelListener` over Micrometer's Observation API and sets
-`gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.system`,
-`gen_ai.request.model`, `gen_ai.response.model` and token usage itself.
+`gen_ai.operation.name`, `gen_ai.provider.name`, `gen_ai.request.model`,
+`gen_ai.response.model` and token usage itself. Two things to know, both
+verified against a live Oodle instance: it does **not** set `gen_ai.system`,
+and `gen_ai.provider.name` arrives as the enum name — `ANTHROPIC`, not
+`anthropic`. See [What each app emits](#what-each-app-emits).
 
 The only wiring this app owns is
 [`Tracing.java`](java-langchain4j/src/main/java/ai/oodle/demo/lc4j/Tracing.java) —
@@ -101,6 +104,40 @@ spring.ai.chat.observations:
 
 The app exposes `POST /chat?q=...` and also drives itself on a timer so the demo
 produces traces unattended.
+
+## What each app emits
+
+Attributes on the `chat` span as Oodle indexed them, one run each. The
+response-side rows are what each app sets after a successful call.
+
+| Attribute | `java-raw` | `java-langchain4j` | `java-spring-ai` |
+|---|---|---|---|
+| `gen_ai.operation.name=chat` | ✅ | ✅ | ✅ |
+| `gen_ai.request.model` | ✅ | ✅ | ✅ |
+| `gen_ai.system` | ✅ `anthropic` | ❌ | ✅ `anthropic` |
+| `gen_ai.provider.name` | ✅ `anthropic` | ⚠️ `ANTHROPIC` | ❌ |
+| `gen_ai.request.max_tokens`, `gen_ai.request.temperature` | ❌ | ❌ | ✅ |
+| `gen_ai.input.messages`, `gen_ai.system_instructions` | ✅ | ❌ | ❌ |
+| `gen_ai.output.messages` | ✅ | ❌ | ❌ |
+| `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | ✅ | ✅ | ✅ |
+| `gen_ai.response.model`, `gen_ai.response.finish_reasons` | ✅ | model only | model only |
+
+Takeaways:
+
+- **The raw wrapper is the most complete.** It sets both the current
+  (`gen_ai.provider.name`) and legacy (`gen_ai.system`) provider keys, in
+  lowercase, and is the only one that puts prompt content on the span.
+- **Neither framework captures prompt or completion content on the span.**
+  `langchain4j-observation` records low-cardinality tags and token counts by
+  design. Spring AI's `log-prompt` / `log-completion` write to the *log*, not
+  the span; putting content on the span needs a Micrometer `ObservationFilter`.
+- **Provider naming differs.** Spring AI 1.0 sets only the legacy
+  `gen_ai.system`; LangChain4j sets only `gen_ai.provider.name`, uppercased.
+  If a backend keys pricing on provider name, check which key and case it reads.
+- **Spring AI wraps the model call in two `gen_ai.operation.name=framework`
+  spans** (`spring_ai chat_client` → `call`). The generation is a grandchild of
+  the agent span, not a child — a graph builder that only follows direct
+  parent→child edges will not connect them.
 
 ## The agent graph
 
