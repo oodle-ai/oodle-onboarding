@@ -1,0 +1,42 @@
+# One service, three ways to run it. Pick with TRACER:
+#
+#   TRACER=litellm-otel      make run   # LiteLLM otel callback -> Oodle
+#   TRACER=laminar           make run   # Laminar callback -> Laminar
+#   TRACER=laminar-to-oodle  make run   # Laminar callback -> Oodle
+#
+# Spans go straight to the Oodle OTLP endpoint; no collector.
+services:
+  agent:
+    build:
+      context: ./app
+    container_name: laminar-litellm-demo
+    environment:
+      - TRACER=${TRACER:-litellm-otel}
+      - MODEL=${MODEL:-gpt-4o-mini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - SESSION_ID=${SESSION_ID:-demo-session-1}
+      - USER_ID=${USER_ID:-demo-user}
+      - TURNS=${TURNS:-2}
+
+      # Oodle, read by the LiteLLM otel callback and, with no
+      # LMNR_PROJECT_API_KEY, by the Laminar SDK as well.
+      - OTEL_EXPORTER_OTLP_ENDPOINT=https://${OODLE_INSTANCE}-otlp.collector.oodle.ai
+      - OTEL_EXPORTER_OTLP_HEADERS=X-API-KEY=${OODLE_API_KEY},X-OODLE-INSTANCE=${OODLE_INSTANCE}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_COMPRESSION=gzip
+      - OTEL_SERVICE_NAME=laminar-litellm-demo
+      # Without these two the LiteLLM callback names the span
+      # litellm_request with no gen_ai.* attributes, and Agent
+      # Observability lists nothing.
+      - OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental
+      - OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=span_and_event
+
+      # Laminar, read only when TRACER=laminar.
+      - LMNR_PROJECT_API_KEY=${LMNR_PROJECT_API_KEY:-}
+      - LMNR_BASE_URL=${LMNR_BASE_URL:-http://host.docker.internal}
+      - LMNR_HTTP_PORT=${LMNR_HTTP_PORT:-8000}
+      - LMNR_GRPC_PORT=${LMNR_GRPC_PORT:-8001}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,5 @@
+litellm>=1.81.0
+lmnr>=0.7.60
+opentelemetry-sdk>=1.30.0
+opentelemetry-exporter-otlp-proto-http>=1.30.0
+opentelemetry-exporter-otlp-proto-grpc>=1.30.0
