@@ -23,13 +23,25 @@ processors:
 
   # APM reads the request, RPC and database duration histograms and
   # nothing else. The runtime metrics the SDKs emit by default
-  # (nodejs_*, v8js_*, process_runtime_*) are dropped until a runtime
-  # page needs them.
+  # (nodejs.*, v8js.*, process.runtime.*) are dropped until a runtime
+  # page needs them. A metric is dropped when the condition is true.
+  #
+  # The names are listed rather than matched with a regex: OTTL takes
+  # the pattern through two levels of escaping (YAML, then its own
+  # string literal), and `error_mode: ignore` turns a wrong pattern
+  # into a filter that silently keeps everything.
   filter/apm-metrics:
     error_mode: ignore
     metrics:
       metric:
-        - 'not IsMatch(name, "^(http\\.(server|client)\\.(request\\.)?duration|rpc\\.(server|client)\\.duration|db\\.client\\.(operation\\.)?duration)$")'
+        - 'name != "http.server.request.duration"
+           and name != "http.server.duration"
+           and name != "http.client.request.duration"
+           and name != "http.client.duration"
+           and name != "rpc.server.duration"
+           and name != "rpc.client.duration"
+           and name != "db.client.operation.duration"
+           and name != "db.client.duration"'
 
 exporters:
   otlphttp/newrelic:
