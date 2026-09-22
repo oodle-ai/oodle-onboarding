@@ -11,7 +11,7 @@ x-otel: &otel
   # Exponential buckets keep p95/p99 exact on both backends; fixed buckets snap them to bucket edges
   OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION: base2_exponential_bucket_histogram
   OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "4095"
-  OTEL_SEMCONV_STABILITY_OPT_IN: http/dup                     # emit current + legacy http metric names
+  OTEL_SEMCONV_STABILITY_OPT_IN: http                         # current http metric names only
 
 services:
   postgres:

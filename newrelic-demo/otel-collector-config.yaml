@@ -21,6 +21,16 @@ processors:
         - 'attributes["server.address"] == "otel-collector" or attributes["net.peer.name"] == "otel-collector"'
         - 'attributes["server.address"] == "collector.newrelic.com" or attributes["net.peer.name"] == "collector.newrelic.com"'
 
+  # APM reads the request, RPC and database duration histograms and
+  # nothing else. The runtime metrics the SDKs emit by default
+  # (nodejs_*, v8js_*, process_runtime_*) are dropped until a runtime
+  # page needs them.
+  filter/apm-metrics:
+    error_mode: ignore
+    metrics:
+      metric:
+        - 'not IsMatch(name, "^(http\\.(server|client)\\.(request\\.)?duration|rpc\\.(server|client)\\.duration|db\\.client\\.(operation\\.)?duration)$")'
+
 exporters:
   otlphttp/newrelic:
     endpoint: "https://otlp.nr-data.net"   # US region; EU is https://otlp.eu01.nr-data.net
@@ -46,5 +56,5 @@ service:
       exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
     metrics:
       receivers: [otlp]
-      processors: [filter/self-telemetry, batch]
+      processors: [filter/self-telemetry, filter/apm-metrics, batch]
       exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
