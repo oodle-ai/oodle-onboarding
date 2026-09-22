@@ -7,7 +7,9 @@ x-otel: &otel
   OTEL_TRACES_EXPORTER: otlp
   OTEL_METRICS_EXPORTER: otlp
   OTEL_LOGS_EXPORTER: none
-  OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta   # New Relic wants delta
+  OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta   # New Relic and Oodle both want delta
+  # Exponential buckets keep p95/p99 exact on both backends; fixed buckets snap them to bucket edges
+  OTEL_EXPORTER_OTLP_METRICS_DEFAULT_HISTOGRAM_AGGREGATION: base2_exponential_bucket_histogram
   OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "4095"
   OTEL_SEMCONV_STABILITY_OPT_IN: http/dup                     # emit current + legacy http metric names
 
@@ -71,6 +73,8 @@ services:
     restart: unless-stopped
     environment:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      OODLE_INSTANCE: ${OODLE_INSTANCE}
+      OODLE_API_KEY: ${OODLE_API_KEY}
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
 

@@ -27,6 +27,14 @@ exporters:
     headers:
       "api-key": "${NEW_RELIC_LICENSE_KEY}"
     compression: gzip
+  # Second destination. Only the OTel-instrumented services reach Oodle;
+  # the New Relic agent path stays New Relic only, which is the comparison.
+  otlphttp/oodle:
+    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+    compression: gzip
   debug:
     verbosity: basic
 
@@ -35,8 +43,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [filter/self-telemetry, batch]
-      exporters: [otlphttp/newrelic, debug]
+      exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
     metrics:
       receivers: [otlp]
       processors: [filter/self-telemetry, batch]
-      exporters: [otlphttp/newrelic, debug]
+      exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
