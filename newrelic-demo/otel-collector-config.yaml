@@ -30,7 +30,7 @@ exporters:
   # Second destination. Only the OTel-instrumented services reach Oodle;
   # the New Relic agent path stays New Relic only, which is the comparison.
   otlphttp/oodle:
-    endpoint: "https://${OODLE_INSTANCE}-otlp.collector.oodle.ai"
+    endpoint: "${OODLE_OTLP_ENDPOINT}"
     headers:
       "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
       "X-API-KEY": "${OODLE_API_KEY}"

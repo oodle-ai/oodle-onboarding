@@ -59,7 +59,7 @@ services:
       # the same process also runs the OTel SDK, reporting as a separate entity so the two can be compared
       <<: *otel
       OTEL_SERVICE_NAME: demo-api-otel
-      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-api-1
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-api-1,deployment.environment.name=demo,service.version=1.0.0
       DATABASE_URL: postgres://demo:demo@postgres:5432/demo
       REDIS_URL: redis://redis:6379
       AMQP_URL: amqp://guest:guest@rabbitmq:5672
@@ -73,6 +73,7 @@ services:
     restart: unless-stopped
     environment:
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      OODLE_OTLP_ENDPOINT: ${OODLE_OTLP_ENDPOINT}
       OODLE_INSTANCE: ${OODLE_INSTANCE}
       OODLE_API_KEY: ${OODLE_API_KEY}
     volumes:
@@ -91,7 +92,7 @@ services:
       NEW_RELIC_LOG: stderr
       <<: *otel
       OTEL_SERVICE_NAME: demo-inventory-otel
-      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-inventory-1
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-inventory-1,deployment.environment.name=demo,service.version=1.0.0
       DATABASE_URL: postgres://demo:demo@postgres:5432/demo
       REDIS_URL: redis://redis:6379
       AMQP_URL: amqp://guest:guest@rabbitmq:5672
@@ -112,7 +113,7 @@ services:
       NEW_RELIC_LOG: stderr
       <<: *otel
       OTEL_SERVICE_NAME: demo-worker-otel
-      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-worker-1
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-worker-1,deployment.environment.name=demo,service.version=1.0.0
       DATABASE_URL: postgres://demo:demo@postgres:5432/demo
       REDIS_URL: redis://redis:6379
       AMQP_URL: amqp://guest:guest@rabbitmq:5672
