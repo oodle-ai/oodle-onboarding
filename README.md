@@ -10,6 +10,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [elasticsearch-alternative/single-write](./elasticsearch-alternative/single-write) | Logs | Baseline Elasticsearch-only setup (no Oodle) |
 | [opensearch-alternative/dual-write](./opensearch-alternative/dual-write) | Logs | Migrate from OpenSearch — dual-write to OS + Oodle via Fluent Bit, Vector, or OTel Collector |
 | [datadog/dual-write](./datadog/dual-write) | Metrics, traces, logs | Dual-ship from Datadog Agent to both Datadog and Oodle using native `DD_ADDITIONAL_ENDPOINTS` |
+| [newrelic-demo](./newrelic-demo) | Traces, metrics, logs | Two services on the native New Relic APM agents (Node + Python) against local Postgres, Redis and RabbitMQ — the baseline a New Relic customer runs today |
 | [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
 | [datadog/oodle-single-write](./datadog/oodle-single-write) | Metrics, traces, logs | Send from Datadog Agent to Oodle only — redirect primary endpoints, no data to Datadog |
 | [datadog/otel-dual-write](./datadog/otel-dual-write) | Traces, metrics, logs | Dual-write from OTel Collector to both Datadog and Oodle — mirrors a Cloud Run sidecar pattern |
