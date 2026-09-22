@@ -1,0 +1,42 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # the OTel SDK also traces this process's own telemetry uploads (its OTLP exporter and the New Relic
+  # agent's collector calls) because both agents patch `http`; drop those so they don't count as transactions
+  filter/self-telemetry:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["server.address"] == "otel-collector" or attributes["net.peer.name"] == "otel-collector"'
+        - 'attributes["server.address"] == "collector.newrelic.com" or attributes["net.peer.name"] == "collector.newrelic.com"'
+    metrics:
+      datapoint:
+        - 'attributes["server.address"] == "otel-collector" or attributes["net.peer.name"] == "otel-collector"'
+        - 'attributes["server.address"] == "collector.newrelic.com" or attributes["net.peer.name"] == "collector.newrelic.com"'
+
+exporters:
+  otlphttp/newrelic:
+    endpoint: "https://otlp.nr-data.net"   # US region; EU is https://otlp.eu01.nr-data.net
+    headers:
+      "api-key": "${NEW_RELIC_LICENSE_KEY}"
+    compression: gzip
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter/self-telemetry, batch]
+      exporters: [otlphttp/newrelic, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [filter/self-telemetry, batch]
+      exporters: [otlphttp/newrelic, debug]

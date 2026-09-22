@@ -1,0 +1,136 @@
+name: newrelic-demo
+
+# OTel SDK settings shared by every app service (New Relic's recommended values)
+x-otel: &otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: none
+  OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: delta   # New Relic wants delta
+  OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "4095"
+  OTEL_SEMCONV_STABILITY_OPT_IN: http/dup                     # emit current + legacy http metric names
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: demo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo"]
+      interval: 2s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 15
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    ports:
+      - "15672:15672"   # management UI, guest/guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: demo-api
+      NEW_RELIC_NO_CONFIG_FILE: "true"
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
+      NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "false"   # APM only, no logs
+      NEW_RELIC_LOG: stdout
+      # the same process also runs the OTel SDK, reporting as a separate entity so the two can be compared
+      <<: *otel
+      OTEL_SERVICE_NAME: demo-api-otel
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-api-1
+      DATABASE_URL: postgres://demo:demo@postgres:5432/demo
+      REDIS_URL: redis://redis:6379
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672
+      INVENTORY_URL: http://inventory:8081
+    depends_on:
+      inventory: { condition: service_started }
+      otel-collector: { condition: service_started }
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    restart: unless-stopped
+    environment:
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+
+  inventory:
+    build: ./inventory
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: demo-inventory
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
+      NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "false"   # APM only, no logs
+      NEW_RELIC_LOG: stderr
+      <<: *otel
+      OTEL_SERVICE_NAME: demo-inventory-otel
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-inventory-1
+      DATABASE_URL: postgres://demo:demo@postgres:5432/demo
+      REDIS_URL: redis://redis:6379
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      otel-collector: { condition: service_started }
+
+  worker:
+    build: ./worker
+    restart: unless-stopped
+    environment:
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
+      NEW_RELIC_APP_NAME: demo-worker
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
+      NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "false"   # APM only, no logs
+      NEW_RELIC_LOG: stderr
+      <<: *otel
+      OTEL_SERVICE_NAME: demo-worker-otel
+      OTEL_RESOURCE_ATTRIBUTES: service.instance.id=demo-worker-1
+      DATABASE_URL: postgres://demo:demo@postgres:5432/demo
+      REDIS_URL: redis://redis:6379
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672
+    depends_on:
+      api: { condition: service_started }
+
+  # bursty traffic so the APM charts move: a burst of requests, then a random pause of up to 2 min
+  load:
+    image: curlimages/curl:8.11.1
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          i=$$(( (i % 40) + 1 ))
+          curl -s -o /dev/null -X POST http://api:8080/api/orders
+          curl -s -o /dev/null http://api:8080/api/products
+          curl -s -o /dev/null http://api:8080/api/orders/$$i
+          curl -s -o /dev/null http://inventory:8081/stock/$$(( (i % 3) + 1 ))
+          curl -s -o /dev/null http://api:8080/api/stats
+          [ $$((i % 10)) -eq 0 ] && sleep $$(( $$(od -An -N2 -tu2 /dev/urandom) % 120 ))
+          sleep 1
+        done
+    depends_on:
+      api: { condition: service_started }
