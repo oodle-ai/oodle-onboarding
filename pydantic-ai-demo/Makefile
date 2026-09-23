@@ -1,6 +1,6 @@
 .PHONY: help up down logs logs-app logs-collector \
 	test-chat test-city test-trip test-review \
-	test-multi clean build
+	test-multi test-research clean build
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -50,12 +50,17 @@ test-multi: ## Multi-agent workflow (city info + trip plan)
 	@curl -s -X POST 'http://localhost:8091/multi-agent?city=Tokyo' \
 		| python3 -m json.tool
 
+test-research: ## Research agent with thinking between tool calls
+	@curl -s -X POST http://localhost:8091/research \
+		| python3 -m json.tool
+
 test-all: ## Run all test requests
 	@echo "=== Chat ===" && $(MAKE) test-chat
 	@echo "\n=== City Info ===" && $(MAKE) test-city
 	@echo "\n=== Trip Plan ===" && $(MAKE) test-trip
 	@echo "\n=== Code Review ===" && $(MAKE) test-review
 	@echo "\n=== Multi-Agent ===" && $(MAKE) test-multi
+	@echo "\n=== Research ===" && $(MAKE) test-research
 
 clean: ## Stop services and remove volumes
 	docker compose down -v --remove-orphans
