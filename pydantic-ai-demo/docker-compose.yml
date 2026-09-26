@@ -25,6 +25,7 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - MODEL=${MODEL:-openai:gpt-4o-mini}
+      - RESEARCH_MODEL=${RESEARCH_MODEL:-anthropic:claude-opus-5}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - PORT=8091
     depends_on:
