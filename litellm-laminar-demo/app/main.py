@@ -1,6 +1,8 @@
 """FastAPI entry point: one POST runs one traced agent session."""
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -15,7 +17,16 @@ tracing.init_oodle(SERVICE_NAME)
 
 import agent  # noqa: E402  (Laminar's @observe must see an initialized SDK)
 
-app = FastAPI(title="Laminar + Oodle dual-write demo")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    yield
+    tracing.flush()
+    tracing.shutdown_oodle()
+
+
+app = FastAPI(title="Laminar + Oodle dual-write demo", lifespan=lifespan)
 
 
 class SessionRequest(BaseModel):
