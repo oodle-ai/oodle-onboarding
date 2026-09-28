@@ -1,0 +1,26 @@
+services:
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: litellm-laminar-demo-app
+    ports:
+      - "8102:8102"
+    environment:
+      - LMNR_PROJECT_API_KEY=${LMNR_PROJECT_API_KEY}
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - MODEL=${MODEL:-gpt-4o-mini}
+      - REASONING_EFFORT=${REASONING_EFFORT:-medium}
+      # Namespace for the 27 route-audit attributes.
+      - ROUTE_ATTRIBUTE_PREFIX=${ROUTE_ATTRIBUTE_PREFIX:-agent.route.}
+      - MOCK_LLM=${MOCK_LLM:-false}
+      # Set to false to see the pre-fix behaviour: Oodle receives only the
+      # LiteLLM chat spans, each pointing at a parent it never gets.
+      - OODLE_MIRROR_LAMINAR_SPANS=${OODLE_MIRROR_LAMINAR_SPANS:-true}
+      - OODLE_CAPTURE_MESSAGE_CONTENT=${OODLE_CAPTURE_MESSAGE_CONTENT:-true}
+      - SERVICE_NAME=litellm-laminar-demo
+      - ENV=demo
+      - PORT=8102
