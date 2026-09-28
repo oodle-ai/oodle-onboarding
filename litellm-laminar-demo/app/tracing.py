@@ -24,7 +24,7 @@ that runs inside span handling logs and moves on.
 import logging
 import os
 import threading
-from collections.abc import Mapping
+from collections.abc import Sequence
 from typing import Any
 
 import litellm
@@ -37,23 +37,75 @@ from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import Event, ReadableSpan, Span, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.util.types import Attributes
 
 logger = logging.getLogger(__name__)
 
-# Prompt, completion, tool-schema and span payload attributes. Dropped from
-# mirrored spans when content capture is off, so one flag governs what content
-# leaves the process on both Oodle pipelines.
+# Content on mirrored spans is dropped when content capture is off, so one flag
+# governs what content leaves the process on both Oodle pipelines. Laminar and
+# its bundled instrumentors (OpenAI, Anthropic, Google GenAI, ...) write content
+# under three key shapes, all matched here:
+#   - whole-payload keys, e.g. ``lmnr.span.input`` or ``gen_ai.input.messages``
+#   - indexed semconv keys, e.g. ``gen_ai.prompt.0.content``,
+#     ``gen_ai.completion.0.tool_calls.1.arguments``, ``llm.request.functions.0.parameters``
+#   - any key whose leaf is a content field, e.g. ``*.content`` or ``*.arguments``
 _CONTENT_KEYS = frozenset(
     {
         "lmnr.span.input",
         "lmnr.span.output",
+        "gen_ai.prompt",
+        "gen_ai.completion",
         "gen_ai.input.messages",
         "gen_ai.output.messages",
+        "gen_ai.system_instructions",
+        "gen_ai.request.instructions",
+        "gen_ai.request.structured_output_schema",
         "gen_ai.tool.definitions",
+        "gen_ai.tool.call.arguments",
+        "gen_ai.tool.call.result",
     }
 )
+_CONTENT_PREFIXES = ("gen_ai.prompt.", "gen_ai.completion.", "llm.request.functions.")
+_CONTENT_SUFFIXES = (".content", ".reasoning", ".arguments")
+
+# GenAI semconv events whose attributes are message content. Marker events
+# (``llm.content.completion.chunk``) and errors (``exception``) carry no content
+# once their attributes are filtered, so they are kept.
+_CONTENT_EVENT_PREFIXES = ("gen_ai.content.", "gen_ai.client.inference.")
+_CONTENT_EVENT_SUFFIXES = (".message", ".choice")
+
+
+def _is_content_key(key: str) -> bool:
+    return key in _CONTENT_KEYS or key.startswith(_CONTENT_PREFIXES) or key.endswith(_CONTENT_SUFFIXES)
+
+
+def _without_content(attributes: Attributes) -> Attributes:
+    if not attributes:
+        return attributes
+    return {key: value for key, value in attributes.items() if not _is_content_key(key)}
+
+
+def _events_without_content(events: Sequence[Event]) -> list[Event]:
+    return [
+        Event(event.name, _without_content(event.attributes), event.timestamp)
+        for event in events
+        if not event.name.startswith(_CONTENT_EVENT_PREFIXES)
+        and not event.name.endswith(_CONTENT_EVENT_SUFFIXES)
+    ]
+
+
+def _laminar_tracing_disabled(span: ReadableSpan) -> bool:
+    """Apply Laminar's own export gate, so the mirror never outlives it.
+
+    Laminar drops a span when ``LMNR_DISABLE_TRACING`` is set, or when it
+    stamped ``lmnr.internal.disabled`` on the span at start. The mirror sits on
+    the same provider, so it must honor the same switch.
+    """
+    if os.environ.get("LMNR_DISABLE_TRACING", "false").strip().lower() == "true":
+        return True
+    return bool((span.attributes or {}).get("lmnr.internal.disabled"))
 
 
 class _OodleLiteLLMCallback(OpenTelemetry):
@@ -92,7 +144,7 @@ class _LaminarMirror(SpanProcessor):
         return
 
     def on_end(self, span: ReadableSpan) -> None:
-        if self._closed:
+        if self._closed or _laminar_tracing_disabled(span):
             return
         try:
             self._delegate.on_end(self._rebind(span))
@@ -100,16 +152,18 @@ class _LaminarMirror(SpanProcessor):
             logger.debug("Failed to mirror Laminar span to Oodle", exc_info=True)
 
     def _rebind(self, span: ReadableSpan) -> ReadableSpan:
-        attributes: Mapping[str, Any] | None = span.attributes
-        if attributes and not self._capture_content:
-            attributes = {k: v for k, v in attributes.items() if k not in _CONTENT_KEYS}
+        attributes: Attributes = span.attributes
+        events: Sequence[Event] = span.events
+        if not self._capture_content:
+            attributes = _without_content(attributes)
+            events = _events_without_content(events)
         return ReadableSpan(
             name=span.name,
             context=span.context,
             parent=span.parent,
             resource=self._resource,
             attributes=attributes,
-            events=span.events,
+            events=events,
             links=span.links,
             kind=span.kind,
             instrumentation_scope=span.instrumentation_scope,
