@@ -120,8 +120,15 @@ ROUTE_FIELDS = 27
 LLM_SPANS = {"llm_call", "llm_call_stream"}
 
 
-def attribute_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]:
-    """Complex attributes that must be present on a backend's copy of the trace."""
+CONTENT_KEYS = {"lmnr.span.input", "lmnr.span.output", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.tool.definitions"}
+
+
+def attribute_checks(rows: list[Row], backend: str, with_content: bool) -> list[tuple[str, bool]]:
+    """Complex attributes a backend's copy of the trace must carry.
+
+    Content (messages, tool schemas, tool and turn payloads) is expected only
+    where it is captured; elsewhere it must be absent from every span.
+    """
     prefix = route_audit.ROUTE_ATTRIBUTE_PREFIX
 
     def route(row: Row) -> dict[str, str]:
@@ -136,7 +143,7 @@ def attribute_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]:
         "llm.usage.visible_output_tokens", "cache.read_tokens", "cache.creation_tokens",
         "cache.hit_pct", "llm.resolved.reasoning_effort", "llm.model_selection.fast_mode_enabled",
     }
-    return [
+    checks = [
         (f"{backend}: every LLM span has all {ROUTE_FIELDS} route fields, event=route_started",
          bool(llm) and all(len(route(r)) == ROUTE_FIELDS and route(r)[prefix + "event"] == "route_started" for r in llm)),
         (f"{backend}: turn loops and agent_session end with event=route_completed",
@@ -146,6 +153,13 @@ def attribute_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]:
          bool(streams) and all(len(route(r).get(prefix + "input_batch_id", "")) == 64 for r in streams)),
         (f"{backend}: LLM spans carry usage, cache and resolved-config attributes",
          bool(llm) and all(usage_keys <= set(r.attributes) for r in llm)),
+    ]
+    if not with_content:
+        return checks + [
+            (f"{backend}: no prompt, completion, tool schema or payload content on any span",
+             bool(rows) and not any(CONTENT_KEYS & set(r.attributes) for r in rows)),
+        ]
+    return checks + [
         (f"{backend}: LLM spans carry input messages, output messages and tool definitions",
          bool(streams) and all({"gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.tool.definitions"} <= set(r.attributes) for r in streams)),
         (f"{backend}: tool spans carry {{tool_id, tool_name, args}} in and {{stdout, exitCode}} out",
@@ -184,8 +198,12 @@ def report(laminar: list[Row], oodle: list[Row], trace_id: str) -> bool:
         (f"Oodle chat spans name the Router group ({alias})",
          bool(chats) and all(_text(c.attributes.get("litellm.model_group", _EMPTY)) == alias for c in chats)),
     ]
-    checks += attribute_checks(laminar, "Laminar")
-    checks += attribute_checks([r for r in oodle if r.span_id in lam_ids], "Oodle")
+    capture = os.environ["OODLE_CAPTURE_MESSAGE_CONTENT"] == "true"
+    checks += attribute_checks(laminar, "Laminar", with_content=True)
+    checks += attribute_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", with_content=capture)
+    if not capture:
+        checks.append(("Oodle: chat spans carry no prompt or completion",
+                       bool(chats) and not any(CONTENT_KEYS & set(c.attributes) for c in chats)))
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")
@@ -197,6 +215,7 @@ def report(laminar: list[Row], oodle: list[Row], trace_id: str) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-mirror", action="store_true")
+    parser.add_argument("--capture", action="store_true", help="send message content to Oodle too")
     args = parser.parse_args()
 
     os.environ.update(
@@ -208,6 +227,7 @@ def main() -> None:
             "OODLE_API_KEY": "local",
             "OODLE_TRACES_ENDPOINT": f"http://127.0.0.1:{OODLE_PORT}/v1/traces",
             "OODLE_MIRROR_LAMINAR_SPANS": "false" if args.no_mirror else "true",
+            "OODLE_CAPTURE_MESSAGE_CONTENT": "true" if args.capture else "false",
         }
     )
     laminar, oodle, stop = start_receivers()
