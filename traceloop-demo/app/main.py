@@ -5,9 +5,15 @@ All Gemini calls are automatically instrumented and traces are exported
 to Oodle via an OpenTelemetry Collector.
 """
 
+import logging
 import os
 
 from flask import Flask, jsonify, request
+from opentelemetry._logs import set_logger_provider
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
 from google import genai
 from traceloop.sdk import Traceloop
 from traceloop.sdk.decorators import workflow
@@ -19,6 +25,18 @@ client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 # When TRACELOOP_BASE_URL is set (e.g., to the OTel Collector at http://otel-collector:4318),
 # the SDK exports traces there via OTLP HTTP. The collector then forwards them to Oodle.
 Traceloop.init(app_name="traceloop-demo")
+
+_otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
+_logger_provider = LoggerProvider(
+    resource=Resource.create({"service.name": "traceloop-demo"}),
+)
+_logger_provider.add_log_record_processor(
+    BatchLogRecordProcessor(OTLPLogExporter(endpoint=_otlp_endpoint))
+)
+set_logger_provider(_logger_provider)
+logger = logging.getLogger("traceloop-demo")
+logger.setLevel(logging.INFO)
+logger.addHandler(LoggingHandler(level=logging.INFO, logger_provider=_logger_provider))
 
 
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
@@ -64,6 +82,7 @@ def chat():
     try:
         reply = run_chat(message, model)
     except Exception as e:
+        logger.error("Gemini chat call failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
     return jsonify({"reply": reply, "model": model})
@@ -83,6 +102,7 @@ def summarize():
     try:
         summary = run_summarize(text)
     except Exception as e:
+        logger.error("Gemini summarize call failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
     return jsonify({"summary": summary})
