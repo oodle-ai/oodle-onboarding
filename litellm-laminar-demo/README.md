@@ -62,16 +62,10 @@ session_workflow
 | Route audit (27 fields) | LLM spans get `route_started`; the enclosing turn loop or `agent_session` gets `route_completed` | `agent.route.event`, `purpose`, `route`, `provider`, `model`, `reason`, `selection_reason`, `attempt_id`, `logical_call_id`, `parent_attempt_id`, `input_batch_id`, `input_message_ids`, `input_message_count`, `started`, `fallback`, `forced_api`, `quota`, `auth`, ... |
 | Usage and cache | `llm_call`, `llm_call_stream` | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `llm.usage.total_tokens`, `llm.usage.visible_output_tokens`, `cache.read_tokens`, `cache.creation_tokens`, `cache.hit_pct`; reasoning and cache token counts when non-zero |
 | Resolved model config | `llm_call`, `llm_call_stream` | `gen_ai.system`, `gen_ai.request.model`, `llm.resolved.reasoning_effort`, `llm.model_selection.fast_mode_enabled` |
-| Content ¹ | `llm_call`, `llm_call_stream` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.definitions` (Laminar shows these as the span's input, output and tools) |
-| Tool payloads ¹ | `tool_call [*]` | input `{tool_id, tool_name, args}`, output `{stdout, stderr, exitCode, outputExceededThreshold}` |
-| Turn-loop payloads ¹ | `run_agent_with_messages` | input `{config, user_messages, message_ids}`, output `{final_text, interrupted, tool_call_count, ...}` |
+| Content | `llm_call`, `llm_call_stream` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.definitions` (Laminar shows these as the span's input, output and tools) |
+| Tool payloads | `tool_call [*]` | input `{tool_id, tool_name, args}`, output `{stdout, stderr, exitCode, outputExceededThreshold}` |
+| Turn-loop payloads | `run_agent_with_messages` | input `{config, user_messages, message_ids}`, output `{final_text, interrupted, tool_call_count, ...}` |
 | Gateway | `chat <model>` (Oodle) | `litellm.model_group`, `gen_ai.provider.name`, `gen_ai.usage.*`, `gen_ai.cost.*`, `hidden_params` |
-
-¹ Laminar always receives content. Oodle receives it only with
-`OODLE_CAPTURE_MESSAGE_CONTENT=true`. It is off by default, so Oodle
-gets the span structure, route data, usage and cost, but no prompts,
-completions, tool schemas or tool and turn payloads, on the mirrored
-spans and the LiteLLM `chat` spans alike.
 
 Set `ROUTE_ATTRIBUTE_PREFIX` to rename the route-audit namespace, for
 example to match an existing platform's attribute names.
@@ -100,11 +94,6 @@ The mirror span processor re-exports every Laminar span to Oodle, so the
 `chat` spans arrive with their parents, and Oodle gets the session, tool,
 subagent and route data too. Set `OODLE_MIRROR_LAMINAR_SPANS=false` to see
 Oodle receive only orphaned `chat` spans.
-
-Telemetry never breaks the app. Initialization is idempotent, a mirror
-or callback failure is logged and dropped, the app still starts with
-LiteLLM spans only if Laminar is not initialized, and both Oodle
-pipelines are flushed and closed when the app stops.
 
 ## Things that fail quietly
 
@@ -137,8 +126,7 @@ in both Laminar and Oodle.
 ## Verify without any accounts
 
 ```bash
-make verify-local            # all 21 checks pass; Oodle gets no content
-make verify-local-capture    # all 22 checks pass; Oodle gets content too
+make verify-local            # all 22 checks pass
 make verify-local-no-mirror  # parent, session and Oodle attribute checks fail
 ```
 
@@ -146,8 +134,7 @@ This runs one mocked session inside the container against a local gRPC
 receiver standing in for Laminar and a local HTTP receiver standing in
 for the Oodle collector. It then checks both copies of the trace: span
 parents, the Router group on `chat` spans, route events on the right
-spans, usage attributes, and where content, tool and turn-loop payloads
-should and should not appear.
+spans, usage and content attributes, and tool and turn-loop payloads.
 
 ## Verification
 

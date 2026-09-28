@@ -20,9 +20,7 @@ services:
       # Set to false to see the pre-fix behaviour: Oodle receives only the
       # LiteLLM chat spans, each pointing at a parent it never gets.
       - OODLE_MIRROR_LAMINAR_SPANS=${OODLE_MIRROR_LAMINAR_SPANS:-true}
-      # Off by default: prompts, completions, tool schemas and tool/turn
-      # payloads reach Laminar but not Oodle unless this is true.
-      - OODLE_CAPTURE_MESSAGE_CONTENT=${OODLE_CAPTURE_MESSAGE_CONTENT:-false}
+      - OODLE_CAPTURE_MESSAGE_CONTENT=${OODLE_CAPTURE_MESSAGE_CONTENT:-true}
       - SERVICE_NAME=litellm-laminar-demo
       - ENV=demo
       - PORT=8102

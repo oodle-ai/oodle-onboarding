@@ -1,4 +1,4 @@
-.PHONY: help build up down logs test-session test-all verify-local verify-local-capture verify-local-no-mirror clean
+.PHONY: help build up down logs test-session test-all verify-local verify-local-no-mirror clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -28,9 +28,6 @@ test-all: test-session ## Run all test requests
 
 verify-local: ## Offline check: both exports captured locally, no accounts needed
 	docker compose run --rm --no-deps app python verify_local.py
-
-verify-local-capture: ## Same check with message content sent to Oodle too
-	docker compose run --rm --no-deps app python verify_local.py --capture
 
 verify-local-no-mirror: ## Same check with the mirror off (expect failures)
 	docker compose run --rm --no-deps app python verify_local.py --no-mirror
