@@ -1,0 +1,49 @@
+# OpenTelemetry Collector configuration for the collector Lambda layer.
+#
+# The layer runs the collector as a Lambda extension, next to the
+# function. OPENTELEMETRY_COLLECTOR_CONFIG_URI points the layer at
+# this file. The function's OpenTelemetry SDK sends traces, metrics, and
+# logs to localhost. The collector listens only on localhost, so nothing
+# outside the execution environment can reach it.
+#
+# This is the file that the Oodle integration tile generates when
+# Metrics, Logs, and Traces are all selected. The demo reads the
+# endpoint and instance from environment variables so that one file
+# works for any Oodle instance. The tile writes the values in.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: localhost:4317
+      http:
+        endpoint: localhost:4318
+
+processors:
+  # Without decouple, the pipeline is synchronous: the SDK's flush at
+  # the end of an invocation waits until the export to Oodle is done,
+  # and the function's response waits with it. decouple answers the SDK
+  # at once and keeps the environment from freezing until the export
+  # finishes. It must be the last processor in each pipeline.
+  decouple:
+
+exporters:
+  otlp_http/oodle:
+    endpoint: ${env:OODLE_OTLP_ENDPOINT}
+    headers:
+      X-OODLE-INSTANCE: ${env:OODLE_INSTANCE}
+      X-API-KEY: ${env:OODLE_API_KEY}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_http/oodle]
+    logs:
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_http/oodle]
+    traces:
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_http/oodle]
