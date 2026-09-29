@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Lambda demo for Oodle. A Python function sends metrics, logs, and
+  traces to Oodle through the OpenTelemetry collector Lambda layer, with
+  the Python language layer loading only the instrumentations it needs.
+
+Parameters:
+  OodleInstance:
+    Type: String
+    Description: Oodle instance ID, for example inst-acme-abc123.
+  OodleApiKey:
+    Type: String
+    NoEcho: true
+    Description: Oodle API key with the DataIngestion role.
+  OodleOtlpEndpoint:
+    Type: String
+    Description: Oodle OTLP endpoint, for example https://inst-acme-abc123-otlp.collector.oodle.ai
+  ScheduleEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Invoke the function every minute so that data keeps flowing.
+
+Conditions:
+  IsScheduleEnabled: !Equals [!Ref ScheduleEnabled, "true"]
+
+Resources:
+  CheckoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: oodle-lambda-demo-checkout
+      CodeUri: otel/
+      Handler: app.handler
+      Runtime: python3.13
+      Architectures: [arm64]
+      # The layers add work to each cold start. With 128 MB and 3 seconds,
+      # the first invocation in a new environment can time out.
+      MemorySize: 256
+      Timeout: 30
+      LoggingConfig:
+        LogFormat: JSON
+      Layers:
+        # The collector runs as an extension and exports to Oodle.
+        - !Sub arn:aws:lambda:${AWS::Region}:184161586896:layer:opentelemetry-collector-arm64-0_23_0:1
+        # The Python SDK and its instrumentations. It sends to the
+        # collector on localhost:4318.
+        - !Sub arn:aws:lambda:${AWS::Region}:184161586896:layer:opentelemetry-python-0_21_0:1
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/otel-instrument
+          OPENTELEMETRY_COLLECTOR_CONFIG_URI: /var/task/collector.yaml
+          OTEL_SERVICE_NAME: oodle-lambda-demo-checkout
+          # The layer loads every instrumentation it contains, and each one
+          # adds to every cold start. Keep aws-lambda (the invocation span
+          # and the flush) and botocore (the AWS calls). Skip the rest.
+          OTEL_PYTHON_DISABLED_INSTRUMENTATIONS: aiobotocore,aiohttp-client,asyncpg,boto3,celery,django,falcon,fastapi,flask,grpc_aio_client,grpc_aio_server,grpc_client,grpc_server,jinja2,mysql,psycopg2,pymemcache,pymongo,pymysql,pyramid,redis,requests,sqlalchemy,sqlite3,starlette,tornado
+          # Logs go through the SDK. The Python SDK attaches its log
+          # handler only when asked to.
+          OTEL_LOGS_EXPORTER: otlp
+          OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED: "true"
+          OODLE_INSTANCE: !Ref OodleInstance
+          OODLE_API_KEY: !Ref OodleApiKey
+          OODLE_OTLP_ENDPOINT: !Ref OodleOtlpEndpoint
+      Events:
+        EveryMinute:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Enabled: !If [IsScheduleEnabled, true, false]
+
+Outputs:
+  FunctionName:
+    Value: !Ref CheckoutFunction
