@@ -53,6 +53,7 @@ class RouteReason(str, Enum):
 class CallPurpose(str, Enum):
     AGENT_TURN = "agent_turn"
     CLASSIFICATION = "classification"
+    COMPACTION = "compaction"
     RESPONSE_VERIFICATION = "response_verification"
 
 
