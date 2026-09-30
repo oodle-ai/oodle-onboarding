@@ -5,7 +5,6 @@ Each model group is named after the selection it serves,
 ``<model>__reasoning-<effort>``, and every deployment carries ``model_info``
 with the provider name and the base model key, so usage and cost tracking
 key on the model rather than the provider-specific deployment string.
-The Oodle LiteLLM callback records the group as ``litellm.model_group``.
 
 The Laminar LLM span around each call gets, by hand:
   - usage: tokens, reasoning, cache read/creation, cache hit %, visible output

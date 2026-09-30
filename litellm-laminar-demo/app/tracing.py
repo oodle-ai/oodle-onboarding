@@ -5,15 +5,11 @@ spans (session, turn loop, tool calls, subagents) and the manual LLM spans
 that carry token usage. Its LiteLLM auto-instrumentation is disabled because
 its streaming handler drops usage.
 
-Oodle gets two span sources, both exported straight to the Oodle collector:
-
-1. A LiteLLM ``OpenTelemetry`` callback on a private TracerProvider, which
-   emits one ``chat <model>`` GenAI span per completion. Laminar attaches its
-   spans to the global OpenTelemetry context, so each of these is created as a
-   child of the Laminar ``llm_call_stream`` span around it.
-2. A mirror of every Laminar span. Without it the parents of the LiteLLM
-   spans never reach Oodle, and a session arrives as a flat list of orphaned
-   model calls. Set ``OODLE_MIRROR_LAMINAR_SPANS=false`` to see that.
+Oodle gets a mirror of every Laminar span, exported straight to the Oodle
+collector, so both backends hold the same trace. There is no LiteLLM
+OpenTelemetry callback: it would add a ``chat <model>`` child under every
+Laminar LLM span that repeats its model, tokens and prompt. Oodle reads the
+model call from the Laminar span itself and prices it from the token counts.
 
 Message content (prompts, completions, tool schemas, tool and turn payloads)
 stays out of Oodle unless ``OODLE_CAPTURE_MESSAGE_CONTENT=true``. Laminar
@@ -27,24 +23,19 @@ import threading
 from collections.abc import Sequence
 from typing import Any
 
-import litellm
-from litellm.integrations.opentelemetry import OpenTelemetry, OpenTelemetryConfig
-from litellm.integrations.opentelemetry_utils.gen_ai_semconv import OTELSemconvCategory
 from lmnr import Laminar
 from lmnr.opentelemetry_lib.tracing.instruments import Instruments
-from opentelemetry import trace as trace_api
 from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import Event, ReadableSpan, Span, SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import Event, ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.util.types import Attributes
 
 logger = logging.getLogger(__name__)
 
-# Content on mirrored spans is dropped when content capture is off, so one flag
-# governs what content leaves the process on both Oodle pipelines. Laminar and
+# Content on mirrored spans is dropped when content capture is off. Laminar and
 # its bundled instrumentors (OpenAI, Anthropic, Google GenAI, ...) write content
 # under three key shapes, all matched here:
 #   - whole-payload keys, e.g. ``lmnr.span.input`` or ``gen_ai.input.messages``
@@ -108,23 +99,6 @@ def _laminar_tracing_disabled(span: ReadableSpan) -> bool:
     return bool((span.attributes or {}).get("lmnr.internal.disabled"))
 
 
-class _OodleLiteLLMCallback(OpenTelemetry):
-    """LiteLLM's OTel callback, kept off LiteLLM's proxy globals."""
-
-    def _init_otel_logger_on_litellm_proxy(self) -> None:
-        return
-
-    def set_attributes(self, span: trace_api.Span, kwargs: Any, response_obj: Any | None) -> None:
-        super().set_attributes(span, kwargs, response_obj)
-        # LiteLLM 1.102 writes gen_ai.operation.name only when it captures
-        # content, and Oodle's Agent Observability lists spans by it.
-        try:
-            if "gen_ai.operation.name" not in (getattr(span, "attributes", None) or {}):
-                span.set_attribute("gen_ai.operation.name", self._gen_ai_operation_name(kwargs))
-        except Exception:
-            logger.debug("Failed to set gen_ai.operation.name on Oodle span", exc_info=True)
-
-
 class _LaminarMirror(SpanProcessor):
     """Re-export finished Laminar spans to Oodle under the app's resource.
 
@@ -182,13 +156,7 @@ class _LaminarMirror(SpanProcessor):
 
 _lock = threading.Lock()
 _initialized = False
-_callback: _OodleLiteLLMCallback | None = None
-_oodle_provider: TracerProvider | None = None
 _mirror: _LaminarMirror | None = None
-
-
-def _flag(name: str, default: str) -> bool:
-    return os.environ.get(name, default).lower() == "true"
 
 
 def init_laminar() -> None:
@@ -213,10 +181,9 @@ def _oodle_exporter() -> OTLPSpanExporter:
     )
 
 
-def _batch_processor(exporter: OTLPSpanExporter, max_queue_size: int) -> BatchSpanProcessor:
+def _batch_processor(exporter: OTLPSpanExporter) -> BatchSpanProcessor:
     return BatchSpanProcessor(
         exporter,
-        max_queue_size=max_queue_size,
         max_export_batch_size=16,
         schedule_delay_millis=5000,
         export_timeout_millis=10000,
@@ -242,49 +209,25 @@ def _laminar_tracer_provider() -> Any | None:
 
 
 def init_oodle(service_name: str) -> bool:
-    """Register the LiteLLM callback and, unless disabled, the Laminar mirror.
+    """Attach the Laminar mirror. False when Laminar is not initialized.
 
     Safe to call more than once: later calls are no-ops, so spans are never
     exported twice.
     """
-    global _callback, _initialized, _mirror, _oodle_provider
+    global _initialized, _mirror
     with _lock:
         if _initialized:
             return True
-        capture = _flag("OODLE_CAPTURE_MESSAGE_CONTENT", "false")
-        environment = os.environ.get("ENV", "demo")
-        resource = Resource.create({"service.name": service_name, "deployment.environment": environment})
-        provider = TracerProvider(resource=resource)
-        provider.add_span_processor(_batch_processor(_oodle_exporter(), max_queue_size=256))
-        callback = _OodleLiteLLMCallback(
-            config=OpenTelemetryConfig(
-                skip_set_global=True,
-                service_name=service_name,
-                deployment_environment=environment,
-                capture_message_content="SPAN_ONLY" if capture else "NO_CONTENT",
-                semconv_stability_opt_in={OTELSemconvCategory.GEN_AI_LATEST_EXPERIMENTAL},
-                ignore_context_propagation=True,
-                enable_metrics=False,
-                enable_events=False,
-            ),
-            tracer_provider=provider,
+        laminar_provider = _laminar_tracer_provider()
+        if laminar_provider is None:
+            logger.warning("Laminar is not initialized; Oodle receives no spans")
+            return False
+        capture = os.environ.get("OODLE_CAPTURE_MESSAGE_CONTENT", "false").lower() == "true"
+        resource = Resource.create(
+            {"service.name": service_name, "deployment.environment": os.environ.get("ENV", "demo")}
         )
-        litellm.callbacks.append(callback)
-
-        mirror = None
-        if _flag("OODLE_MIRROR_LAMINAR_SPANS", "true"):
-            laminar_provider = _laminar_tracer_provider()
-            if laminar_provider is None:
-                logger.warning("Laminar is not initialized; Oodle receives LiteLLM spans only")
-            else:
-                # Sessions record far more Laminar spans than completions, so
-                # the mirror keeps the SDK's default queue depth.
-                mirror = _LaminarMirror(
-                    _batch_processor(_oodle_exporter(), max_queue_size=2048), resource, capture
-                )
-                laminar_provider.add_span_processor(mirror)
-
-        _callback, _oodle_provider, _mirror = callback, provider, mirror
+        _mirror = _LaminarMirror(_batch_processor(_oodle_exporter()), resource, capture)
+        laminar_provider.add_span_processor(_mirror)
         _initialized = True
         return True
 
@@ -293,28 +236,17 @@ def flush() -> None:
     Laminar.flush()
     if _mirror is not None:
         _mirror.force_flush()
-    if _oodle_provider is not None:
-        _oodle_provider.force_flush()
 
 
 def shutdown_oodle() -> None:
-    """Flush and close both Oodle pipelines and unregister the callback."""
-    global _callback, _initialized, _mirror, _oodle_provider
+    """Flush and close the Oodle mirror."""
+    global _initialized, _mirror
     with _lock:
-        callback, provider, mirror = _callback, _oodle_provider, _mirror
-        _callback, _oodle_provider, _mirror, _initialized = None, None, None, False
-        if callback is not None:
-            # LiteLLM copies callbacks into internal success/failure lists and
-            # dedups by class, so a stale copy would swallow a new callback's events.
-            try:
-                litellm.logging_callback_manager.remove_callback_from_all_lists(callback)
-            except Exception:
-                logger.warning("Failed to remove the Oodle LiteLLM callback", exc_info=True)
-        for processor in (mirror, provider):
-            if processor is None:
-                continue
-            try:
-                processor.force_flush(10000)
-                processor.shutdown()
-            except Exception:
-                logger.warning("Failed to shut down an Oodle span pipeline", exc_info=True)
+        mirror, _mirror, _initialized = _mirror, None, False
+        if mirror is None:
+            return
+        try:
+            mirror.force_flush(10000)
+            mirror.shutdown()
+        except Exception:
+            logger.warning("Failed to shut down the Oodle mirror", exc_info=True)

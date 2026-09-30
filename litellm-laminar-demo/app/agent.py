@@ -9,7 +9,6 @@ Span tree for one user message:
     session_workflow
       agent_session                     session id + account metadata; route_completed
         llm_call                        title generation, first message only; route_started
-          chat <model>                  LiteLLM GenAI span (Oodle only)
         run_agent_with_messages         input: run config + messages; output: run result
           summarizing_compact [main]    only when the context nears the window
             compaction_extract_terms_from_text [main]
@@ -18,7 +17,6 @@ Span tree for one user message:
               compaction_call_model_api
                 llm_call
           llm_call_stream               usage, cache, content, tool definitions, route
-            chat <model>
           tool_call [bash_execute]      input: {tool_id, tool_name, args}
                                         output: {stdout, stderr, exitCode, ...}
           llm_call_stream
@@ -36,7 +34,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import litellm
-from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from lmnr import Laminar, observe
 
 import compaction
@@ -367,8 +364,6 @@ async def run_session(prompt: str, followups: list[str] | None = None, account_i
             result = await run_agent_with_messages(
                 config, [{"role": "user", "content": text}], [message_id], conversation
             )
-    # LiteLLM emits its callback spans from a background task; drain it here.
-    await GLOBAL_LOGGING_WORKER.flush()
     return {
         "session_id": session_id,
         "trace_id": trace_ids[0],
