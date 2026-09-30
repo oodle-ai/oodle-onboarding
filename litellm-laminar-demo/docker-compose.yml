@@ -23,6 +23,9 @@ services:
       # Off by default: prompts, completions, tool schemas and tool/turn
       # payloads reach Laminar but not Oodle unless this is true.
       - OODLE_CAPTURE_MESSAGE_CONTENT=${OODLE_CAPTURE_MESSAGE_CONTENT:-false}
+      # Context window the agent compacts against. Small, so a session of a
+      # few messages compacts; the app's own default is 200000.
+      - CONTEXT_WINDOW_TOKENS=${CONTEXT_WINDOW_TOKENS:-600}
       - SERVICE_NAME=litellm-laminar-demo
       - ENV=demo
       - PORT=8102

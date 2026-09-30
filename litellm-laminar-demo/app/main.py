@@ -31,11 +31,13 @@ app = FastAPI(title="Laminar + Oodle dual-write demo", lifespan=lifespan)
 
 class SessionRequest(BaseModel):
     message: str = "What is in this repository?"
+    # Later user messages in the same session, one trace each.
+    followups: list[str] = []
 
 
 @app.post("/session")
 async def session(request: SessionRequest) -> dict:
-    result = await agent.run_session(request.message)
+    result = await agent.run_session(request.message, request.followups)
     tracing.flush()
     return result
 

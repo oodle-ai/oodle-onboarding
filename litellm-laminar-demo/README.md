@@ -7,8 +7,8 @@ receives both LiteLLM's GenAI spans and a mirror of every Laminar span.
 
 The agent emits the span hierarchy, attribute keys and payload shapes of a
 production coding agent: route-audit events, per-call usage and cache
-metrics, prompt and tool content, and structured tool and turn-loop
-payloads.
+metrics, prompt and tool content, structured tool and turn-loop
+payloads, and a context-compaction timeline for long sessions.
 
 ## Architecture
 
@@ -31,15 +31,24 @@ FastAPI app (:8102) — small coding agent
 
 ## What gets traced
 
-One session produces this tree. Every span below reaches both backends,
-except `chat <model>`, which only Oodle receives.
+A session is one or more user messages, and each message produces this
+tree as its own trace. Every span below reaches both backends, except
+`chat <model>`, which only Oodle receives.
 
 ```
 session_workflow
   agent_session                       session id, account metadata; route_completed
-    llm_call                          title generation; route_started
+    llm_call                          title generation, first message only; route_started
       chat <model>                    LiteLLM GenAI span
     run_agent_with_messages           run config in, run result out; route_completed
+      summarizing_compact [main]      only when the context nears the window; compaction timeline
+        compaction_extract_terms_from_text [main]    output: extracted terms ¹
+          llm_call
+            chat <model>
+        summarizing_get_summary       output: the handoff summary ¹
+          compaction_call_model_api
+            llm_call
+              chat <model>
       llm_call_stream                 usage, cache, content, tool definitions; route_started
         chat <model>
       tool_call [bash_execute]        {tool_id, tool_name, args} in, {stdout, stderr, exitCode} out
@@ -66,6 +75,8 @@ session_workflow
 | Tool payloads ¹ | `tool_call [*]` | input `{tool_id, tool_name, args}`, output `{stdout, stderr, exitCode, outputExceededThreshold}` |
 | Turn-loop payloads ¹ | `run_agent_with_messages` | input `{config, user_messages, message_ids}`, output `{final_text, interrupted, tool_call_count, ...}` |
 | Gateway | `chat <model>` (Oodle) | `litellm.model_group`, `gen_ai.provider.name`, `gen_ai.usage.*`, `gen_ai.cost.*`, `hidden_params` |
+| Conversation | `llm_call`, `llm_call_stream` | `gen_ai.conversation.id`; after the agent's first compaction, `gen_ai.conversation.compacted=true` and `agent.compaction.round` |
+| Compaction timeline | `summarizing_compact [<agent>]` | `gen_ai.conversation.id`, `gen_ai.agent.name`, `agent.compaction.round`, `trigger`, `strategy`, `context_window_tokens`, `threshold`, `tokens_before`, `tokens_after`, `messages_before`, `messages_after`, `summary_id`, `previous_summary_id`, `seconds_since_previous`, `agent_key` |
 
 ¹ Laminar always receives content. Oodle receives it only with
 `OODLE_CAPTURE_MESSAGE_CONTENT=true`. It is off by default, so Oodle
@@ -92,6 +103,38 @@ per selection, named `<model>__reasoning-<effort>`. Each deployment
 carries `model_info` with the provider name and base model key.
 Cooldowns are off when a group has a single deployment, because cooling it
 down would leave nothing to route to.
+
+**Compaction** (`app/compaction.py`). Before every model call the agent
+estimates its context size. At 80% of `CONTEXT_WINDOW_TOKENS` (soft) or
+87.5% (hard) it extracts key terms, summarizes the history, and keeps
+only the system prompt, the summary and the last five user requests. The
+agent keeps its history and compaction state from one message's trace to
+the next, so rounds count up across the whole session.
+
+Each compaction writes one timeline row onto its `summarizing_compact`
+span: round, trigger, tokens and messages before and after, the window
+and threshold, a digest of the summary, the previous summary's digest,
+and the seconds since the previous compaction. Token counts are estimates
+of the context the agent holds, not provider usage, so they compare
+before and after. Every later inference span of that agent carries
+`gen_ai.conversation.compacted=true` and the round it runs in. Nothing
+here is message content, so it reaches Oodle with content capture off.
+
+The handoff summary itself is content. It is the output of
+`summarizing_get_summary`, in markdown with the sections User Request,
+Progress and Next Steps, so a trace viewer can show what the agent kept
+at each compaction. Oodle receives it only with content capture on.
+
+This maps to the [OpenTelemetry GenAI semantic conventions](https://github.com/open-telemetry/semantic-conventions-genai)
+where they reach:
+
+| Need | Convention | Here |
+|---|---|---|
+| Group a session's spans across traces | `gen_ai.conversation.id` | set on inference and compaction spans |
+| Mark a call that runs on a compacted history | `gen_ai.conversation.compacted` (boolean, set only when `true`) | set on inference spans after round 1 |
+| Name the agent | `gen_ai.agent.name` | `main`, or the subagent type |
+| A span for the compaction step | none: orchestrator-side compaction was deferred upstream | `summarizing_compact [<agent>]` |
+| Round, trigger, tokens before/after, time between compactions | none | `agent.compaction.*` |
 
 **Dual write** (`app/tracing.py`). Laminar attaches its spans to the global
 OpenTelemetry context, so each LiteLLM `chat` span is created as a child of
@@ -129,25 +172,32 @@ pipelines are flushed and closed when the app stops.
 cp .env.example .env    # fill in the keys
 make up
 make test-session
+make test-long-session
 ```
 
 `test-session` returns the session id and trace id. Search for either
-in both Laminar and Oodle.
+in both Laminar and Oodle. `test-long-session` sends nine messages in one
+session and returns every trace id and the number of compactions. Search
+Oodle for `agent.compaction.round` to see the session's timeline.
 
 ## Verify without any accounts
 
 ```bash
-make verify-local            # all 21 checks pass; Oodle gets no content
-make verify-local-capture    # all 22 checks pass; Oodle gets content too
+make verify-local            # all 30 checks pass; Oodle gets no content
+make verify-local-capture    # all 32 checks pass; Oodle gets content too
 make verify-local-no-mirror  # parent, session and Oodle attribute checks fail
 ```
 
-This runs one mocked session inside the container against a local gRPC
-receiver standing in for Laminar and a local HTTP receiver standing in
-for the Oodle collector. It then checks both copies of the trace: span
-parents, the Router group on `chat` spans, route events on the right
-spans, usage attributes, and where content, tool and turn-loop payloads
-should and should not appear.
+This runs one mocked session of six messages inside the container against
+a local gRPC receiver standing in for Laminar and a local HTTP receiver
+standing in for the Oodle collector. It uses a 320-token context window,
+so the agent compacts four times across the six traces. It then checks
+both copies of the traces: span parents, the Router group on `chat`
+spans, route events on the right spans, usage attributes, where content,
+tool and turn-loop payloads should and should not appear, and the
+compaction timeline: consecutive rounds across traces, each round linked
+to the one before, and every inference span marked with the round it
+runs in.
 
 ## Verification
 
