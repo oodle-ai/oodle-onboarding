@@ -8,8 +8,8 @@ The session has several user messages, one trace each, and a small context
 window, so the main agent compacts more than once and the compaction
 timeline can be checked across traces.
 
-    python verify_local.py              # mirror on: expect every check to pass
-    python verify_local.py --no-mirror  # pre-fix behaviour: parent checks fail
+    python verify_local.py            # expect every check to pass
+    python verify_local.py --capture  # same, with message content sent to Oodle
 """
 
 import argparse
@@ -47,6 +47,7 @@ class Row:
     parent_id: str
     attributes: dict
     start_time: int = 0
+    scope: str = ""
 
 
 class Capture:
@@ -64,7 +65,7 @@ class Capture:
                     rows.append(
                         Row(
                             service, s.name, s.trace_id.hex(), s.span_id.hex(), s.parent_span_id.hex(), attrs,
-                            s.start_time_unix_nano,
+                            s.start_time_unix_nano, ss.scope.name,
                         )
                     )
         with self._lock:
@@ -268,35 +269,33 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
     lam_names, ood_names = Counter(r.name for r in laminar), Counter(r.name for r in oodle)
 
     print(f"\n{'span':44} {'Laminar':>8} {'Oodle':>6}")
-    for name in sorted(set(lam_names) | set(ood_names), key=lambda n: (n.startswith("chat"), n)):
+    for name in sorted(set(lam_names) | set(ood_names)):
         print(f"{name:44} {lam_names[name]:>8} {ood_names[name]:>6}")
 
-    chats = [r for r in oodle if r.attributes.get("gen_ai.operation.name") is not None]
     dangling = [r for r in oodle if r.parent_id and r.parent_id not in ood_ids]
-    chat_parents = Counter(next((l.name for l in laminar if l.span_id == c.parent_id), "?") for c in chats)
-    alias = agent.SELECTION.alias
+    oodle_llm = [r for r in oodle if r.name in LLM_SPANS]
     checks = [
         ("Laminar received the session trace", len(laminar) > 0),
-        ("Oodle received LiteLLM chat spans", len(chats) >= 4),
-        ("every Laminar span also reached Oodle, same ids", lam_ids <= ood_ids),
+        # A second instrumentation (LiteLLM's OTel callback) would add a span
+        # per model call that repeats the Laminar LLM span's model, tokens
+        # and prompt, and double the model calls Oodle counts.
+        ("Oodle received exactly the spans Laminar did, same ids", lam_ids == ood_ids),
+        ("no LiteLLM spans reach Oodle", not any(r.scope == "litellm" for r in oodle)),
         ("every Oodle span's parent is in Oodle", not dangling),
-        ("chat spans are children of llm_call / llm_call_stream", set(chat_parents) <= LLM_SPANS),
         ("Oodle service.name is the app, not argv[0]", {r.service for r in oodle} == {SERVICE_NAME}),
         (
             "session id reaches Oodle",
             any(r.attributes.get("lmnr.association.properties.session_id") for r in oodle),
         ),
-        (f"Oodle chat spans name the Router group ({alias})",
-         bool(chats) and all(_text(c.attributes.get("litellm.model_group", _EMPTY)) == alias for c in chats)),
+        # Oodle prices a model call from its model and token counts.
+        ("Oodle LLM spans name the model they called",
+         bool(oodle_llm) and all(_text(r.attributes.get("gen_ai.request.model", _EMPTY)) for r in oodle_llm)),
     ]
     capture = os.environ["OODLE_CAPTURE_MESSAGE_CONTENT"] == "true"
     checks += attribute_checks(laminar, "Laminar", with_content=True)
     checks += attribute_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", with_content=capture)
     checks += compaction_checks(laminar, "Laminar", session_id, with_content=True)
     checks += compaction_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", session_id, with_content=capture)
-    if not capture:
-        checks.append(("Oodle: chat spans carry no prompt or completion",
-                       bool(chats) and not any(CONTENT_KEYS & set(c.attributes) for c in chats)))
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")
@@ -307,7 +306,6 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--no-mirror", action="store_true")
     parser.add_argument("--capture", action="store_true", help="send message content to Oodle too")
     args = parser.parse_args()
 
@@ -319,7 +317,6 @@ def main() -> None:
             "OODLE_INSTANCE": "local",
             "OODLE_API_KEY": "local",
             "OODLE_TRACES_ENDPOINT": f"http://127.0.0.1:{OODLE_PORT}/v1/traces",
-            "OODLE_MIRROR_LAMINAR_SPANS": "false" if args.no_mirror else "true",
             "OODLE_CAPTURE_MESSAGE_CONTENT": "true" if args.capture else "false",
             "CONTEXT_WINDOW_TOKENS": str(CONTEXT_WINDOW_TOKENS),
         }

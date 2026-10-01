@@ -3,7 +3,7 @@
 Agent tracing that dual-writes to [Laminar](https://lmnr.ai) and Oodle,
 set up the way production agent platforms run it: the Laminar SDK is the
 primary tracer, model calls go through a LiteLLM Router gateway, and Oodle
-receives both LiteLLM's GenAI spans and a mirror of every Laminar span.
+receives a mirror of every Laminar span.
 
 The agent emits the span hierarchy, attribute keys and payload shapes of a
 production coding agent: route-audit events, per-call usage and cache
@@ -22,45 +22,34 @@ FastAPI app (:8102) — small coding agent
      |     model groups: <model>__reasoning-<effort>
      |
      +-- Laminar SDK (own TracerProvider) ---- gRPC ----> Laminar
-     |        |
-     |        +-- mirror span processor --+
-     |                                    |
-     +-- LiteLLM otel callback -----------+-- OTLP/HTTP --> Oodle
-              (private TracerProvider)
+              |
+              +-- mirror span processor ---- OTLP/HTTP --> Oodle
 ```
 
 ## What gets traced
 
 A session is one or more user messages, and each message produces this
-tree as its own trace. Every span below reaches both backends, except
-`chat <model>`, which only Oodle receives.
+tree as its own trace. Every span below reaches both backends.
 
 ```
 session_workflow
   agent_session                       session id, account metadata; route_completed
     llm_call                          title generation, first message only; route_started
-      chat <model>                    LiteLLM GenAI span
     run_agent_with_messages           run config in, run result out; route_completed
       summarizing_compact [main]      only when the context nears the window; compaction timeline
         compaction_extract_terms_from_text [main]    output: extracted terms ¹
           llm_call
-            chat <model>
         summarizing_get_summary       output: the handoff summary ¹
           compaction_call_model_api
             llm_call
-              chat <model>
       llm_call_stream                 usage, cache, content, tool definitions; route_started
-        chat <model>
       tool_call [bash_execute]        {tool_id, tool_name, args} in, {stdout, stderr, exitCode} out
       llm_call_stream
-        chat <model>
       tool_call [add_task]
         subagent [explore]
           run_agent_with_messages     subagent config, its own route scope
             llm_call_stream
-              chat <model>
       llm_call_stream
-        chat <model>
 ```
 
 ### Attributes
@@ -74,15 +63,13 @@ session_workflow
 | Content ¹ | `llm_call`, `llm_call_stream` | `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.tool.definitions` (Laminar shows these as the span's input, output and tools) |
 | Tool payloads ¹ | `tool_call [*]` | input `{tool_id, tool_name, args}`, output `{stdout, stderr, exitCode, outputExceededThreshold}` |
 | Turn-loop payloads ¹ | `run_agent_with_messages` | input `{config, user_messages, message_ids}`, output `{final_text, interrupted, tool_call_count, ...}` |
-| Gateway | `chat <model>` (Oodle) | `litellm.model_group`, `gen_ai.provider.name`, `gen_ai.usage.*`, `gen_ai.cost.*`, `hidden_params` |
 | Conversation | `llm_call`, `llm_call_stream` | `gen_ai.conversation.id`; after the agent's first compaction, `gen_ai.conversation.compacted=true` and `agent.compaction.round` |
 | Compaction timeline | `summarizing_compact [<agent>]` | `gen_ai.conversation.id`, `gen_ai.agent.name`, `agent.compaction.round`, `trigger`, `strategy`, `context_window_tokens`, `threshold`, `tokens_before`, `tokens_after`, `messages_before`, `messages_after`, `summary_id`, `previous_summary_id`, `seconds_since_previous`, `agent_key` |
 
 ¹ Laminar always receives content. Oodle receives it only with
 `OODLE_CAPTURE_MESSAGE_CONTENT=true`. It is off by default, so Oodle
 gets the span structure, route data, usage and cost, but no prompts,
-completions, tool schemas or tool and turn payloads, on the mirrored
-spans and the LiteLLM `chat` spans alike.
+completions, tool schemas or tool and turn payloads.
 
 Set `ROUTE_ATTRIBUTE_PREFIX` to rename the route-audit namespace, for
 example to match an existing platform's attribute names.
@@ -136,27 +123,28 @@ where they reach:
 | A span for the compaction step | none: orchestrator-side compaction was deferred upstream | `summarizing_compact [<agent>]` |
 | Round, trigger, tokens before/after, time between compactions | none | `agent.compaction.*` |
 
-**Dual write** (`app/tracing.py`). Laminar attaches its spans to the global
-OpenTelemetry context, so each LiteLLM `chat` span is created as a child of
-the Laminar LLM span around it. Laminar exports only to Laminar, though.
-The mirror span processor re-exports every Laminar span to Oodle, so the
-`chat` spans arrive with their parents, and Oodle gets the session, tool,
-subagent and route data too. Set `OODLE_MIRROR_LAMINAR_SPANS=false` to see
-Oodle receive only orphaned `chat` spans.
+**Dual write** (`app/tracing.py`). Laminar exports only to Laminar. A
+mirror span processor on Laminar's TracerProvider re-exports every
+Laminar span to Oodle, so both backends hold the same trace with the same
+span ids: session, turn loop, model calls, tools, subagents and route
+data.
+
+Each model call is one span, the Laminar `llm_call` or `llm_call_stream`
+around it, which carries the model and the token counts. The app sends no
+cost. Laminar prices the span from its copy of LiteLLM's price list, and
+Oodle prices it from its model pricing table.
 
 Telemetry never breaks the app. Initialization is idempotent, a mirror
-or callback failure is logged and dropped, the app still starts with
-LiteLLM spans only if Laminar is not initialized, and both Oodle
-pipelines are flushed and closed when the app stops.
+failure is logged and dropped, the app still starts without an Oodle
+export if Laminar is not initialized, and the mirror is flushed and
+closed when the app stops.
 
 ## Things that fail quietly
 
 | Setting | What happens without it |
 |---|---|
 | `disabled_instruments={Instruments.LITELLM}` on `Laminar.initialize` | Laminar's LiteLLM streaming handler records no usage, so Laminar shows $0. The app sets usage on its own LLM spans instead. |
-| `semconv_stability_opt_in=gen_ai_latest_experimental` on the LiteLLM callback | The span is named `litellm_request` and Agent Observability lists nothing. |
-| `skip_set_global=True` on the LiteLLM callback | LiteLLM tries to become the global tracer provider and competes with Laminar. |
-| `gen_ai.operation.name` restored in the callback | LiteLLM 1.102 writes it only when message content is captured. With capture off, Oodle drops the span from Agent Observability. |
+| No LiteLLM OpenTelemetry callback next to Laminar | Every model call reaches Oodle twice: the Laminar LLM span and a LiteLLM `chat` child that repeats its model, tokens and prompt. Oodle then counts each call's tokens and cost twice. |
 | Mirror spans rebuilt with the app's resource | Laminar names its resource after `sys.argv[0]`, so mirrored spans would land under a service called `main.py`. |
 
 ## Prerequisites
@@ -183,19 +171,18 @@ Oodle for `agent.compaction.round` to see the session's timeline.
 ## Verify without any accounts
 
 ```bash
-make verify-local            # all 30 checks pass; Oodle gets no content
-make verify-local-capture    # all 32 checks pass; Oodle gets content too
-make verify-local-no-mirror  # parent, session and Oodle attribute checks fail
+make verify-local            # all 28 checks pass; Oodle gets no content
+make verify-local-capture    # all 31 checks pass; Oodle gets content too
 ```
 
 This runs one mocked session of six messages inside the container against
 a local gRPC receiver standing in for Laminar and a local HTTP receiver
 standing in for the Oodle collector. It uses a 320-token context window,
 so the agent compacts four times across the six traces. It then checks
-both copies of the traces: span parents, the Router group on `chat`
-spans, route events on the right spans, usage attributes, where content,
-tool and turn-loop payloads should and should not appear, and the
-compaction timeline: consecutive rounds across traces, each round linked
+both copies of the traces: the same span ids on both sides, no LiteLLM
+spans in Oodle, span parents, the model on every LLM span, route events
+on the right spans, usage attributes, where content, tool and turn-loop
+payloads should and should not appear, and the compaction timeline: consecutive rounds across traces, each round linked
 to the one before, and every inference span marked with the round it
 runs in.
 
@@ -203,14 +190,15 @@ runs in.
 
 In Oodle:
 1. Open **Agent Observability** and filter to service `litellm-laminar-demo`.
-2. Open the trace from `make test-session`. The `chat` spans sit under
-   `llm_call_stream`, inside the session, tool and subagent spans.
+2. Open the trace from `make test-session`. The `llm_call_stream` spans
+   sit inside the session, tool and subagent spans, with the model, the
+   token counts and a cost.
 3. Open an `llm_call_stream` span and filter on `agent.route.event`.
 
 In Laminar:
 1. Open the project's traces and search for the session id.
-2. The trace shows the same tree without the `chat` spans. LLM spans show
-   input, output and tools, and Laminar adds cost from the token counts.
+2. The trace shows the same tree. LLM spans show input, output and
+   tools, and Laminar adds cost from the token counts.
 
 ## Cleanup
 
