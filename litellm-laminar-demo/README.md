@@ -36,6 +36,7 @@ session_workflow
   agent_session                       session id, account metadata; route_completed
     llm_call                          title generation, first message only; route_started
     run_agent_with_messages           run config in, run result out; route_completed
+      tool_trim [main]                past half the window, once per compaction cycle; what it trimmed
       summarizing_compact [main]      only when the context nears the window; compaction timeline
         compaction_extract_terms_from_text [main]    output: extracted terms ¹
           llm_call
@@ -64,6 +65,7 @@ session_workflow
 | Tool payloads ¹ | `tool_call [*]` | input `{tool_id, tool_name, args}`, output `{stdout, stderr, exitCode, outputExceededThreshold}` |
 | Turn-loop payloads ¹ | `run_agent_with_messages` | input `{config, user_messages, message_ids}`, output `{final_text, interrupted, tool_call_count, ...}` |
 | Conversation | `llm_call`, `llm_call_stream` | `gen_ai.conversation.id`; after the agent's first compaction, `gen_ai.conversation.compacted=true` and `agent.compaction.round` |
+| Tool trim | `tool_trim [<agent>]` | `tool_trim.outcome` (`trimmed` or `no_op`), `messages_trimmed`, `tokens_before`, `tokens_after`, `threshold_tokens`, `trimmed_tool_call_ids` (string array) |
 | Compaction timeline | `summarizing_compact [<agent>]` | `gen_ai.conversation.id`, `gen_ai.agent.name`, `agent.compaction.round`, `trigger`, `strategy`, `context_window_tokens`, `threshold`, `tokens_before`, `tokens_after`, `messages_before`, `messages_after`, `summary_id`, `previous_summary_id`, `seconds_since_previous`, `agent_key` |
 
 ¹ Laminar always receives content. Oodle receives it only with
@@ -123,6 +125,25 @@ where they reach:
 | A span for the compaction step | none: orchestrator-side compaction was deferred upstream | `summarizing_compact [<agent>]` |
 | Round, trigger, tokens before/after, time between compactions | none | `agent.compaction.*` |
 
+**Tool trimming** (`app/tool_trim.py`). Before it compacts, the agent
+makes room a cheaper way. Once its context passes 50% of
+`CONTEXT_WINDOW_TOKENS`, it replaces each tool output longer than
+`TOOL_TRIM_CHAR_THRESHOLD` characters in the oldest 75% of the history
+with `[Tool output saved to <file>]`. It does this only when the history
+has more than `TOOL_TRIM_MIN_MESSAGES` messages, and at most once per
+compaction cycle. A compaction re-arms it. The model no longer sees the
+outputs it replaced, so a trace must show the trim to explain why the
+agent later runs the same call again.
+
+Each attempt is a `tool_trim [<agent>]` span. Its
+`tool_trim.trimmed_tool_call_ids` are the ids of the tool calls whose
+output was replaced. They match the `tool_id` in the input of the
+`tool_call [*]` spans, so a backend can tie a later repeat of a call to
+the trim that removed its output. The ids are the only list-valued
+attribute in the demo, and the offline check confirms that both
+backends receive them as a string array. Nothing here is message
+content, so it reaches Oodle with content capture off.
+
 **Dual write** (`app/tracing.py`). Laminar exports only to Laminar. A
 mirror span processor on Laminar's TracerProvider re-exports every
 Laminar span to Oodle, so both backends hold the same trace with the same
@@ -166,25 +187,30 @@ make test-long-session
 `test-session` returns the session id and trace id. Search for either
 in both Laminar and Oodle. `test-long-session` sends nine messages in one
 session and returns every trace id and the number of compactions. Search
-Oodle for `agent.compaction.round` to see the session's timeline.
+Oodle for `agent.compaction.round` to see the session's timeline, and for
+`tool_trim.outcome` to see the trims between its compactions.
 
 ## Verify without any accounts
 
 ```bash
-make verify-local            # all 28 checks pass; Oodle gets no content
-make verify-local-capture    # all 31 checks pass; Oodle gets content too
+make verify-local            # all 37 checks pass; Oodle gets no content
+make verify-local-capture    # all 41 checks pass; Oodle gets content too
 ```
 
 This runs one mocked session of six messages inside the container against
 a local gRPC receiver standing in for Laminar and a local HTTP receiver
-standing in for the Oodle collector. It uses a 320-token context window,
-so the agent compacts four times across the six traces. It then checks
+standing in for the Oodle collector. It uses a 700-token context window
+and small trim thresholds, so the agent compacts three times across the
+six traces and trims tool output once in each compaction cycle. It then checks
 both copies of the traces: the same span ids on both sides, no LiteLLM
 spans in Oodle, span parents, the model on every LLM span, route events
 on the right spans, usage attributes, where content, tool and turn-loop
 payloads should and should not appear, and the compaction timeline: consecutive rounds across traces, each round linked
 to the one before, and every inference span marked with the round it
-runs in.
+runs in. It also checks the trims: one per compaction cycle at most,
+`trimmed_tool_call_ids` received as a string array, a smaller context
+after each trim and, where tool payloads are captured, only ids of tool
+calls made before the trim.
 
 ## Verification
 
