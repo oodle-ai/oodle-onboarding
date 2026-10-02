@@ -6,7 +6,8 @@ through the real tracing setup, and compares what each side received.
 
 The session has several user messages, one trace each, and a small context
 window, so the main agent compacts more than once and the compaction
-timeline can be checked across traces.
+timeline can be checked across traces. Small trim thresholds make the agent
+trim tool output between compactions too.
 
     python verify_local.py            # expect every check to pass
     python verify_local.py --capture  # same, with message content sent to Oodle
@@ -128,8 +129,12 @@ def _json(row: Row, key: str) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
-# Small enough that the scripted session compacts more than once.
-CONTEXT_WINDOW_TOKENS = 320
+# Small enough that the scripted session compacts more than once, and large
+# enough that the file it reads is old by the time the trimmer fires.
+CONTEXT_WINDOW_TOKENS = 700
+# Small enough that the file the agent reads is trimmed between compactions.
+TOOL_TRIM_CHAR_THRESHOLD = 200
+TOOL_TRIM_MIN_MESSAGES = 4
 FOLLOWUPS = [
     "Which tests exist?",
     "Where does the Flask app start?",
@@ -262,6 +267,57 @@ def compaction_checks(rows: list[Row], backend: str, session_id: str, with_conte
     ] if with_content else [])
 
 
+TRIM_KEYS = {"outcome", "messages_trimmed", "tokens_before", "tokens_after", "threshold_tokens", "trimmed_tool_call_ids"}
+
+
+def _strings(value) -> list[str] | None:
+    """A string-array attribute as a list, or None when it is not an array."""
+    if value is None or value.WhichOneof("value") != "array_value":
+        return None
+    return [v.string_value for v in value.array_value.values]
+
+
+def tool_trim_checks(rows: list[Row], backend: str, with_content: bool) -> list[tuple[str, bool]]:
+    """The main agent's tool-output trims, rebuilt from spans alone.
+
+    A trim must say what it replaced as a list of tool call ids that survives
+    export, fire at most once per compaction cycle, and, where tool payloads
+    are captured, name only tool calls the agent made before it.
+    """
+    prefix = tool_trim.TOOL_TRIM_ATTRIBUTE_PREFIX
+
+    def attr(row: Row, key: str):
+        value = row.attributes.get(prefix + key)
+        return None if value is None else _value(value)
+
+    trims = sorted((r for r in rows if r.name == "tool_trim [main]"), key=lambda r: r.start_time)
+    trimmed = [r for r in trims if attr(r, "outcome") == "trimmed"]
+    starts = [r.start_time for r in rows if r.name == "summarizing_compact [main]"]
+    cycles = Counter(sum(1 for s in starts if s < r.start_time) for r in trims)
+    tool_ids = {
+        _json(r, "lmnr.span.input").get("tool_id"): r.start_time
+        for r in rows if r.name.startswith("tool_call [")
+    }
+
+    def ids(row: Row) -> list[str]:
+        return _strings(row.attributes.get(prefix + "trimmed_tool_call_ids")) or []
+
+    return [
+        (f"{backend}: main agent trimmed tool output, and every trim carries the trim attributes",
+         bool(trimmed) and all({prefix + k for k in TRIM_KEYS} <= set(r.attributes) for r in trims)),
+        (f"{backend}: trimmed_tool_call_ids arrives as a string array that matches messages_trimmed",
+         bool(trims) and all(_strings(r.attributes[prefix + "trimmed_tool_call_ids"]) is not None
+                             and len(ids(r)) == attr(r, "messages_trimmed") for r in trims)),
+        (f"{backend}: a trim that replaced output shrank the context",
+         bool(trimmed) and all(attr(r, "tokens_after") < attr(r, "tokens_before") for r in trimmed)),
+        (f"{backend}: at most one trim per compaction cycle, in more than one cycle",
+         len(cycles) >= 2 and max(cycles.values()) == 1),
+    ] + ([
+        (f"{backend}: every trimmed id is the tool_id of a tool call made before the trim",
+         bool(trimmed) and all(i in tool_ids and tool_ids[i] < r.start_time for r in trimmed for i in ids(r))),
+    ] if with_content else [])
+
+
 def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_id: str) -> bool:
     laminar = [r for r in laminar if r.trace_id in trace_ids]
     oodle = [r for r in oodle if r.trace_id in trace_ids]
@@ -296,6 +352,8 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
     checks += attribute_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", with_content=capture)
     checks += compaction_checks(laminar, "Laminar", session_id, with_content=True)
     checks += compaction_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", session_id, with_content=capture)
+    checks += tool_trim_checks(laminar, "Laminar", with_content=True)
+    checks += tool_trim_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", with_content=capture)
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")
@@ -319,6 +377,8 @@ def main() -> None:
             "OODLE_TRACES_ENDPOINT": f"http://127.0.0.1:{OODLE_PORT}/v1/traces",
             "OODLE_CAPTURE_MESSAGE_CONTENT": "true" if args.capture else "false",
             "CONTEXT_WINDOW_TOKENS": str(CONTEXT_WINDOW_TOKENS),
+            "TOOL_TRIM_CHAR_THRESHOLD": str(TOOL_TRIM_CHAR_THRESHOLD),
+            "TOOL_TRIM_MIN_MESSAGES": str(TOOL_TRIM_MIN_MESSAGES),
         }
     )
     laminar, oodle, stop = start_receivers()
@@ -339,10 +399,11 @@ def main() -> None:
 
     tracing.init_laminar()
     tracing.init_oodle(SERVICE_NAME)
-    global agent, compaction, route_audit
+    global agent, compaction, route_audit, tool_trim
     import agent
     import compaction
     import route_audit
+    import tool_trim
 
     result = asyncio.run(agent.run_session("What is in this repository?", FOLLOWUPS))
     tracing.flush()

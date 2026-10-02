@@ -10,6 +10,7 @@ Span tree for one user message:
       agent_session                     session id + account metadata; route_completed
         llm_call                        title generation, first message only; route_started
         run_agent_with_messages         input: run config + messages; output: run result
+          tool_trim [main]              once the context passes half the window; once per compaction cycle
           summarizing_compact [main]    only when the context nears the window
             compaction_extract_terms_from_text [main]
               llm_call
@@ -38,6 +39,7 @@ from lmnr import Laminar, observe
 
 import compaction
 import gateway
+import tool_trim
 from route_audit import CallPurpose, ExecutionScope, RouteAttempt, attribute_current_span, input_batch
 
 MAX_TURNS = 6
@@ -81,8 +83,8 @@ TOOLS = [
 
 SYSTEM_PROMPT = (
     "You are a coding agent working in a small Python repository. "
-    "First run `ls` with bash_execute, then delegate one question about the "
-    "repo layout with add_task, then answer in one sentence."
+    "First run `ls` with bash_execute, then read app/main.py with `cat app/main.py`, "
+    "then delegate one question about the repo layout with add_task, then answer in one sentence."
 )
 
 TERMS_PROMPT = (
@@ -96,14 +98,49 @@ SUMMARY_PROMPT = (
     "Preserve these key terms:\n{terms}"
 )
 
+APP_MAIN = """\
+\"\"\"Entry point of the demo Flask service.\"\"\"
+
+from flask import Flask, jsonify, request
+
+app = Flask(__name__)
+ITEMS: dict[int, dict] = {}
+
+
+@app.get("/health")
+def health():
+    return jsonify(status="ok")
+
+
+@app.get("/items/<int:item_id>")
+def get_item(item_id: int):
+    item = ITEMS.get(item_id)
+    return (jsonify(item), 200) if item else (jsonify(error="not found"), 404)
+
+
+@app.post("/items")
+def create_item():
+    item = {"id": len(ITEMS) + 1, **request.get_json()}
+    ITEMS[item["id"]] = item
+    return jsonify(item), 201
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
+"""
+
+# A file read gives the agent a large tool output, which is what the
+# trimmer replaces once the context grows.
 FAKE_REPO = {
     "ls": "README.md\napp/\ntests/\n",
     "cat README.md": "# demo-repo\nA tiny Flask service.\n",
+    "cat app/main.py": APP_MAIN,
 }
 
 # Scripted replies for MOCK_LLM=true: (text, tool call or None) per turn.
 _MOCK_MAIN = [
     ("I'll list the repository first.", ("bash_execute", {"command": "ls", "description": "List files"})),
+    ("Now the entry point.", ("bash_execute", {"command": "cat app/main.py", "description": "Read the app"})),
     ("Let me have a subagent look at the layout.", ("add_task", {"question": "What does app/ contain?"})),
     ("The repo is a small Flask service with app code in app/ and tests in tests/.", None),
 ]
@@ -147,6 +184,7 @@ class Conversation:
 
     messages: list[dict]
     compaction: compaction.CompactionState
+    trim: tool_trim.TrimState
     user_requests: list[dict] = field(default_factory=list)
 
 
@@ -257,6 +295,31 @@ async def _compact_if_needed(scope: ExecutionScope, conversation: Conversation) 
             state, trigger, (tokens_before, messages_before), (tokens_after, len(conversation.messages)), summary
         )
         Laminar.set_span_attributes(row.attributes(scope.session_id, state))
+    # A new compaction cycle: the trimmer may fire once more.
+    conversation.trim.fired = False
+
+
+async def _trim_if_needed(scope: ExecutionScope, conversation: Conversation) -> None:
+    """Replace large, old tool outputs once the context passes half the window."""
+    state = conversation.trim
+    tokens_before = compaction.estimate_tokens(SELECTION.model_key, conversation.messages)
+    if not tool_trim.should_trim(state, tokens_before):
+        return
+    # Set first, so a failed attempt still waits for the next compaction.
+    state.fired = True
+    with Laminar.start_as_current_span(name=f"tool_trim [{state.agent_key}]", session_id=scope.session_id):
+        conversation.messages, trimmed_ids = tool_trim.trim_messages(conversation.messages, state.agent_key)
+        record = tool_trim.TrimRecord(
+            tokens_before=tokens_before,
+            tokens_after=compaction.estimate_tokens(SELECTION.model_key, conversation.messages),
+            threshold_tokens=tool_trim.threshold_tokens(),
+            trimmed_tool_call_ids=trimmed_ids,
+        )
+        # The same call the platform makes, so a list-valued attribute takes
+        # the same path to both backends.
+        span = Laminar.get_current_span()
+        for key, value in record.attributes().items():
+            span.set_attribute(key, value)
 
 
 async def _run_tool(scope: ExecutionScope, call: dict) -> str:
@@ -288,6 +351,7 @@ def _new_conversation(config: RunConfig) -> Conversation:
     return Conversation(
         messages=[{"role": "system", "content": system}],
         compaction=compaction.CompactionState(agent_key, config.subagent_type or "main"),
+        trim=tool_trim.TrimState(agent_key),
     )
 
 
@@ -309,6 +373,7 @@ async def run_agent_with_messages(
     with input_batch(scope, message_ids):
         for turn in range(MAX_TURNS):
             mock = script[min(turn, len(script) - 1)] if script is not None else None
+            await _trim_if_needed(scope, conversation)
             await _compact_if_needed(scope, conversation)
             message = await _stream_turn(scope, conversation.messages, mock, conversation.compaction)
             conversation.messages.append({k: v for k, v in message.items() if v is not None})

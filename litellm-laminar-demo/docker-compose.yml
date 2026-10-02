@@ -22,7 +22,12 @@ services:
       - OODLE_CAPTURE_MESSAGE_CONTENT=${OODLE_CAPTURE_MESSAGE_CONTENT:-false}
       # Context window the agent compacts against. Small, so a session of a
       # few messages compacts; the app's own default is 200000.
-      - CONTEXT_WINDOW_TOKENS=${CONTEXT_WINDOW_TOKENS:-600}
+      - CONTEXT_WINDOW_TOKENS=${CONTEXT_WINDOW_TOKENS:-700}
+      # Tool outputs longer than this, in a history longer than the minimum,
+      # are trimmed once the context passes half the window. Small, so the
+      # demo trims; the app's own defaults are 2000 and 50.
+      - TOOL_TRIM_CHAR_THRESHOLD=${TOOL_TRIM_CHAR_THRESHOLD:-200}
+      - TOOL_TRIM_MIN_MESSAGES=${TOOL_TRIM_MIN_MESSAGES:-4}
       - SERVICE_NAME=litellm-laminar-demo
       - ENV=demo
       - PORT=8102
