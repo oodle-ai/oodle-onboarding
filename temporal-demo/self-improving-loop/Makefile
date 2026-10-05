@@ -38,13 +38,13 @@ seed:
 
 up:
 	$(COMPOSE) up -d --build
-	@echo "Temporal UI: http://localhost:8083 - worker is idle, run 'make ticket'"
+	@echo "Store UI: http://localhost:8090  Temporal UI: http://localhost:8083"
 
 down:
 	$(COMPOSE) down
 
 logs:
-	$(COMPOSE) logs -f worker
+	$(COMPOSE) logs -f worker web
 
 T ?= T-1001
 ticket:

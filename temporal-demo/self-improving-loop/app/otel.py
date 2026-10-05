@@ -86,6 +86,8 @@ def setup(service_name: str) -> Runtime:
     handler.setFormatter(JsonLogFormatter(service_name))
     root.addHandler(handler)
     root.addHandler(LoggingHandler(logger_provider=logger_provider))
+    # httpx logs every request URL at INFO, and a Slack webhook URL is a secret.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     return Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=ENDPOINT_GRPC)))
 
@@ -98,3 +100,11 @@ def flush():
     """Drain the batch processors. A short-lived CLI exits before they tick."""
     otel_trace.get_tracer_provider().force_flush()
     otel_logs.get_logger_provider().force_flush()
+
+
+def flush_spans():
+    """Push this process's finished spans to the collector now. The agent's spans come
+    from the worker but the root span from the gateway, and an Oodle experiment scores
+    the trace as soon as it sees one. Flushing before each activity returns means the
+    root span, which ends last, cannot overtake them."""
+    otel_trace.get_tracer_provider().force_flush()

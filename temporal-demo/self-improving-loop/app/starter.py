@@ -32,13 +32,17 @@ TASK_QUEUE = "self-improving-loop"
 log = logging.getLogger("starter")
 
 
-async def submit(client: Client, ticket: dict) -> None:
+async def submit(client: Client, ticket: dict) -> dict:
     span_name = f"invoke_agent {otel.AGENT_NAME}"
     with otel.tracer().start_as_current_span(span_name) as span:
         span.set_attribute("gen_ai.operation.name", "invoke_agent")
         span.set_attribute("gen_ai.agent.name", otel.AGENT_NAME)
         span.set_attribute("session.id", ticket["id"])
         span.set_attribute("gen_ai.conversation.id", ticket["id"])
+        if ticket.get("experiment"):
+            # Keeps experiment traffic apart from production in Oodle.
+            span.set_attribute("oodle.experiment.run_id", ticket["experiment"])
+            span.set_attribute("deployment.environment", "experiment")
         span.set_attribute(
             "gen_ai.input.messages",
             json.dumps([{"role": "user", "parts": [{"type": "text", "content": ticket["text"]}]}]),
@@ -58,7 +62,7 @@ async def submit(client: Client, ticket: dict) -> None:
                 cause = cause.cause
             span.set_status(Status(StatusCode.ERROR, str(cause)))
             log.warning("Ticket %s failed: %s", ticket["id"], cause)
-            return
+            return {"ticket": ticket["id"], "error": str(cause)}
 
         span.set_attribute("prompt_version", str(result["prompt_version"]))
         span.set_attribute("gen_ai.output.messages", json.dumps(
@@ -72,6 +76,7 @@ async def submit(client: Client, ticket: dict) -> None:
             "Ticket %s on prompt v%d: %d turns, %d bad tool calls",
             ticket["id"], result["prompt_version"], result["turns"], result["tool_errors"],
         )
+        return {**result, "trace_id": format(span.get_span_context().trace_id, "032x")}
 
 
 async def start_improver(client: Client) -> None:
