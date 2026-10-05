@@ -1,3 +1,5 @@
 traceloop-sdk==0.60.0
 google-genai>=1.0.0
 flask==3.1.0
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
