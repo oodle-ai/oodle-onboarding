@@ -12,8 +12,12 @@ import os
 import sys
 
 import oodle
+from tools import ORDERS, TICKETS
 
 PROMPT_NAME = os.environ.get("PROMPT_NAME", "order-support-agent")
+DATASET_NAME = os.environ.get("DATASET_NAME", "order-support-eval")
+EXPECTED_REASON = {"T-1001": "damaged_in_transit", "T-1002": "never_arrived",
+                   "T-1003": "wrong_item", "T-1004": "damaged_in_transit"}
 
 DRIFTED_PROMPT = """\
 You are a support agent for ShopWorld.
@@ -49,7 +53,28 @@ DRIFTED_TOOLS = [
 ]
 
 
+def seed_dataset():
+    """The tickets the improver's Oodle experiment replays through the agent."""
+    try:
+        oodle.dataset(DATASET_NAME)
+        print(f"Dataset {DATASET_NAME} already exists")
+        return
+    except RuntimeError:
+        pass
+    oodle._api("POST", "datasets", json={
+        "name": DATASET_NAME, "description": "Tickets the agent got wrong in production"})
+    for ticket in TICKETS:
+        order_id = "ORD-" + next(w for w in ticket["text"].replace(",", " ").split() if w.isdigit() and len(w) == 5)
+        cents = round(float(ORDERS[order_id]["total"].lstrip("$")) * 100)
+        oodle._api("POST", "dataset-items", json={
+            "datasetName": DATASET_NAME, "input": ticket["text"],
+            "expectedOutput": f"Refund of {cents} cents issued for order {order_id}, "
+                              f"reason_code {EXPECTED_REASON[ticket['id']]}."})
+    print(f"Created dataset {DATASET_NAME} with {len(TICKETS)} tickets")
+
+
 def main():
+    seed_dataset()
     if "--force" not in sys.argv:
         try:
             live = oodle.get_prompt(PROMPT_NAME)

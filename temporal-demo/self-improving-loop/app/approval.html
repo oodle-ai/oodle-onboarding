@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Improver</title>
+<style>
+  :root { --green:#008060; --ink:#202223; --muted:#6d7175; --line:#e1e3e5; --bg:#f6f6f7; --bad:#d72c0d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:14px 28px; display:flex; gap:18px; align-items:center; }
+  header a { color:var(--green); text-decoration:none; }
+  main { max-width:980px; margin:24px auto; padding:0 20px; display:flex; flex-direction:column; gap:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+  h1 { font-size:18px; margin:0; } h2 { font-size:14px; margin:0 0 8px; }
+  .status { display:inline-block; font-weight:600; padding:3px 10px; border-radius:999px; background:#eef; }
+  .status.awaiting_approval { background:#fff4e5; color:#8a5a00; } .status.promoted { background:#e3f1df; color:#1a5c3a; }
+  .links a { margin-right:14px; color:var(--green); }
+  pre { margin:0; padding:12px; background:#fafbfb; border:1px solid var(--line); border-radius:8px; overflow-x:auto; font:12px/1.5 ui-monospace,Menlo,monospace; }
+  .add { background:#e3f1df; display:block; } .del { background:#fde8e4; display:block; } .hunk { color:var(--muted); } pre span { display:block; }
+  button { border:0; border-radius:8px; padding:9px 18px; font-weight:600; cursor:pointer; margin-right:8px; }
+  .approve { background:var(--green); color:#fff; } .reject { background:#fff; border:1px solid var(--bad); color:var(--bad); }
+  .plain { background:#fff; border:1px solid var(--line); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<header><h1>Prompt improver</h1><a href="/">← ShopWorld store</a></header>
+<main id="main"><div class="card muted">Loading…</div></main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const act = async a => { await fetch("/api/improver/" + a, {method:"POST"}); setTimeout(load, 800); };
+function diffHtml(d) {
+  return d.split("\n").map(l => {
+    const cls = l.startsWith("+++") || l.startsWith("---") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : l.startsWith("@@") ? "hunk" : "";
+    return `<span class="${cls}">${esc(l) || " "}</span>`;
+  }).join("");
+}
+async function load() {
+  const s = await (await fetch("/api/improver")).json();
+  let h = `<div class="card"><h2>Status</h2><span class="status ${s.status}">${esc(s.status)}</span>
+    <div class="links" style="margin-top:10px">
+      ${s.workflow_url ? `<a target="_blank" href="${s.workflow_url}">Temporal workflow</a>` : ""}
+      ${s.insights_url ? `<a target="_blank" href="${s.insights_url}">Oodle insights</a>` : ""}</div>`;
+  if (["not_started","terminated","completed","failed","timed_out","canceled"].includes(s.status))
+    h += `<p><button class="plain" onclick="act('start')">Start the improver</button></p>`;
+  if (["watching","given_up"].includes(s.status))
+    h += `<p class="muted">Watching Oodle for findings on the support agent. Oodle analyses traffic periodically; to skip the wait, hand it a finding copied from real traces.</p>
+          <button class="plain" onclick="act('nudge')">Send an Oodle finding now</button>`;
+  if (s.status === "testing")
+    h += `<p>Candidate v${s.candidate_version} is being tested. Oodle is replaying the dataset through the live agent.
+          <a target="_blank" href="${s.run_url}">Watch the experiment run in Oodle</a></p>`;
+  if (s.previous) h += `<p class="muted">Last lap: ${esc(s.previous.status)}${s.previous.production_version ? " → production v" + s.previous.production_version : ""}</p>`;
+  h += `</div>`;
+  if (s.status === "awaiting_approval") {
+    h += `<div class="card"><h2>What Oodle found</h2>${s.insights.map(i => `<div>• <a target="_blank" href="${i.url}">${esc(i.title)}</a></div>`).join("")}</div>
+      <div class="card"><h2>Gate: Oodle experiment</h2>The <code>support-agent/no-tool-errors</code> code evaluator scored ${s.gate.tickets} tickets from their traces:
+        ${s.gate.tickets - (s.gate.failed_items || 0)} of ${s.gate.tickets} had no tool errors (${s.gate.tool_errors} bad tool calls in all, ${s.gate.turns} model calls).
+        <a target="_blank" href="${s.gate.run_url}">Open run ${esc(s.gate.run_name)} in Oodle</a>
+        <p class="muted">${esc(s.rationale)}</p></div>
+      <div class="card"><h2>Diff: live v${s.baseline_version} → candidate v${s.candidate_version}</h2>
+        <div class="links" style="margin-bottom:10px"><a target="_blank" href="${s.baseline_url}">v${s.baseline_version} in Oodle</a><a target="_blank" href="${s.candidate_url}">v${s.candidate_version} in Oodle</a></div>
+        <pre>${diffHtml(s.diff)}</pre></div>
+      <div class="card"><button class="approve" onclick="act('approve')">Approve and ship v${s.candidate_version}</button><button class="reject" onclick="act('reject')">Reject</button></div>`;
+  }
+  document.getElementById("main").innerHTML = h;
+}
+load(); setInterval(() => { if (!document.querySelector("#main pre")) load(); }, 4000);
+</script>
+</body>
+</html>

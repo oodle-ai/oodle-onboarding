@@ -81,13 +81,22 @@ make up                   # Temporal, collector, idle worker. No model calls.
 make ticket               # one agent run. The first model calls.
 ```
 
+### Or drive it from the browser
+
+`make up` also starts a small UI on <http://localhost:8090>:
+
+1. The storefront (`/`) is a ShopWorld order page with a support chat. Each message runs one `SupportAgentWorkflow` and shows the prompt version, model turns, and bad tool calls.
+2. The approval page (`/approval`) starts the improver and can hand it a finding. It then shows the Oodle findings, the gate result, and the prompt diff, with Approve and Reject buttons.
+
+When a candidate passes the gate, the improver posts to Slack. The message holds the diff and links to the approval page, the Temporal workflow, both prompt versions in Oodle, and the Oodle insights. To enable it, set `SLACK_WEBHOOK_URL` in `.env`. If it is not set, the worker logs the message instead.
+
 `make help` lists everything. These are the commands that cost model calls:
 
 | Command | Cost |
 |---|---|
 | `make ticket` (or `make ticket T=T-1003`) | one agent run, about 5 model calls on v1 |
 | `make all` | all four tickets, about 20 model calls on v1 |
-| `make improver` | free until a finding appears, then about 15 calls to write and test a new prompt |
+| `make improver` | nothing while it waits for a finding. Per finding: 1 call to write a new prompt, and about 12 for the Oodle experiment over 4 tickets |
 
 Everything else is free: `prompt`, `insights`, `status`, `approve`, `reject`,
 `rollback`, `models`, `nudge`, `stopimprover`.
@@ -118,15 +127,36 @@ submitted, and Temporal's tracing interceptor carries it through. So every model
 and tool call, across every Activity, ends up in a single trace with the right
 parent-child structure.
 
-**The test step.** Before anything ships, the new prompt replays real tickets and has
-to make zero bad tool calls. Without this the system is self-*changing*, not
-self-improving. Oodle's Experiments feature is the heavier version of the same idea if
-you want a scored comparison rather than pass or fail.
+**The test step.** Before anything ships, the new prompt must make zero bad tool
+calls on real tickets. Without this the system is self-*changing*, not self-improving.
+
+The improver does not run this test itself. It publishes the candidate with the
+`candidate` label and starts an Oodle experiment over the `order-support-eval` dataset
+(`make seed` creates it). Oodle posts each ticket to an experiment webhook. The webhook
+runs the real `SupportAgentWorkflow`, pinned to the candidate version named in the run
+(`prompt-v4-…`). The improver waits on a durable timer and reads the run's results.
+Each result row in Oodle links to the agent's trace, because the webhook continues the
+`traceparent` that Oodle sends.
+
+Oodle calls the webhook from the internet. A Cloudflare quick tunnel (the `tunnel`
+service) gives it a public URL, and the improver points the webhook at that URL before
+each run. The tunnel exposes only port 8091. That port serves only `/agent`, and
+`/agent` requires a bearer token that the worker registers with the webhook.
+
+A quick tunnel is temporary. If its link to Cloudflare drops, its hostname stops
+resolving but the container stays up, and experiment items then fail to reach the agent.
+To get a new hostname, run `docker compose up -d --force-recreate tunnel`. The next
+improver run points the webhook at the new URL.
+
+Each experiment is scored by a code evaluator, `support-agent/no-tool-errors`
+(`app/tool_errors_eval.py`). The worker uploads it to Oodle before each run. It reads
+the agent's trace and scores `no_tool_errors`, `tool_errors` and `model_calls` for each
+ticket. The gate passes only when every ticket scores `no_tool_errors` as true.
 
 That test earns its keep. Oodle reports one finding per tool, so an early version of
 this demo wrote a prompt from only the loudest finding, fixed `lookup_order`, left
 `issue_refund` broken, and the test correctly refused it. The improver now feeds every
-related finding into one rewrite. A failed test also costs about 15 model calls, so the
+related finding into one rewrite. A failed test also costs about 12 model calls, so the
 improver waits (`IMPROVER_COOLDOWN_MINUTES`, default 10) before trying again and stops
 after `IMPROVER_MAX_ATTEMPTS` (default 3) rather than burning through your allowance on
 something it cannot fix.

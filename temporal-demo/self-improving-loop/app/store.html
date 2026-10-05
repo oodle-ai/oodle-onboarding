@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShopWorld Support</title>
+<style>
+  :root { --green:#008060; --ink:#202223; --muted:#6d7175; --line:#e1e3e5; --bg:#f6f6f7; --bad:#d72c0d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:14px 28px; display:flex; align-items:center; gap:24px; }
+  .logo { font-weight:700; font-size:20px; letter-spacing:-.3px; }
+  .logo span { color:var(--green); }
+  nav { display:flex; gap:18px; color:var(--muted); }
+  nav a { color:inherit; text-decoration:none; }
+  .spacer { flex:1; }
+  .pill { font-size:12px; padding:3px 10px; border-radius:999px; background:#e3f1df; color:#1a5c3a; text-decoration:none; }
+  main { max-width:1180px; margin:24px auto; padding:0 20px; display:grid; grid-template-columns:1fr 420px; gap:24px; }
+  @media (max-width:900px){ main{ grid-template-columns:1fr; } }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .orders { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .thumb { height:110px; border-radius:8px; background:linear-gradient(135deg,#dfe9e4,#f3efe6); display:grid; place-items:center; font-size:40px; margin-bottom:10px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .status { font-size:11px; padding:2px 8px; border-radius:6px; background:#f1f1f1; }
+  .chat { background:#fff; border:1px solid var(--line); border-radius:12px; display:flex; flex-direction:column; height:calc(100vh - 110px); min-height:520px; position:sticky; top:20px; }
+  .chat-head { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+  .avatar { width:32px; height:32px; border-radius:50%; background:var(--green); color:#fff; display:grid; place-items:center; font-weight:700; }
+  .log { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:85%; padding:9px 12px; border-radius:12px; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:var(--green); color:#fff; border-bottom-right-radius:4px; }
+  .bot { align-self:flex-start; background:#f1f2f3; border-bottom-left-radius:4px; }
+  .meta { align-self:flex-start; font-size:11px; color:var(--muted); margin-top:-6px; }
+  .meta b.bad { color:var(--bad); } .meta b.ok { color:var(--green); }
+  .chips { padding:8px 12px 0; display:flex; flex-wrap:wrap; gap:6px; }
+  .chips .chip { font-size:12px; border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:400; border-radius:999px; padding:4px 10px; cursor:pointer; }
+  .chip:hover { border-color:var(--green); }
+  form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); margin-top:8px; }
+  textarea { flex:1; resize:none; height:44px; border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
+  button { background:var(--green); color:#fff; border:0; border-radius:8px; padding:0 16px; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .typing { align-self:flex-start; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Shop<span>World</span></div>
+  <nav><a href="#">Shop</a><a href="#">Orders</a><a href="#">Help</a></nav>
+  <div class="spacer"></div>
+  <a class="pill" id="prompt" target="_blank">prompt v?</a>
+  <a class="pill" href="/approval" style="background:#fff4e5;color:#8a5a00">Prompt improver</a>
+</header>
+<main>
+  <section>
+    <h2>Your recent orders</h2>
+    <div class="orders" id="orders"></div>
+  </section>
+  <aside class="chat">
+    <div class="chat-head"><div class="avatar">S</div><div><b>ShopWorld support</b><div class="muted">AI assistant, runs on Temporal</div></div></div>
+    <div class="log" id="log"><div class="msg bot">Hi! Tell me what went wrong with your order and I will sort it out.</div></div>
+    <div class="chips" id="chips"></div>
+    <form id="form"><textarea id="text" placeholder="Describe your problem..."></textarea><button id="send">Send</button></form>
+  </aside>
+</main>
+<script>
+const ICONS = {"ORD-78432":"🫖","ORD-51907":"🧦","ORD-66120":"💡","ORD-40388":"🧊"};
+const $ = id => document.getElementById(id);
+function add(cls, text) { const d = document.createElement("div"); d.className = cls; d.textContent = text; $("log").append(d); $("log").scrollTop = 1e9; return d; }
+
+async function load() {
+  const s = await (await fetch("/api/store")).json();
+  $("prompt").textContent = "live prompt v" + s.prompt_version; $("prompt").href = s.prompt_url;
+  $("orders").innerHTML = Object.entries(s.orders).map(([id, o]) =>
+    `<div class="card"><div class="thumb">${ICONS[id] || "📦"}</div><b>${o.item}</b>
+     <div class="muted">${id} · ${o.total}</div><span class="status">${o.status.replace("_", " ")}</span></div>`).join("");
+  $("chips").innerHTML = "";
+  for (const t of s.tickets) {
+    const c = document.createElement("button"); c.type = "button"; c.className = "chip";
+    c.textContent = t.id + ": " + t.text.slice(0, 38) + "…";
+    c.onclick = () => send(t.text, t.id); $("chips").append(c);
+  }
+}
+
+async function send(text, id) {
+  $("send").disabled = true; add("msg me", text);
+  const wait = add("typing", "Agent is working (model calls and tool calls run as Temporal activities)…");
+  try {
+    const r = await fetch("/api/ticket", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({text, id})});
+    const res = r.ok ? await r.json() : {error: await r.text()};
+    wait.remove();
+    if (res.error) { add("msg bot", "Sorry, something went wrong: " + res.error); return; }
+    add("msg bot", res.reply || "(the agent ran out of turns)");
+    const m = add("meta", "");
+    m.innerHTML = `prompt v${res.prompt_version} · ${res.turns} model turns · ` +
+      `<b class="${res.tool_errors ? "bad" : "ok"}">${res.tool_errors} bad tool calls</b> · trace ${res.trace_id.slice(0, 12)}…`;
+  } finally { $("send").disabled = false; load(); }
+}
+
+$("form").onsubmit = e => { e.preventDefault(); const t = $("text").value.trim(); if (t) { $("text").value = ""; send(t); } };
+load();
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 """One turn of the agent, and one tool call. Both emit GenAI spans.
 
-Kept out of worker.py so the improver's eval gate can drive the same agent with a
-candidate prompt without going through Temporal.
+The improver's gate runs this same agent too: Oodle's experiment runner calls it
+through a webhook (see web.py), so a candidate prompt is tested on the real path.
 """
 
 import json
@@ -131,20 +131,3 @@ def run_tool(name: str, args: dict) -> dict:
 
 def tool_response(name: str, result: dict) -> dict:
     return {"role": "user", "parts": [{"function_response": {"name": name, "response": result}}]}
-
-
-def run_agent(system: str, tool_declarations: list, ticket_text: str, max_turns: int = 8) -> dict:
-    """The whole loop in one process. Used by the improver's eval gate; the
-    production path runs the same steps as Temporal activities instead."""
-    history = [{"role": "user", "parts": [{"text": ticket_text}]}]
-    tool_errors = 0
-    for turn in range(max_turns):
-        step = llm_turn(system, tool_declarations, history)
-        history.append(step["model_content"])
-        if not step["tool_calls"]:
-            return {"reply": step["text"], "turns": turn + 1, "tool_errors": tool_errors}
-        for call in step["tool_calls"]:
-            result = run_tool(call["name"], call["args"])
-            tool_errors += "error" in result
-            history.append(tool_response(call["name"], result))
-    return {"reply": None, "turns": max_turns, "tool_errors": tool_errors}

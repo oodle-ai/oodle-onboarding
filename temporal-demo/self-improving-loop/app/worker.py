@@ -16,17 +16,21 @@ with workflow.unsafe.imports_passed_through():
     import json
     import logging
     import os
+    import time
+
+    import httpx
 
     import oodle
     import otel
-    from agent import generate, llm_turn, run_agent, run_tool, tool_response
+    import slack
+    from agent import generate, llm_turn, run_tool, tool_response
     from google.genai import types
     from opentelemetry.instrumentation.google_genai import GoogleGenAiSdkInstrumentor
     from temporalio.client import Client
     from temporalio.contrib.opentelemetry import TracingInterceptor
     from temporalio.exceptions import ActivityError
     from temporalio.worker import Worker
-    from tools import TICKETS, TOOLS
+    from tools import TOOLS
 
 SERVICE_NAME = os.environ.get("SERVICE_NAME", "support-agent")
 TASK_QUEUE = "self-improving-loop"
@@ -34,6 +38,7 @@ PROMPT_NAME = os.environ.get("PROMPT_NAME", "order-support-agent")
 MAX_TURNS = 8
 POLL_SECONDS = int(os.environ.get("INSIGHT_POLL_SECONDS", "120"))
 MAX_ATTEMPTS = int(os.environ.get("IMPROVER_MAX_ATTEMPTS", "3"))
+EXPERIMENT_POLLS = 80  # 15s apart: give an experiment 20 minutes
 COOLDOWN = timedelta(minutes=int(os.environ.get("IMPROVER_COOLDOWN_MINUTES", "10")))
 
 log = logging.getLogger("self-improving-loop")
@@ -44,18 +49,20 @@ log = logging.getLogger("self-improving-loop")
 # --------------------------------------------------------------------------
 
 @activity.defn
-async def resolve_prompt(name: str) -> dict:
-    """Resolve `production` to an integer version.
+async def resolve_prompt(request: dict) -> dict:
+    """Resolve `production` to an integer version, unless the run asks for one.
+    An Oodle experiment asks for the candidate's version; a customer never does.
 
     This is an Activity, deliberately. Workflow code is replayed; resolving a
     label in workflow code would resolve a *different* version on replay the
     moment the improver moves it, which is exactly what this demo does. The
     integer is pinned into Event History and passed to every later Activity.
     """
-    resolved = oodle.get_prompt(name, label="production")
+    resolved = oodle.get_prompt(request["name"], label="production",
+                                version=request.get("version"))
     version = resolved["version"]
     otel.prompt_version.set(version)
-    log.info("Pinned %s to version %d", name, version)
+    log.info("Pinned %s to version %d", request["name"], version)
     return {
         "version": version,
         "prompt": resolved["prompt"],
@@ -66,13 +73,19 @@ async def resolve_prompt(name: str) -> dict:
 @activity.defn
 async def agent_turn(request: dict) -> dict:
     otel.prompt_version.set(request["prompt_version"])
-    return llm_turn(request["system"], request["tools"], request["history"])
+    try:
+        return llm_turn(request["system"], request["tools"], request["history"])
+    finally:
+        otel.flush_spans()
 
 
 @activity.defn
 async def agent_tool(call: dict) -> dict:
     otel.prompt_version.set(call["prompt_version"])
-    return run_tool(call["name"], call.get("args") or {})
+    try:
+        return run_tool(call["name"], call.get("args") or {})
+    finally:
+        otel.flush_spans()
 
 
 # --------------------------------------------------------------------------
@@ -179,15 +192,52 @@ async def draft_candidate(payload: dict) -> dict:
     }
 
 
+DATASET_NAME = os.environ.get("DATASET_NAME", "order-support-eval")
+TUNNEL_METRICS_URL = os.environ.get("TUNNEL_METRICS_URL", "http://tunnel:2000")
+
+
 @activity.defn
-async def evaluate_candidate(candidate: dict) -> dict:
-    """The gate. The candidate replays real tickets and must make zero bad tool
-    calls, or the label never moves."""
-    runs = [run_agent(candidate["prompt"], candidate["tools"], t["text"]) for t in TICKETS[:3]]
-    errors = sum(r["tool_errors"] for r in runs)
-    turns = sum(r["turns"] for r in runs)
-    log.info("Gate: %d tool errors over %d tickets", errors, len(runs))
-    return {"passed": errors == 0, "tool_errors": errors, "turns": turns, "tickets": len(runs)}
+async def start_experiment(version: int) -> dict:
+    """The gate, part one. Oodle replays the dataset through the REAL agent: its
+    experiment runner calls our webhook once per ticket, and each call runs a
+    SupportAgentWorkflow pinned to the candidate version named in the run.
+
+    The tunnel's URL changes when it restarts, so point the webhook at it first."""
+    host = httpx.get(f"{TUNNEL_METRICS_URL}/quicktunnel", timeout=10).json()["hostname"]
+    webhook_id = oodle.upsert_webhook(f"https://{host}/agent")
+    evaluator_id = oodle.upsert_evaluator()
+    dataset = oodle.dataset(DATASET_NAME)
+    run_name = f"prompt-v{version}-{int(time.time())}"
+    job = oodle.start_experiment(dataset["id"], webhook_id, run_name, [evaluator_id])
+    log.info("Experiment %s queued in Oodle over %s", run_name, DATASET_NAME)
+    return {"job_id": job["id"], "run_id": job["datasetRunId"], "run_name": run_name,
+            "run_url": oodle.ui_run_url(DATASET_NAME, job["datasetRunId"])}
+
+
+@activity.defn
+async def experiment_result(experiment: dict) -> dict | None:
+    """The gate, part two. None while the run is still going. Once it ends, Oodle's
+    code evaluator (tool_errors_eval.py) must have scored every ticket
+    no_tool_errors = true from the agent's trace, or the label never moves."""
+    status = oodle.job(experiment["job_id"])["status"]
+    if status in ("pending", "queued", "running", "in_progress"):
+        return None
+    errors = model_calls = failed = unscored = 0
+    items = oodle.run_items(experiment["run_id"])
+    for item in items:
+        scores = {s["name"]: s["value"] for s in item.get("scores") or []}
+        if item.get("status") != "completed" or "no_tool_errors" not in scores:
+            unscored += 1  # the webhook call failed, or the evaluator never ran
+            continue
+        failed += not scores["no_tool_errors"]
+        errors += int(scores.get("tool_errors", 0))
+        model_calls += int(scores.get("model_calls", 0))
+    passed = status == "completed" and items and not unscored and not failed
+    log.info("Experiment %s %s: %d of %d tickets had tool errors (%d in all), %d unscored",
+             experiment["run_name"], status, failed, len(items), errors, unscored)
+    return {**experiment, "passed": bool(passed), "status": status, "tool_errors": errors,
+            "failed_items": failed, "unscored_items": unscored, "turns": model_calls,
+            "tickets": len(items)}
 
 
 @activity.defn
@@ -201,6 +251,21 @@ async def publish_candidate(candidate: dict) -> int:
     )
     log.info("Published candidate version %d (unlabelled for production)", created["version"])
     return created["version"]
+
+
+TEMPORAL_UI_URL = os.environ.get("TEMPORAL_UI_URL", "http://localhost:8083")
+
+
+@activity.defn
+async def notify_slack(state: dict) -> None:
+    """Ask a person to approve, in Slack. The message itself is built in slack.py."""
+    info = activity.info()
+    workflow_url = (f"{TEMPORAL_UI_URL}/namespaces/{info.workflow_namespace}/workflows/"
+                    f"{info.workflow_id}/{info.workflow_run_id}/history")
+    if slack.post(slack.approval_message(state, workflow_url)):
+        log.info("Asked for approval of version %d in Slack", state["candidate_version"])
+    else:
+        log.warning("No SLACK_WEBHOOK_URL or SLACK_BOT_TOKEN+SLACK_CHANNEL; skipped Slack")
 
 
 @activity.defn
@@ -219,7 +284,7 @@ class SupportAgentWorkflow:
     async def run(self, ticket: dict) -> dict:
         resolved = await workflow.execute_activity(
             resolve_prompt,
-            PROMPT_NAME,
+            {"name": PROMPT_NAME, "version": ticket.get("prompt_version")},
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
@@ -346,14 +411,40 @@ class PromptImproverWorkflow:
                 retry_policy=RetryPolicy(maximum_attempts=2,
                                          non_retryable_error_types=["QuotaExhausted"]),
             )
-            gate = await workflow.execute_activity(
-                evaluate_candidate,
+            # Published before it is tested, because Oodle's experiment calls the agent,
+            # and the agent can only load a prompt version that exists. It is labelled
+            # `candidate`, never `production`, so no customer sees it.
+            version = await workflow.execute_activity(
+                publish_candidate,
                 candidate,
-                start_to_close_timeout=timedelta(minutes=10),
-                retry_policy=RetryPolicy(maximum_attempts=1),
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=3),
             )
+            experiment = await workflow.execute_activity(
+                start_experiment,
+                version,
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+            self._state = {"status": "testing", "insights": titles, "candidate_version": version,
+                           "run_url": experiment["run_url"], "attempts": attempts}
+            # Waiting on Oodle costs nothing: a durable timer between cheap status reads.
+            gate = None
+            for _ in range(EXPERIMENT_POLLS):
+                await workflow.sleep(timedelta(seconds=15))
+                gate = await workflow.execute_activity(
+                    experiment_result,
+                    experiment,
+                    start_to_close_timeout=timedelta(seconds=60),
+                    retry_policy=RetryPolicy(maximum_attempts=5),
+                )
+                if gate is not None:
+                    break
+            if gate is None:
+                gate = {**experiment, "passed": False, "status": "timed_out", "tool_errors": 0,
+                        "failed_items": 0, "turns": 0, "tickets": 0}
         except ActivityError as exc:
-            # A bad draft or a rate-limited gate is a failed attempt, not the end of
+            # A bad draft or a failed experiment is a failed attempt, not the end of
             # the watcher. Back off, then go round again.
             workflow.logger.warning("Improvement attempt failed: %s", exc)
             await self._cool_off()
@@ -364,30 +455,36 @@ class PromptImproverWorkflow:
             self._state = {"status": "discarded_by_gate", "insights": titles,
                            "gate": gate, "attempts": attempts}
             workflow.logger.info(
-                "Candidate did not beat the gate (%d tool errors); the label does not "
-                "move. Cooling off %s before redrafting.", gate["tool_errors"], COOLDOWN)
+                "Candidate v%d did not pass the Oodle experiment (%s, %d tool errors); the "
+                "label does not move. Cooling off %s before redrafting.",
+                version, gate["status"], gate["tool_errors"], COOLDOWN)
             await self._cool_off()
             workflow.continue_as_new({"attempts": attempts + 1, "handled": handled,
                                       "last": self._state})
-
-        version = await workflow.execute_activity(
-            publish_candidate,
-            candidate,
-            start_to_close_timeout=timedelta(seconds=60),
-            retry_policy=RetryPolicy(maximum_attempts=3),
-        )
 
         # Parks on a durable timer at zero compute cost. Kill the worker here:
         # it resumes on the same run, and nothing re-emits.
         self._state = {
             "status": "awaiting_approval",
-            "insights": titles,
+            "insights": [{"title": i.get("title"), "fingerprint": i.get("fingerprint")}
+                         for i in insights],
             "candidate_version": version,
             "baseline_version": candidate["baseline_version"],
             "rationale": candidate["rationale"],
             "gate": gate,
         }
         workflow.logger.info("Awaiting human approval of version %d", version)
+        try:
+            await workflow.execute_activity(
+                notify_slack,
+                {**self._state},
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
+        except ActivityError as exc:
+            # Slack being down must not lose the candidate: the approval page and
+            # `make approve` still work.
+            workflow.logger.warning("Slack notification failed: %s", exc)
         await workflow.wait_condition(lambda: self._decision is not None)
 
         if self._decision == "approve":
@@ -428,7 +525,9 @@ async def main():
         task_queue=TASK_QUEUE,
         workflows=[SupportAgentWorkflow, PromptImproverWorkflow],
         activities=[resolve_prompt, agent_turn, agent_tool, fetch_insight,
-                    draft_candidate, evaluate_candidate, publish_candidate, promote],
+                    draft_candidate, publish_candidate, start_experiment, experiment_result,
+                    notify_slack,
+                    promote],
     ).run()
 
 
