@@ -1,4 +1,4 @@
-.PHONY: help build run clean
+.PHONY: help build run run-dual clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -9,6 +9,9 @@ build: ## Build the container
 
 run: ## One chat: one Langfuse trace with one generation, sent by the Langfuse SDK itself
 	docker compose run --rm app
+
+run-dual: ## The same chat, delivered to both Langfuse and Oodle by the SDK itself
+	docker compose run --rm app-dual
 
 clean: ## Remove the container and image
 	docker compose down --rmi local
