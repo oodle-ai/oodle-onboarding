@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars, or pass the same values as TF_VAR_* environment variables.
+# The Makefile sets all of these for you from ../single-write/.env and the oodle CLI.
+
+dd_site = "us5.datadoghq.com"
+# dd_api_key = "..."            # prefer TF_VAR_dd_api_key
+
+# Phase 2: dual-write to Oodle
+oodle_dual_write       = false
+oodle_instance_id      = "inst-..."
+oodle_collector_domain = "inst-....collector.oodle.ai"
+# oodle_api_key = "..."         # prefer TF_VAR_oodle_api_key
