@@ -13,3 +13,26 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_GATEWAY_URL:-https://api.openai.com/v1}
       - MODEL=${MODEL:-gpt-4o-mini}
+
+  # The dual-write variant: the same SDK, two destinations.
+  app-dual:
+    build: ./app
+    container_name: langfuse-native-demo-dual
+    command: ["python", "main_dual.py"]
+    environment:
+      # Destination one: the Langfuse project the app already has. These
+      # are the three variables a Langfuse app is configured with today.
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      # Destination two: Oodle. The app builds the ingest URL and the
+      # credentials from these and adds a second span processor.
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_API_DOMAIN=${OODLE_API_DOMAIN:-us1.oodle.ai}
+      # The service name and environment the traces carry, in both.
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-langfuse-native-demo}
+      - LANGFUSE_TRACING_ENVIRONMENT=${LANGFUSE_TRACING_ENVIRONMENT:-production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_GATEWAY_URL:-https://api.openai.com/v1}
+      - MODEL=${MODEL:-gpt-4o-mini}
