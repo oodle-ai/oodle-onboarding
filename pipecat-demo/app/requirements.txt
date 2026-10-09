@@ -1,0 +1,12 @@
+# tracing: the OpenTelemetry SDK Pipecat records through
+# webrtc:   the browser transport, so the demo needs no voice vendor account
+# runner:   the development server and its prebuilt client UI
+pipecat-ai[tracing,webrtc,runner]==1.12.0
+
+# The OTLP/HTTP span exporter. pipecat-ai[tracing] brings the SDK but not
+# an exporter, and both tracing paths need this one.
+opentelemetry-exporter-otlp-proto-http>=1.33,<2
+
+# The Langfuse SDK path. v4 is required: its span processor takes base_url=
+# (v3 took host=) and a tracer_provider= can be handed to the client.
+langfuse>=4.17,<5
