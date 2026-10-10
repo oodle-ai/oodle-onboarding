@@ -1,0 +1,50 @@
+services:
+  app:
+    build: ./app
+    container_name: pipecat-demo
+    ports:
+      # The dev runner serves the prebuilt WebRTC client here.
+      - "7860:7860"
+    extra_hosts:
+      # So a self-hosted Langfuse running on the host — rather than in this
+      # compose project — can be reached as host.docker.internal.
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Which path writes the spans: `otel` (two OTLP exporters) or
+      # `langfuse-sdk` (the Langfuse Python SDK). `none` disables tracing.
+      - TRACING_BACKEND=${TRACING_BACKEND:-otel}
+
+      # Destination one: the Langfuse project. These are the three
+      # variables a Langfuse app is configured with today, unchanged.
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+
+      # Destination two: Oodle. Both paths build their endpoint and
+      # credentials from these.
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_API_DOMAIN=${OODLE_API_DOMAIN:-us1.oodle.ai}
+
+      # The resource every span carries. langfuse.environment is a resource
+      # attribute rather than a client argument here, because Pipecat owns
+      # the tracer provider on both paths.
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-pipecat-demo}
+      - ENVIRONMENT=${ENVIRONMENT:-demo}
+      - OTEL_RESOURCE_ATTRIBUTES=langfuse.environment=${ENVIRONMENT:-demo}
+      # Print spans to stdout as well, to watch the tree being built.
+      - OTEL_CONSOLE_EXPORT=${OTEL_CONSOLE_EXPORT:-}
+
+      # STT, LLM and TTS are all OpenAI, so one key covers the pipeline.
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Passed through only when it is set. Writing it as
+      # `OPENAI_BASE_URL=${OPENAI_BASE_URL:-}` instead would put an empty
+      # string in the container, and the OpenAI SDK reads this variable
+      # itself: an empty value becomes an empty base URL and every call
+      # fails with "Connection error".
+      - OPENAI_BASE_URL
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - STT_MODEL=${STT_MODEL:-gpt-4o-mini-transcribe}
+      - TTS_MODEL=${TTS_MODEL:-gpt-4o-mini-tts}
+      - TTS_VOICE=${TTS_VOICE:-alloy}
+      - AGENT_NAME=${AGENT_NAME:-pipecat-voice-agent}

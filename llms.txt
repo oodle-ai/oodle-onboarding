@@ -28,6 +28,7 @@ Pick by your current stack and what you want to send:
 | OpenClaw + Langfuse SDK | Traces | Real agent traced through the Langfuse SDK — `langfuse.*` attributes instead of GenAI semconv | [openclaw-demo](openclaw-demo/README.md) |
 | Langfuse SDK native export | Traces | The Langfuse SDK's own exporter pointed at Oodle's Langfuse-compatible endpoint; env vars only, no OTel SDK, no collector | [langfuse-native-demo](langfuse-native-demo/README.md) |
 | Langfuse SDK + OpenInference | Traces | Langfuse `generation` around an OpenInference-instrumented OpenAI call with hidden payloads; tokens on the child, messages on the wrapper | [langfuse-openinference-demo](langfuse-openinference-demo/README.md) |
+| Pipecat (voice agents) + Langfuse | Traces | Voice agent dual-writing to Langfuse and Oodle two ways: plain OTel exporters on Pipecat's provider, or the Langfuse SDK with Oodle as a second destination | [pipecat-demo](pipecat-demo/README.md) |
 | OpenCode + Langfuse OpenCode plugin | Traces | Real OpenCode CLI traced into Oodle's Langfuse-compatible endpoint; native OTLP export kept as a repro | [opencode-demo](opencode-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
@@ -241,6 +242,20 @@ The Langfuse Python SDK with its own exporter, pointed at Oodle's Langfuse-compa
 - Config files: `docker-compose.yml`, `app/main.py`
 - Spans emitted: `chat` (observation type `span`, root), `OpenAI-generation` (type `generation`, model, messages, `usage_details`)
 - Env: `OTEL_SERVICE_NAME` names the service; `LANGFUSE_TRACING_ENVIRONMENT` sets the environment
+
+### pipecat-demo
+
+A Pipecat voice agent (browser WebRTC in, OpenAI transcription, chat and speech out, local Silero VAD) whose traces land in both Langfuse and Oodle. `TRACING_BACKEND` picks one of two paths, kept in separate modules because they are genuinely different. `otel` is Pipecat's documented OpenTelemetry setup with a second leg: `setup_tracing(exporter=<Oodle OTLP>)` registers the provider and owns the resource, then a second `BatchSpanProcessor` for Langfuse's OTLP endpoint is added to it. `langfuse-sdk` runs the same spans through the Langfuse SDK's own span processor — the path to take when the app already uses a Langfuse client for scores or prompt links — with `Langfuse(tracer_provider=<Pipecat's>)` as leg one and a second `LangfuseSpanProcessor` re-addressed at Oodle's Langfuse-compatible endpoint as leg two. On that path the SDK's default export filter has to be widened: Pipecat's instrumentation scopes (`pipecat`, `pipecat.turn`) are not on Langfuse's allow list and its `turn` spans carry no `gen_ai.*` attribute, so by default the turn spans are dropped and their STT/LLM/TTS children arrive parented to a span that was never sent. Two things about Pipecat's output matter to a backend reading it. FastAPI traces its own requests as soon as a tracer provider exists and the dev runner is a FastAPI app, so `app/bot.py` disables that before importing Pipecat — otherwise the `conversation` span hangs under the WebRTC offer request and every page load becomes its own trace. And Pipecat records the conversation as `input`/`output` on the LLM span, `transcript` on STT and `text` on TTS, not as `gen_ai.input.messages` / `gen_ai.output.messages`, so a backend reading the GenAI semantic conventions shows a voice trace with timings and token counts but no transcript (only `gen_ai.system_instructions` lands conventionally); the demo leaves that as it is and documents it. `make verify-local` checks both paths against two local OTLP receivers with no accounts needed.
+
+- Languages: Python
+- Infra: Docker Compose (one container; the Pipecat dev runner serves the prebuilt WebRTC client on :7860)
+- Signals: Traces (voice-agent specific)
+- Instrumentation: Pipecat `setup_tracing` + `PipelineWorker(enable_tracing=True, enable_turn_tracking=True)`; OTLP exporters or the Langfuse SDK v4
+- Requires: Oodle credentials + Langfuse project keys + an OpenAI API key (one key covers STT, LLM and TTS)
+- Config files: `docker-compose.yml`, `app/tracing_otel.py`, `app/tracing_langfuse.py`, `app/destinations.py`, `app/bot.py`
+- Spans emitted: `conversation` (root once FastAPI's own request tracing is off, scope `pipecat.turn`), `turn` (scope `pipecat.turn`), `stt` / `llm` / `tts` (scope `pipecat`, `gen_ai.*` attributes, `metrics.ttfb`, token usage on `llm`)
+- Env: `TRACING_BACKEND=otel|langfuse-sdk|none`; `OTEL_SERVICE_NAME` names the service; `OTEL_RESOURCE_ATTRIBUTES=langfuse.environment=<env>` sets the Langfuse environment, because Pipecat owns the tracer provider on both paths; `LANGFUSE_EXPORT_PIPECAT_SPANS=false` reproduces the dropped turn spans
+- Gotcha: `PipelineParams(enable_metrics=True, enable_usage_metrics=True)` is what puts `metrics.ttfb` on the service spans and token counts on the LLM span; and the dev runner serves every connection from one process, so a session flushes the provider rather than shutting it down
 
 ### opencode-demo
 

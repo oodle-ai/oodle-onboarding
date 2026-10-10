@@ -30,6 +30,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [openai-demo](./openai-demo) | Traces, logs | OpenAI SDK auto-instrumented with the official OpenTelemetry GenAI instrumentation |
 | [litellm-demo](./litellm-demo) | Traces, logs | One LiteLLM call routed to any provider, traced through its `otel` callback |
 | [litellm-laminar-demo](./litellm-laminar-demo) | Traces | Coding agent dual-writing to Laminar and Oodle: Laminar SDK spans mirrored to Oodle alongside LiteLLM GenAI spans, with a LiteLLM Router gateway and route-audit attributes |
+| [pipecat-demo](./pipecat-demo) | Traces | Pipecat voice agent dual-writing to Langfuse and Oodle, two ways: plain OpenTelemetry exporters on Pipecat's tracer provider, or the Langfuse SDK with Oodle as a second Langfuse destination. Conversation, turn, STT, LLM and TTS spans from a browser WebRTC session |
 | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | Traces | Vercel AI SDK 7 agents, steps and tool calls through `@ai-sdk/otel` |
 | [eve-demo](./eve-demo) | Traces | Agents on Vercel's eve framework: durable sessions, tools and full transcripts |
 | [openclaw-demo](./openclaw-demo) | Traces | Real OpenClaw agent traced through the real Langfuse SDK: observations described in the `langfuse.*` namespace instead of the GenAI semconv one, exported over OTLP |
