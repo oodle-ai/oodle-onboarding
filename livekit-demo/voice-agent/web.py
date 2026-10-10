@@ -65,7 +65,9 @@ async def token(request: web.Request) -> web.Response:
 
 
 def main() -> None:
-    app = web.Application()
+    # Browsers send every localhost cookie, including those other local apps
+    # set, and the Cookie header easily passes aiohttp's 8190-byte default.
+    app = web.Application(handler_args={"max_field_size": 65536})
     app.router.add_get("/", index)
     app.router.add_post("/api/token", token)
     web.run_app(app, host="0.0.0.0", port=int(os.environ.get("PORT", "7870")))
