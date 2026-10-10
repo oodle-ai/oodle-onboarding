@@ -1,39 +1,45 @@
-.PHONY: up down logs clean replay replay-pii status help
+.PHONY: help up down logs clean replay replay-pii voice voice-logs verify-local status
 
-help:
+# Every target sees the voice services, so down and clean stop them too.
+COMPOSE := docker compose --profile voice
+
+help: ## Show this help
 	@echo "LiveKit Voice Agent Trace Demo"
 	@echo ""
-	@echo "Usage:"
-	@echo "  make up       - Start OTel Collector"
-	@echo "  make down     - Stop OTel Collector"
-	@echo "  make logs     - View collector logs"
-	@echo "  make replay   - Replay sample trace via OTLP"
-	@echo "  make replay-pii - Replay it as an agent that marks personal data"
-	@echo "  make clean    - Stop and remove volumes"
-	@echo "  make status   - Show service status"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; \
+			{printf "  make %-13s - %s\n", $$1, $$2}'
 
-up:
+up: ## Start the OTel Collector for the replay
 	@echo "Starting OTel Collector..."
-	docker compose up -d
+	docker compose up -d otel-collector
 
-down:
-	@echo "Stopping OTel Collector..."
-	docker compose down
+replay: ## Replay the sample trace via OTLP
+	@echo "Replaying LiveKit sample trace..."
+	static-replay/replay.py static-replay/sample-trace.json --fresh-ids
 
-logs:
+replay-pii: ## Replay it as an agent that marks personal data
+	@echo "Replaying LiveKit sample trace, personal data marked..."
+	static-replay/replay.py static-replay/sample-trace.json --fresh-ids --mark-pii
+
+logs: ## View collector logs
 	docker compose logs -f otel-collector
 
-clean:
-	@echo "Cleaning up..."
-	docker compose down -v
+voice: ## Start LiveKit, the voice agent and its web page
+	$(COMPOSE) up --build -d livekit agent web
+	@echo "Open http://localhost:7870, pick a PII mode and start a call."
 
-replay:
-	@echo "Replaying LiveKit sample trace..."
-	./replay.py sample-trace.json --fresh-ids
+voice-logs: ## Tail the voice agent's logs
+	$(COMPOSE) logs -f agent
 
-replay-pii:
-	@echo "Replaying LiveKit sample trace, personal data marked..."
-	./replay.py sample-trace.json --fresh-ids --mark-pii
+verify-local: ## Offline check of both PII modes, no accounts needed
+	$(COMPOSE) run --rm --no-deps -T web python verify_local.py
 
-status:
-	docker compose ps
+status: ## Show service status
+	$(COMPOSE) ps
+
+down: ## Stop everything
+	$(COMPOSE) down
+
+clean: ## Stop everything, remove volumes and the voice agent image
+	$(COMPOSE) down -v --rmi local --remove-orphans

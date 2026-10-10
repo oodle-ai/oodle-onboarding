@@ -1,0 +1,7 @@
+# The agent framework with the OpenAI plugin (STT, LLM and TTS) and Silero
+# voice-activity detection. 1.8 writes personal data under lk.pii.* and
+# takes allow_pii= on set_tracer_provider; both are what this demo shows.
+livekit-agents[openai,silero]==1.8.6
+
+# The OTLP/HTTP span exporter, in the range livekit-agents pins the SDK to.
+opentelemetry-exporter-otlp-proto-http>=1.39,<1.45

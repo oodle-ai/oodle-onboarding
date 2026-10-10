@@ -1,77 +1,66 @@
 # LiveKit Voice Agent Trace Demo
 
-Replay a captured LiveKit voice-agent trace through an
-OTel Collector into Oodle for end-to-end testing of
-LiveKit trace normalization.
+LiveKit Agents voice traces in Oodle, two ways:
+
+| Folder | What it does |
+| --- | --- |
+| [`static-replay/`](static-replay) | Replays a captured LiveKit voice-agent trace through an OTel Collector into Oodle, for end-to-end testing of LiveKit trace normalization. With `--mark-pii`, replays it as an agent that marks personal data. |
+| [`voice-agent/`](voice-agent) | A live LiveKit voice agent you talk to in the browser, with each call traced straight to Oodle either with its personal data or without it. |
+
+Both share this directory's `docker-compose.yml`, `.env` and
+`Makefile`. Each folder's README explains how it works.
 
 ## Prerequisites
 
 - Docker and docker-compose
 - [uv](https://docs.astral.sh/uv/) (for the replay script)
 - An Oodle instance with an API key
+- An OpenAI API key (for the voice agent only)
 
 ## Quick start
 
 ```bash
 # 1. Configure credentials
 cp .env.example .env
-# Edit .env with your Oodle instance and API key
+# Edit .env with your Oodle instance and API key, and your
+# OpenAI key for the voice agent
 
-# 2. Start the OTel Collector
+# 2a. Replay: start the OTel Collector and replay the sample trace
 make up
-
-# 3. Replay the sample trace
 make replay
 
-# 4. View traces in Oodle LLM Ops
+# 2b. Live: start LiveKit, the voice agent and its page
+make voice
+# Open http://localhost:7870, pick a PII mode and start a call
+
+# 3. View traces in Oodle LLM Ops
 ```
 
-## How it works
+The replay needs only the collector, and `make up` starts only that.
+The voice services sit behind the compose profile `voice`, so `make
+voice` is what builds and starts them. `make down` stops everything.
 
-`replay.py` reads a Jaeger-format trace export
-(`sample-trace.json`) and re-creates all 104 spans with
-their original attributes (`lk.*`, `gen_ai.*`) and span
-events (`gen_ai.system.message`, `gen_ai.choice`, etc.),
-then exports them via OTLP/HTTP to the collector.
+## Make targets
 
-The collector forwards traces to Oodle where the event
-receiver normalizes LiveKit-specific attributes into
-standard `gen_ai.*` attributes for the LLM Ops pipeline.
+| Target | Description |
+| --- | --- |
+| `make up` | Start the OTel Collector for the replay |
+| `make replay` | Replay the sample trace via OTLP |
+| `make replay-pii` | Replay it as an agent that marks personal data |
+| `make logs` | View collector logs |
+| `make voice` | Start LiveKit, the voice agent and its web page |
+| `make voice-logs` | Tail the voice agent's logs |
+| `make verify-local` | Offline check of the voice agent's two PII modes, no accounts needed |
+| `make status` | Show service status |
+| `make down` | Stop everything |
+| `make clean` | Stop everything, remove volumes and the voice agent image |
 
 ## Files
 
 | File | Purpose |
-|------|---------|
-| `replay.py` | Reads trace JSON, sends via OTLP |
-| `sample-trace.json` | Captured LiveKit agent trace |
-| `docker-compose.yml` | OTel Collector service |
-| `otel-collector-config.yaml` | Collector config |
-
-## Replay options
-
-```bash
-# Custom endpoint
-./replay.py sample-trace.json --endpoint http://localhost:4319
-
-# Generate fresh trace/span IDs (for multiple replays)
-./replay.py sample-trace.json --fresh-ids
-
-# Replay as an agent that marks personal data
-./replay.py sample-trace.json --fresh-ids --mark-pii
-```
-
-## Agents that mark personal data
-
-An application can mark the LiveKit fields that may hold
-personal data. LiveKit then writes each of those under
-`lk.pii.` instead of `lk.`, with the same value: the
-prompt, the transcript, the reply, the chat context, a
-tool's arguments and result, the room and the
-participant. A name or a metric keeps its place.
-
-The capture was taken with the marking off, so
-`--mark-pii` renames those fields and replays the same
-run as an agent with it on. Use it to check that ingest
-resolves both spellings onto `gen_ai.*`: a receiver that
-knows only `lk.` produces a trace with no transcript at
-all, since every attribute carrying one has moved.
+| --- | --- |
+| `docker-compose.yml` | OTel Collector for the replay; LiveKit server, voice agent and web page under the `voice` profile |
+| `.env.example` | Oodle credentials for both, and the voice agent's OpenAI and model settings |
+| `Makefile` | The targets above |
+| `static-replay/` | `replay.py`, the captured `sample-trace.json` and the collector config |
+| `voice-agent/` | The agent, its tracing, the web page and the image they run in |

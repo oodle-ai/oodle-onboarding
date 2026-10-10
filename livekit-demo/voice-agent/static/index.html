@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiveKit PII Demo</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66;
+    --line: #e2e1dc; --accent: #2f6f4f; --accent-text: #ffffff; --warn: #9a5b00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1f1f1d; --text: #ededea; --muted: #a3a39c;
+      --line: #34342f; --accent: #5fb38a; --accent-text: #0f1a14; --warn: #e0a54a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.lede { color: var(--muted); margin: 0 0 24px; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .modes { grid-template-columns: 1fr; } }
+  label.mode {
+    display: block; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px; cursor: pointer;
+  }
+  label.mode:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  label.mode strong { display: block; margin-bottom: 4px; }
+  label.mode span { color: var(--muted); font-size: 13px; }
+  label.mode code { font-size: 12px; }
+  input[type=radio] { margin: 0 6px 0 0; accent-color: var(--accent); }
+  .controls { display: flex; align-items: center; gap: 12px; margin: 20px 0; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px 18px;
+    background: var(--accent); color: var(--accent-text); cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  #status { color: var(--muted); }
+  .call {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 16px; font-size: 13px; display: none;
+  }
+  .call code { word-break: break-all; }
+  #transcript {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 16px; min-height: 160px; max-height: 50vh; overflow-y: auto;
+  }
+  #transcript:empty::before { content: "The conversation appears here."; color: var(--muted); }
+  .line { margin: 6px 0; }
+  .line b { font-weight: 600; }
+  .line.agent b { color: var(--accent); }
+  .hint { color: var(--warn); font-size: 13px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>LiveKit voice agent, traced to Oodle</h1>
+  <p class="lede">
+    Book a home valuation with Max. Give a name, a phone number and an address,
+    or ask for a person to see the handoff. Each call is one trace in Oodle.
+  </p>
+
+  <div class="modes">
+    <label class="mode">
+      <strong><input type="radio" name="pii" value="allow" checked>Personal data allowed</strong>
+      <span>The trace carries the conversation: <code>lk.pii.*</code> transcripts and tool
+      arguments, and <code>gen_ai.input/output.messages</code>.</span>
+    </label>
+    <label class="mode">
+      <strong><input type="radio" name="pii" value="withhold">Personal data withheld</strong>
+      <span>The same spans, timings, models, tokens and tool names. LiveKit strips every
+      piece of text before export.</span>
+    </label>
+  </div>
+
+  <div class="controls">
+    <button id="toggle">Start call</button>
+    <span id="status">Not connected</span>
+  </div>
+
+  <div class="call" id="call">
+    In Oodle, filter traces on <code>session.id</code> = <code id="call-id"></code>
+    (personal data <span id="call-mode"></span>). The trace is complete once the call ends.
+  </div>
+
+  <div id="transcript"></div>
+  <p class="hint" id="hint" hidden></p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.js"></script>
+<script>
+  const { Room, RoomEvent, Track } = LivekitClient;
+
+  const toggle = document.getElementById("toggle");
+  const statusEl = document.getElementById("status");
+  const transcript = document.getElementById("transcript");
+  const hint = document.getElementById("hint");
+  let room = null;
+
+  function setStatus(text) { statusEl.textContent = text; }
+
+  function addLine(who, text, isAgent) {
+    const line = document.createElement("div");
+    line.className = "line" + (isAgent ? " agent" : "");
+    const name = document.createElement("b");
+    name.textContent = who + ": ";
+    line.append(name, document.createTextNode(text));
+    transcript.append(line);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  async function start() {
+    toggle.disabled = true;
+    hint.hidden = true;
+    transcript.replaceChildren();
+    const piiMode = document.querySelector("input[name=pii]:checked").value;
+
+    try {
+      setStatus("Starting a call…");
+      const response = await fetch("/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pii_mode: piiMode }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      const call = await response.json();
+
+      room = new Room({ adaptiveStream: true, dynacast: true });
+
+      room.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === Track.Kind.Audio) document.body.append(track.attach());
+      });
+      room.on(RoomEvent.Disconnected, () => stopped());
+
+      // The agent publishes what both sides say as transcription streams.
+      room.registerTextStreamHandler("lk.transcription", async (reader, participant) => {
+        const text = (await reader.readAll()).trim();
+        if (!text) return;
+        const isAgent = participant.identity !== room.localParticipant.identity;
+        addLine(isAgent ? "Max" : "You", text, isAgent);
+      });
+
+      await room.connect(call.url, call.token);
+      // The click that started the call is the gesture browsers want first.
+      await room.startAudio();
+      await room.localParticipant.setMicrophoneEnabled(true);
+
+      document.getElementById("call-id").textContent = call.call_id;
+      document.getElementById("call-mode").textContent =
+        call.pii_mode === "allow" ? "allowed" : "withheld";
+      document.getElementById("call").style.display = "block";
+      document.querySelectorAll("input[name=pii]").forEach((input) => (input.disabled = true));
+      setStatus("Connected. Waiting for Max…");
+      room.on(RoomEvent.ParticipantConnected, () => setStatus("Connected. Talk to Max."));
+      if (room.remoteParticipants.size > 0) setStatus("Connected. Talk to Max.");
+      toggle.textContent = "End call";
+    } catch (error) {
+      hint.textContent = "Could not start the call: " + error.message;
+      hint.hidden = false;
+      if (room) await room.disconnect();
+      stopped();
+    } finally {
+      toggle.disabled = false;
+    }
+  }
+
+  function stopped() {
+    room = null;
+    setStatus("Not connected");
+    toggle.textContent = "Start call";
+    document.querySelectorAll("input[name=pii]").forEach((input) => (input.disabled = false));
+    document.querySelectorAll("audio").forEach((element) => element.remove());
+  }
+
+  toggle.addEventListener("click", async () => {
+    if (room) {
+      toggle.disabled = true;
+      await room.disconnect();
+      toggle.disabled = false;
+    } else {
+      await start();
+    }
+  });
+</script>
+</body>
+</html>

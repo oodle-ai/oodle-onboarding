@@ -1,18 +1,89 @@
 services:
+  # The replay: static-replay/replay.py sends the captured trace here,
+  # and the collector forwards it to Oodle.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
     container_name: livekit-otel-collector
     volumes:
-      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+      - ./static-replay/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "4319:4318"
       - "13134:13133"
     environment:
       - OODLE_INSTANCE=${OODLE_INSTANCE}
       - OODLE_API_KEY=${OODLE_API_KEY}
-    networks:
-      - livekit-net
 
-networks:
-  livekit-net:
-    driver: bridge
+  # The live voice agent, started with `make voice`. It exports straight
+  # to Oodle, not through the collector.
+  livekit:
+    # A local LiveKit server, so the demo needs no LiveKit Cloud project.
+    image: livekit/livekit-server:v1.13.7
+    container_name: livekit-voice-server
+    profiles: [voice]
+    command:
+      - --bind=0.0.0.0
+      # The address WebRTC media is advertised on. The browser on this
+      # machine reaches it through the published ports below, and the agent
+      # shares this container's network, so 127.0.0.1 works for both.
+      - --node-ip=127.0.0.1
+      - --udp-port=7882
+    environment:
+      # "key: secret", quoted so YAML does not read it as a mapping.
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-local-dev-secret-not-for-production}"
+    ports:
+      # The agent shares this network namespace, so its published ports
+      # live here too.
+      - "7880:7880"       # signalling (WebSocket)
+      - "7881:7881"       # WebRTC over TCP
+      - "7882:7882/udp"   # WebRTC over UDP
+
+  agent:
+    build: ./voice-agent
+    container_name: livekit-voice-agent
+    profiles: [voice]
+    depends_on:
+      - livekit
+    # Same network as the server: it advertises 127.0.0.1 for media.
+    network_mode: "service:livekit"
+    environment:
+      - LIVEKIT_URL=ws://127.0.0.1:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-local-dev-secret-not-for-production}
+      - AGENT_NAME=${AGENT_NAME:-livekit-demo-agent}
+      - AGENT_ID=${AGENT_ID:-maple-street-sales-agent}
+
+      # What a call gets when the client does not ask for a mode.
+      - DEFAULT_PII_MODE=${DEFAULT_PII_MODE:-allow}
+
+      # Destination: Oodle.
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-livekit-voice-worker}
+      - ENVIRONMENT=${ENVIRONMENT:-demo}
+      # Print spans to stdout as well, to compare the two modes.
+      - OTEL_CONSOLE_EXPORT=${OTEL_CONSOLE_EXPORT:-}
+
+      # STT, LLM and TTS are all OpenAI, so one key covers the pipeline.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Passed through only when set: an empty OPENAI_BASE_URL breaks every
+      # OpenAI call.
+      - OPENAI_BASE_URL
+      - LLM_MODEL=${LLM_MODEL:-gpt-4.1-mini}
+      - FALLBACK_LLM_MODEL=${FALLBACK_LLM_MODEL:-gpt-4o-mini}
+      - STT_MODEL=${STT_MODEL:-gpt-4o-mini-transcribe}
+      - TTS_MODEL=${TTS_MODEL:-gpt-4o-mini-tts}
+      - TTS_VOICE=${TTS_VOICE:-alloy}
+
+  web:
+    build: ./voice-agent
+    container_name: livekit-voice-web
+    profiles: [voice]
+    command: ["python", "web.py"]
+    ports:
+      - "7870:7870"
+    environment:
+      # Where the browser reaches LiveKit.
+      - LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-local-dev-secret-not-for-production}
+      - AGENT_NAME=${AGENT_NAME:-livekit-demo-agent}

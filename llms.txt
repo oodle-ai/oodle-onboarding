@@ -29,6 +29,7 @@ Pick by your current stack and what you want to send:
 | Langfuse SDK native export | Traces | The Langfuse SDK's own exporter pointed at Oodle's Langfuse-compatible endpoint; env vars only, no OTel SDK, no collector | [langfuse-native-demo](langfuse-native-demo/README.md) |
 | Langfuse SDK + OpenInference | Traces | Langfuse `generation` around an OpenInference-instrumented OpenAI call with hidden payloads; tokens on the child, messages on the wrapper | [langfuse-openinference-demo](langfuse-openinference-demo/README.md) |
 | Pipecat (voice agents) + Langfuse | Traces | Voice agent dual-writing to Langfuse and Oodle two ways: plain OTel exporters on Pipecat's provider, or the Langfuse SDK with Oodle as a second destination | [pipecat-demo](pipecat-demo/README.md) |
+| LiveKit Agents (voice agents) | Traces | Live browser voice agent traced per call with personal data (`lk.pii.*`, `gen_ai.*.messages`) or without it (`allow_pii=False`); plus a replay of a captured call | [livekit-demo](livekit-demo/README.md) |
 | OpenCode + Langfuse OpenCode plugin | Traces | Real OpenCode CLI traced into Oodle's Langfuse-compatible endpoint; native OTLP export kept as a repro | [opencode-demo](opencode-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
@@ -256,6 +257,20 @@ A Pipecat voice agent (browser WebRTC in, OpenAI transcription, chat and speech 
 - Spans emitted: `conversation` (root once FastAPI's own request tracing is off, scope `pipecat.turn`), `turn` (scope `pipecat.turn`), `stt` / `llm` / `tts` (scope `pipecat`, `gen_ai.*` attributes, `metrics.ttfb`, token usage on `llm`)
 - Env: `TRACING_BACKEND=otel|langfuse-sdk|none`; `OTEL_SERVICE_NAME` names the service; `OTEL_RESOURCE_ATTRIBUTES=langfuse.environment=<env>` sets the Langfuse environment, because Pipecat owns the tracer provider on both paths; `LANGFUSE_EXPORT_PIPECAT_SPANS=false` reproduces the dropped turn spans
 - Gotcha: `PipelineParams(enable_metrics=True, enable_usage_metrics=True)` is what puts `metrics.ttfb` on the service spans and token counts on the LLM span; and the dev runner serves every connection from one process, so a session flushes the provider rather than shutting it down
+
+### livekit-demo/voice-agent
+
+A LiveKit Agents 1.8 voice agent (browser WebRTC through a local LiveKit server, OpenAI transcription, chat and speech, local Silero VAD) that traces each call to Oodle, with the call's personal data in the trace or out of it. LiveKit writes content that may identify a person under `lk.pii.*` (`user_transcript`, `user_input`, `response.text`, `chat_ctx`, `function_tool.arguments`/`output`, `input_text`, `room_name`, `participant_identity`) and in the GenAI content attributes and message events. `set_tracer_provider(provider, metadata=..., allow_pii=...)` decides what non-LiveKit-Cloud exporters receive: `allow_pii=True` (LiveKit's default) sends everything; `allow_pii=False` installs a span processor ahead of every exporter that drops those attributes whole (by key, not by value) and the `gen_ai.*.message`/`gen_ai.choice` events, leaving the span tree, timings, models, token usage, tool names and agent labels. The browser picks the mode per call; `web.py` puts it in the agent dispatch metadata of the room token, and the agent builds a tracer provider per call in its entrypoint (each call is its own job process), as LiveKit's Langfuse example does. The setup mirrors a production LiveKit deployment: a `voice_agent` that hands off to a `transfer_agent` (`lk.agent_label`), the LLM behind `llm.FallbackAdapter` (an `llm_fallback_adapter` span), and `agent.id`/`job.id`/`session.id`/`user.id`/`langfuse.session.id`/`langfuse.user.id`/`langfuse.tags` stamped on every span. That metadata is never filtered, so it holds pseudonymous ids only. It shares `livekit-demo/`'s `docker-compose.yml`, `.env` and `Makefile` with the trace replay: the voice services sit behind the compose profile `voice`, started with `make voice`, while `make up` starts only the replay's collector. `make verify-local` checks both modes against a local OTLP receiver with no accounts needed.
+
+- Languages: Python
+- Infra: Docker Compose, profile `voice` (`livekit-server` with `--node-ip=127.0.0.1`; the agent shares its network namespace; a token server and page on :7870)
+- Signals: Traces (voice-agent specific)
+- Instrumentation: `livekit.agents.telemetry.set_tracer_provider` with an OTLP/HTTP exporter straight to Oodle
+- Requires: Oodle credentials + an OpenAI API key; no LiveKit Cloud project
+- Config files: `livekit-demo/docker-compose.yml`, `livekit-demo/.env.example`, `voice-agent/agent.py`, `voice-agent/tracing.py`, `voice-agent/web.py`
+- Spans emitted: `agent_session`, `agent_turn`, `user_turn`, `llm_node`, `llm_fallback_adapter`, `llm_request`, `function_tool`, `tts_node`, `tts_request` and the rest of LiveKit's tree, scope `livekit-agents`
+- Env: `DEFAULT_PII_MODE=allow|withhold` for clients that do not ask; `OTEL_SERVICE_NAME` (default `livekit-voice-worker`); `AGENT_NAME` must match between the agent and the token server
+- Gotcha: `LIVEKIT_TELEMETRY_ALLOW_PII` only applies when `allow_pii` is not passed; a LiveKit Cloud project that mandates redaction strips PII for every exporter and `allow_pii=True` cannot override it
 
 ### opencode-demo
 
