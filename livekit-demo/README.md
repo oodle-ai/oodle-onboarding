@@ -55,4 +55,23 @@ standard `gen_ai.*` attributes for the LLM Ops pipeline.
 
 # Generate fresh trace/span IDs (for multiple replays)
 ./replay.py sample-trace.json --fresh-ids
+
+# Replay as an agent that marks personal data
+./replay.py sample-trace.json --fresh-ids --mark-pii
 ```
+
+## Agents that mark personal data
+
+An application can mark the LiveKit fields that may hold
+personal data. LiveKit then writes each of those under
+`lk.pii.` instead of `lk.`, with the same value: the
+prompt, the transcript, the reply, the chat context, a
+tool's arguments and result, the room and the
+participant. A name or a metric keeps its place.
+
+The capture was taken with the marking off, so
+`--mark-pii` renames those fields and replays the same
+run as an agent with it on. Use it to check that ingest
+resolves both spellings onto `gen_ai.*`: a receiver that
+knows only `lk.` produces a trace with no transcript at
+all, since every attribute carrying one has moved.

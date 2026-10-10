@@ -57,7 +57,53 @@ def parse_args():
         help="Generate new trace/span IDs "
         "instead of preserving originals",
     )
+    p.add_argument(
+        "--mark-pii",
+        action="store_true",
+        help="Rename the fields that can hold personal "
+        "data to their lk.pii.* spelling, as an agent "
+        "sends them when that marking is on",
+    )
     return p.parse_args()
+
+
+# The LiveKit fields that can hold personal data. An
+# application can mark them, and LiveKit then writes each
+# one under `lk.pii.` instead of `lk.`, with the same
+# value. Only these move: a tool's name, an agent's name
+# and a metric keep their place, so the two spellings
+# never name different fields.
+MARKED_FIELDS = (
+    "lk.user_input",
+    "lk.user_transcript",
+    "lk.response.text",
+    "lk.response.function_calls",
+    "lk.chat_ctx",
+    "lk.input_text",
+    "lk.function_tool.arguments",
+    "lk.function_tool.output",
+    "lk.participant_identity",
+    "lk.room_name",
+)
+
+
+def mark_pii(data):
+    """Rewrite the marked fields onto their lk.pii.* names.
+
+    The capture was taken from an agent with the marking
+    off. Renaming them here replays the same run as an
+    agent with it on, which is what a reader has to
+    resolve back onto gen_ai.* at ingest.
+    """
+    renamed = 0
+    for span in data.get("spans", []):
+        for tag in span.get("tags") or []:
+            key = tag.get("key", "")
+            if key in MARKED_FIELDS:
+                tag["key"] = "lk.pii." + key[len("lk."):]
+                renamed += 1
+    print(f"Marked {renamed} attributes as personal data.")
+    return data
 
 
 def load_trace(path):
@@ -273,6 +319,8 @@ def replay_trace(data, endpoint, fresh_ids):
 def main():
     args = parse_args()
     data = load_trace(args.trace_file)
+    if args.mark_pii:
+        data = mark_pii(data)
     replay_trace(data, args.endpoint, args.fresh_ids)
 
 
