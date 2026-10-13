@@ -40,6 +40,7 @@ from lmnr import Laminar, observe
 import compaction
 import gateway
 import tool_trim
+import tracing
 from route_audit import CallPurpose, ExecutionScope, RouteAttempt, attribute_current_span, input_batch
 
 MAX_TURNS = 6
@@ -393,7 +394,11 @@ async def run_agent_with_messages(
 
 async def _run_subagent(parent: ExecutionScope, question: str) -> str:
     subagent_id = f"explore-{uuid.uuid4().hex[:8]}"
-    with Laminar.start_as_current_span(name="subagent [explore]", session_id=parent.session_id):
+    # The subagent is awaited inline, so its identity must not outlive its span.
+    with (
+        Laminar.start_as_current_span(name="subagent [explore]", session_id=parent.session_id),
+        tracing.agent_invocation("explore"),
+    ):
         result = await run_agent_with_messages(
             RunConfig(parent.account_id, parent.session_id, subagent_id=subagent_id, subagent_type="explore"),
             [{"role": "user", "content": question}],
@@ -408,7 +413,12 @@ async def _generate_title(scope: ExecutionScope, prompt: str) -> None:
     await _complete(aux, [{"role": "user", "content": f"Write a 3-word title for: {prompt}"}], "List repo files")
 
 
-async def run_session(prompt: str, followups: list[str] | None = None, account_id: str = "demo-account") -> dict:
+async def run_session(
+    prompt: str,
+    followups: list[str] | None = None,
+    account_id: str = "demo-account",
+    user_id: str = "demo-user",
+) -> dict:
     """Run one session: the prompt, then each follow-up, one trace per user message."""
     session_id = str(uuid.uuid4())
     # Session id and account metadata ride the Laminar context, so every
@@ -422,6 +432,11 @@ async def run_session(prompt: str, followups: list[str] | None = None, account_i
         with (
             Laminar.start_as_current_span(name="session_workflow", session_id=session_id, metadata=metadata),
             Laminar.start_as_current_span(name="agent_session", session_id=session_id, metadata=metadata),
+            # Entered last so it stamps agent_session, and names every span underneath for
+            # the Agent Name and User ID views; Laminar's span type alone gives Oodle no
+            # operation name for a run span. Uses the name the compaction spans already
+            # carry, so one agent never shows up under two names in the same trace.
+            tracing.agent_invocation(config.subagent_type or "main", user_id),
         ):
             trace_ids.append(format(Laminar.get_current_span().get_span_context().trace_id, "032x"))
             if message_id == 1:

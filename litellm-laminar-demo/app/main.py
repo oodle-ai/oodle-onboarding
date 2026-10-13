@@ -33,11 +33,13 @@ class SessionRequest(BaseModel):
     message: str = "What is in this repository?"
     # Later user messages in the same session, one trace each.
     followups: list[str] = []
+    # Rides every span as user.id, so the Users view can attribute the session.
+    user_id: str = "demo-user"
 
 
 @app.post("/session")
 async def session(request: SessionRequest) -> dict:
-    result = await agent.run_session(request.message, request.followups)
+    result = await agent.run_session(request.message, request.followups, user_id=request.user_id)
     tracing.flush()
     return result
 

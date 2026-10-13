@@ -20,11 +20,14 @@ that runs inside span handling logs and moves on.
 import logging
 import os
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from lmnr import Laminar
 from lmnr.opentelemetry_lib.tracing.instruments import Instruments
+from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -67,6 +70,19 @@ _CONTENT_SUFFIXES = (".content", ".reasoning", ".arguments")
 _CONTENT_EVENT_PREFIXES = ("gen_ai.content.", "gen_ai.client.inference.")
 _CONTENT_EVENT_SUFFIXES = (".message", ".choice")
 
+# GenAI semconv attributes Oodle's agent-observability views facet and group traces by.
+# Neither the Laminar SDK nor the agent's own span helpers write any of them.
+_AGENT_NAME_KEY = "gen_ai.agent.name"
+_USER_ID_KEY = "user.id"
+_OPERATION_NAME_KEY = "gen_ai.operation.name"
+# Oodle derives ``chat``/``execute_tool`` at ingest from Laminar's LLM/TOOL span type, but
+# has nothing to derive from for the plain spans that wrap an agent run.
+_INVOKE_AGENT = "invoke_agent"
+
+# Identity of the agent whose work the current context represents, read by _AgentIdentity.
+_agent_name: ContextVar[str] = ContextVar("trace_agent_name", default="")
+_user_id: ContextVar[str] = ContextVar("trace_user_id", default="")
+
 
 def _is_content_key(key: str) -> bool:
     return key in _CONTENT_KEYS or key.startswith(_CONTENT_PREFIXES) or key.endswith(_CONTENT_SUFFIXES)
@@ -97,6 +113,86 @@ def _laminar_tracing_disabled(span: ReadableSpan) -> bool:
     if os.environ.get("LMNR_DISABLE_TRACING", "false").strip().lower() == "true":
         return True
     return bool((span.attributes or {}).get("lmnr.internal.disabled"))
+
+
+class _AgentIdentity(SpanProcessor):
+    """Stamp agent and user identity onto every span Laminar records.
+
+    Oodle expects ``gen_ai.agent.name`` and ``user.id`` on the model and tool spans
+    themselves, not only on the span wrapping the agent run, because that is what makes
+    "which agent and user produced this model call" answerable. Threading identity through
+    the gateway and every tool would touch every call site, so it is applied here instead:
+    ``on_start`` runs in the task that created the span, so the context vars still hold
+    that task's identity.
+
+    Like the mirror, it cannot be removed from Laminar's provider, so it goes inert once
+    shut down rather than stamping spans that only Laminar still receives.
+    """
+
+    def __init__(self) -> None:
+        self._closed = False
+
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        if self._closed:
+            return
+        agent_name = _agent_name.get()
+        if agent_name:
+            span.set_attribute(_AGENT_NAME_KEY, agent_name)
+        user_id = _user_id.get()
+        if user_id:
+            span.set_attribute(_USER_ID_KEY, user_id)
+
+    def on_end(self, span: ReadableSpan) -> None:
+        return
+
+    def shutdown(self) -> None:
+        self._closed = True
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
+
+_identity: _AgentIdentity | None = None
+
+
+@contextmanager
+def agent_invocation(agent_name: str, user_id: str = "") -> Iterator[None]:
+    """Scope the spans created inside to one agent run.
+
+    Labels the current span as the GenAI ``invoke_agent`` operation, which is what makes it
+    read as an agent run rather than an untyped span, and names every span created inside
+    for the same agent and user, however deep (model calls, tool calls, compaction,
+    subagents).
+
+    This is a scope, not a one-way switch. A subagent awaited inline shares its caller's
+    context, so without restoring the previous identity on exit it would keep renaming its
+    caller's spans after it finished.
+
+    Args:
+        agent_name: Stable, low-cardinality name of the running agent, e.g. ``"main"``.
+        user_id: User who owns this run. Empty keeps whoever is already set, so background
+            work inside a user's session stays attributed to them.
+
+    Spans are only stamped while the Oodle mirror is attached; Laminar alone gets none of
+    these attributes.
+    """
+    name_token = _agent_name.set(agent_name)
+    user_token = _user_id.set(user_id) if user_id else None
+    span = trace.get_current_span()
+    if _identity is not None and span.is_recording():
+        # This span is already open, so _AgentIdentity ran against the previous identity
+        # and cannot stamp the new one. Write all three here, or the agent run is the one
+        # span missing the identity it establishes.
+        span.set_attribute(_OPERATION_NAME_KEY, _INVOKE_AGENT)
+        span.set_attribute(_AGENT_NAME_KEY, agent_name)
+        if user_id:
+            span.set_attribute(_USER_ID_KEY, user_id)
+    try:
+        yield
+    finally:
+        _agent_name.reset(name_token)
+        if user_token is not None:
+            _user_id.reset(user_token)
 
 
 class _LaminarMirror(SpanProcessor):
@@ -214,7 +310,7 @@ def init_oodle(service_name: str) -> bool:
     Safe to call more than once: later calls are no-ops, so spans are never
     exported twice.
     """
-    global _initialized, _mirror
+    global _initialized, _mirror, _identity
     with _lock:
         if _initialized:
             return True
@@ -227,6 +323,10 @@ def init_oodle(service_name: str) -> bool:
             {"service.name": service_name, "deployment.environment": os.environ.get("ENV", "demo")}
         )
         _mirror = _LaminarMirror(_batch_processor(_oodle_exporter()), resource, capture)
+        # Identity is stamped at span start, so this goes on before the mirror, which
+        # reads attributes at span end.
+        _identity = _AgentIdentity()
+        laminar_provider.add_span_processor(_identity)
         laminar_provider.add_span_processor(_mirror)
         _initialized = True
         return True
@@ -240,9 +340,12 @@ def flush() -> None:
 
 def shutdown_oodle() -> None:
     """Flush and close the Oodle mirror."""
-    global _initialized, _mirror
+    global _initialized, _mirror, _identity
     with _lock:
         mirror, _mirror, _initialized = _mirror, None, False
+        if _identity is not None:
+            _identity.shutdown()
+            _identity = None
         if mirror is None:
             return
         try:
