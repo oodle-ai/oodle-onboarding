@@ -33,7 +33,7 @@ tree as its own trace. Every span below reaches both backends.
 
 ```
 session_workflow
-  agent_session                       session id, account metadata; route_completed
+  agent_session                       session id, account metadata, agent name, user id; route_completed
     llm_call                          title generation, first message only; route_started
     run_agent_with_messages           run config in, run result out; route_completed
       tool_trim [main]                past half the window, once per compaction cycle; what it trimmed
@@ -58,6 +58,7 @@ session_workflow
 | Group | Spans | Keys |
 |---|---|---|
 | Session association | every Laminar span | `lmnr.association.properties.session_id`, `...metadata.account_id`, `...metadata.environment` |
+| Agent and user identity | every Laminar span; the run span also gets the operation name | `gen_ai.agent.name`, `user.id`, and `gen_ai.operation.name` = `invoke_agent` on `agent_session` and `subagent [*]` |
 | Route audit (27 fields) | LLM spans get `route_started`; the enclosing turn loop or `agent_session` gets `route_completed` | `agent.route.event`, `purpose`, `route`, `provider`, `model`, `reason`, `selection_reason`, `attempt_id`, `logical_call_id`, `parent_attempt_id`, `input_batch_id`, `input_message_ids`, `input_message_count`, `started`, `fallback`, `forced_api`, `quota`, `auth`, ... |
 | Usage and cache | `llm_call`, `llm_call_stream` | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `llm.usage.total_tokens`, `llm.usage.visible_output_tokens`, `cache.read_tokens`, `cache.creation_tokens`, `cache.hit_pct`; reasoning and cache token counts when non-zero |
 | Resolved model config | `llm_call`, `llm_call_stream` | `gen_ai.system`, `gen_ai.request.model`, `llm.resolved.reasoning_effort`, `llm.model_selection.fast_mode_enabled` |

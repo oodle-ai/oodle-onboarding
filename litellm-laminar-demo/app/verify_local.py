@@ -200,6 +200,40 @@ def attribute_checks(rows: list[Row], backend: str, with_content: bool) -> list[
     ]
 
 
+def identity_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]:
+    """Agent and user identity, which the trace views facet and group by.
+
+    The run span must name itself as a GenAI agent invocation, and the identity must reach
+    the leaf spans too, since the question being answered is "which agent and user produced
+    this model call". A subagent must be named as itself, never left as the agent that
+    started it, and must not rename that agent once it finishes.
+    """
+    runs = [r for r in rows if r.name == "agent_session"]
+    leaves = [r for r in rows if r.name in LLM_SPANS or r.name.startswith("tool_call [")]
+    subagents = [r for r in rows if r.name == "subagent [explore]"]
+
+    def attr(row: Row, key: str) -> str:
+        return _text(row.attributes.get(key, _EMPTY))
+
+    return [
+        (f"{backend}: agent_session is a GenAI invoke_agent operation named by agent",
+         bool(runs) and all(attr(r, "gen_ai.operation.name") == "invoke_agent" and attr(r, "gen_ai.agent.name") == "main" for r in runs)),
+        # The run span is already open when its identity is established, so it cannot pick
+        # these up from the start-time processor like a child span does.
+        (f"{backend}: agent_session carries the user it ran for",
+         bool(runs) and all(attr(r, "user.id") == "demo-user" for r in runs)),
+        (f"{backend}: every model and tool span carries agent name and user id",
+         bool(leaves) and all(attr(r, "gen_ai.agent.name") and attr(r, "user.id") == "demo-user" for r in leaves)),
+        (f"{backend}: the subagent is named as itself, not as the agent that started it",
+         bool(subagents) and all(attr(r, "gen_ai.agent.name") == "explore" for r in subagents)),
+        # The subagent is awaited inline, so an unscoped identity would rename the main
+        # agent's later spans; compaction spans set this key themselves, so a mismatch
+        # there would split one agent across two values in the Agent Name view.
+        (f"{backend}: the main agent has one name on every span, compaction included",
+         {attr(r, "gen_ai.agent.name") for r in rows if r.name.endswith("[main]") or r.name == "agent_session"} == {"main"}),
+    ]
+
+
 def _value(value):
     kind = value.WhichOneof("value")
     return None if kind is None else getattr(value, kind)
@@ -354,6 +388,9 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
     checks += compaction_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", session_id, with_content=capture)
     checks += tool_trim_checks(laminar, "Laminar", with_content=True)
     checks += tool_trim_checks([r for r in oodle if r.span_id in lam_ids], "Oodle", with_content=capture)
+    # Identity is not message content, so it must survive with capture off.
+    checks += identity_checks(laminar, "Laminar")
+    checks += identity_checks([r for r in oodle if r.span_id in lam_ids], "Oodle")
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")
