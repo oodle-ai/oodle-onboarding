@@ -1,0 +1,27 @@
+services:
+  # Receives the ElevenLabs post-call webhook, checks its signature and
+  # forwards the OpenTelemetry trace in it to Oodle.
+  forwarder:
+    build: ./forwarder
+    container_name: elevenlabs-forwarder
+    ports:
+      - "8787:8787"
+    # Read from the file, not interpolated: a shell that exports
+    # OODLE_INSTANCE or OODLE_API_KEY would otherwise win over .env.
+    env_file:
+      - .env
+    environment:
+      # `make forwarder` writes the webhook's signing secret here.
+      - ELEVENLABS_WEBHOOK_SECRET_FILE=/state/webhook_secret
+    volumes:
+      - ./state:/state:ro
+
+  # A Cloudflare quick tunnel, so ElevenLabs can reach the forwarder on
+  # this machine. No account needed. The URL changes on each start, and
+  # `make webhook` points the agent at the current one.
+  tunnel:
+    image: cloudflare/cloudflared:2025.8.1
+    container_name: elevenlabs-tunnel
+    command: tunnel --no-autoupdate --url http://forwarder:8787
+    depends_on:
+      - forwarder
