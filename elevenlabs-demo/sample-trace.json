@@ -1,0 +1,1551 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "elevenlabs-convai"
+            }
+          },
+          {
+            "key": "elevenlabs.conversation_id",
+            "value": {
+              "stringValue": "conv_4901m4wneaqaf3bbrz65563bcfnk"
+            }
+          },
+          {
+            "key": "elevenlabs.agent_id",
+            "value": {
+              "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "elevenlabs.convai",
+            "version": "1.0.0"
+          },
+          "spans": [
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.conversation",
+              "kind": 1,
+              "startTimeUnixNano": "1791963376000000000",
+              "endTimeUnixNano": "1791963430000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent_name",
+                  "value": {
+                    "stringValue": "Oodle demo: Globetrotter travel desk"
+                  }
+                },
+                {
+                  "key": "elevenlabs.conversation_id",
+                  "value": {
+                    "stringValue": "conv_4901m4wneaqaf3bbrz65563bcfnk"
+                  }
+                },
+                {
+                  "key": "elevenlabs.conversation_product",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.status",
+                  "value": {
+                    "stringValue": "done"
+                  }
+                },
+                {
+                  "key": "elevenlabs.session.duration_ms",
+                  "value": {
+                    "intValue": "54000"
+                  }
+                },
+                {
+                  "key": "elevenlabs.source",
+                  "value": {
+                    "stringValue": "post_call_webhook"
+                  }
+                },
+                {
+                  "key": "elevenlabs.user_id",
+                  "value": {
+                    "stringValue": "caller-priya-raman"
+                  }
+                },
+                {
+                  "key": "elevenlabs.environment",
+                  "value": {
+                    "stringValue": "production"
+                  }
+                },
+                {
+                  "key": "elevenlabs.cost",
+                  "value": {
+                    "intValue": "374"
+                  }
+                },
+                {
+                  "key": "elevenlabs.cost_fiat",
+                  "value": {
+                    "doubleValue": 0.08169409608264466
+                  }
+                },
+                {
+                  "key": "elevenlabs.authorization_method",
+                  "value": {
+                    "stringValue": "signed_url"
+                  }
+                },
+                {
+                  "key": "elevenlabs.termination_reason",
+                  "value": {
+                    "stringValue": "Client disconnected: 1000"
+                  }
+                },
+                {
+                  "key": "elevenlabs.analysis.call_successful",
+                  "value": {
+                    "stringValue": "success"
+                  }
+                },
+                {
+                  "key": "elevenlabs.analysis.transcript_summary",
+                  "value": {
+                    "stringValue": "The user initiated the conversation by asking the agent to check a booking reference (T1234), which the agent could not find. The user then shifted topics, inquiring about the exchange rate from US dollars to British pounds, which the agent provided as approximately 0.75 GBP per USD. Lastly, the user asked about the cost of an extra checked bag, and the agent informed them it costs $60 for international bookings. The conversation ended amicably."
+                  }
+                },
+                {
+                  "key": "elevenlabs.analysis.call_summary_title",
+                  "value": {
+                    "stringValue": "Travel Inquiries"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__agent_turns",
+                  "value": {
+                    "intValue": "5"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__current_agent_turns",
+                  "value": {
+                    "intValue": "5"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__current_subagent_turns",
+                  "value": {
+                    "intValue": "5"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__current_agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__conversation_id",
+                  "value": {
+                    "stringValue": "conv_4901m4wneaqaf3bbrz65563bcfnk"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__call_duration_secs",
+                  "value": {
+                    "intValue": "54"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__time_utc",
+                  "value": {
+                    "stringValue": "2026-10-14T07:37:10.432842+00:00"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__time",
+                  "value": {
+                    "stringValue": "Wednesday, 07:37 14 October 2026"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__time_hour",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__time_minute",
+                  "value": {
+                    "intValue": "37"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__time_second",
+                  "value": {
+                    "intValue": "10"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__is_text_only",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__channel",
+                  "value": {
+                    "stringValue": "python_sdk"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__conversation_history",
+                  "value": {
+                    "stringValue": "{\"x-elevenlabs-history\": true, \"entries\": [{\"role\": \"agent\", \"message\": \"Hi, this is Maya from Globetrotter Travel. How can I help?\"}, {\"role\": \"user\", \"message\": \"Hi, can you check Birking G, T1234 for me?\"}, {\"role\": \"agent\", \"tool_requests\": [{\"tool_name\": \"lookup_booking\", \"params_as_json\": {\"booking_ref\": \"T1234\"}}]}, {\"role\": \"agent\", \"tool_results\": [{\"tool_name\": \"lookup_booking\", \"result_value\": \"{\\\"error\\\": \\\"No booking found for T1234\\\"}\"}]}, {\"role\": \"agent\", \"message\": \"I couldn't find a booking under T1234. Could you please double-check the reference and provide it again?\"}, {\"role\": \"user\", \"message\": \"I will be in London. What is the exchange rate from US dollars to British pounds?\"}, {\"role\": \"agent\", \"tool_requests\": [{\"tool_name\": \"get_exchange_rate\", \"params_as_json\": {\"base\": \"USD\", \"symbols\": \"GBP\"}}]}, {\"role\": \"agent\", \"tool_results\": [{\"tool_name\": \"get_exchange_rate\", \"result_value\": \"{\\\"amount\\\":1.0,\\\"base\\\":\\\"USD\\\",\\\"date\\\":\\\"2026-10-13\\\",\\\"rates\\\":{\\\"GBP\\\":0.75492}}\"}]}, {\"role\": \"agent\", \"message\": \"The exchange rate from US dollars to British pounds is about seventy-five pence for one dollar. Would you like to know anything else?\"}, {\"role\": \"user\", \"message\": \"How much does an extra checked bag cost?\"}, {\"role\": \"agent\", \"message\": \"An extra checked bag costs sixty US dollars on international bookings. Let me know if you need info on anything else!\"}, {\"role\": \"user\", \"message\": \"Great, thanks. That is all. Goodbye.\"}, {\"role\": \"agent\", \"message\": \"You're welcome! Have a wonderful trip and goodbye!\"}]}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__user_id",
+                  "value": {
+                    "stringValue": "caller-priya-raman"
+                  }
+                },
+                {
+                  "key": "elevenlabs.dynamic_variable.system__environment",
+                  "value": {
+                    "stringValue": "production"
+                  }
+                },
+                {
+                  "key": "elevenlabs.visited_agents.0.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.visited_agents.0.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "a2f31016998d484e",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963376000000000",
+              "endTimeUnixNano": "1791963381000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent.text",
+                  "value": {
+                    "stringValue": "Hi, this is Maya from Globetrotter Travel. How can I help?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "0"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.voice_id",
+                  "value": {
+                    "stringValue": "cjVigY5qzO86Huf0OWal"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_tts_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 65.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_since_silence_ms",
+                  "value": {
+                    "doubleValue": 72.8
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_silence_before_initiation_ms",
+                  "value": {
+                    "doubleValue": 0.0
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "a150e54b24114174",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.user_transcript",
+              "kind": 1,
+              "startTimeUnixNano": "1791963381000000000",
+              "endTimeUnixNano": "1791963385000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "user"
+                  }
+                },
+                {
+                  "key": "elevenlabs.user.text",
+                  "value": {
+                    "stringValue": "Hi, can you check Birking G, T1234 for me?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "dd9162b7dcc04f0d",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963385000000000",
+              "endTimeUnixNano": "1791963385009999872",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 607.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_tool_request_generation_latency_ms",
+                  "value": {
+                    "doubleValue": 607.8
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 998, \"price\": 0.00039920000000000005}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 33, \"price\": 5.28e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "3035984eeda4465f",
+              "parentSpanId": "dd9162b7dcc04f0d",
+              "name": "elevenlabs.tool.lookup_booking",
+              "kind": 1,
+              "startTimeUnixNano": "1791963385000000000",
+              "endTimeUnixNano": "1791963385074358016",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "client_tool_call"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.name",
+                  "value": {
+                    "stringValue": "lookup_booking"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool_span_id",
+                  "value": {
+                    "stringValue": "3035984eeda4465f"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.latency_ms",
+                  "value": {
+                    "doubleValue": 74.4
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.params",
+                  "value": {
+                    "stringValue": "{\"booking_ref\": \"T1234\"}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.result",
+                  "value": {
+                    "stringValue": "{\"error\": \"No booking found for T1234\"}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "b84ecb097a4e4cf9",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963385000000000",
+              "endTimeUnixNano": "1791963386000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "3"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "6c262548d8cf4f47",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963386000000000",
+              "endTimeUnixNano": "1791963394000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent.text",
+                  "value": {
+                    "stringValue": "I couldn't find a booking under T1234. Could you please double-check the reference and provide it again?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.voice_id",
+                  "value": {
+                    "stringValue": "cjVigY5qzO86Huf0OWal"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttf_sentence_ms",
+                  "value": {
+                    "doubleValue": 476.1
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 390.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_tt_last_sentence_ms",
+                  "value": {
+                    "doubleValue": 515.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_tts_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 73.1
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_since_silence_ms",
+                  "value": {
+                    "doubleValue": 1894.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_silence_before_initiation_ms",
+                  "value": {
+                    "doubleValue": 256.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_unaccounted_ms",
+                  "value": {
+                    "doubleValue": 906.6
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.embedding_model",
+                  "value": {
+                    "stringValue": "multilingual_e5_large_instruct"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.retrieval_query",
+                  "value": {
+                    "stringValue": "Can you check reservation Birking G, T1234?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.latency_ms",
+                  "value": {
+                    "doubleValue": 110.1
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 1035, \"price\": 0.000414}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 23, \"price\": 3.680000000000001e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "c517cb59a9164567",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.user_transcript",
+              "kind": 1,
+              "startTimeUnixNano": "1791963394000000000",
+              "endTimeUnixNano": "1791963399000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "user"
+                  }
+                },
+                {
+                  "key": "elevenlabs.user.text",
+                  "value": {
+                    "stringValue": "I will be in London. What is the exchange rate from US dollars to British pounds?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "5"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "873837b2436243c0",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963399000000000",
+              "endTimeUnixNano": "1791963400000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "6"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 497.2
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_tool_request_generation_latency_ms",
+                  "value": {
+                    "doubleValue": 498.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 1083, \"price\": 0.00043320000000000007}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 19, \"price\": 3.0400000000000004e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "553c81fd09744cba",
+              "parentSpanId": "873837b2436243c0",
+              "name": "elevenlabs.tool.get_exchange_rate",
+              "kind": 1,
+              "startTimeUnixNano": "1791963399000000000",
+              "endTimeUnixNano": "1791963399069262080",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "client_tool_call"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.name",
+                  "value": {
+                    "stringValue": "get_exchange_rate"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool_span_id",
+                  "value": {
+                    "stringValue": "553c81fd09744cba"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.latency_ms",
+                  "value": {
+                    "doubleValue": 69.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.params",
+                  "value": {
+                    "stringValue": "{\"base\":\"USD\",\"symbols\":\"GBP\"}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.tool.result",
+                  "value": {
+                    "stringValue": "{\"amount\":1.0,\"base\":\"USD\",\"date\":\"2026-10-13\",\"rates\":{\"GBP\":0.75492}}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "d7f9f9a7d7cd44a0",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963400000000000",
+              "endTimeUnixNano": "1791963400009999872",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "7"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "aa9fa54697ce4176",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963400000000000",
+              "endTimeUnixNano": "1791963409000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent.text",
+                  "value": {
+                    "stringValue": "The exchange rate from US dollars to British pounds is about seventy-five pence for one dollar. Would you like to know anything else?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "8"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.voice_id",
+                  "value": {
+                    "stringValue": "cjVigY5qzO86Huf0OWal"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttf_sentence_ms",
+                  "value": {
+                    "doubleValue": 413.9
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 363.7
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_tt_last_sentence_ms",
+                  "value": {
+                    "doubleValue": 536.7
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_tts_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 83.6
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_since_silence_ms",
+                  "value": {
+                    "doubleValue": 1755.5
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_silence_before_initiation_ms",
+                  "value": {
+                    "doubleValue": 288.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_unaccounted_ms",
+                  "value": {
+                    "doubleValue": 840.7
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.embedding_model",
+                  "value": {
+                    "stringValue": "multilingual_e5_large_instruct"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.retrieval_query",
+                  "value": {
+                    "stringValue": "What is the current exchange rate from US dollars to British pounds?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.latency_ms",
+                  "value": {
+                    "doubleValue": 109.8
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 116, \"price\": 4.64e-05}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 1024, \"price\": 0.00010240000000000001}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 28, \"price\": 4.4800000000000005e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "fcb62dfa94b34835",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.user_transcript",
+              "kind": 1,
+              "startTimeUnixNano": "1791963409000000000",
+              "endTimeUnixNano": "1791963412000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "user"
+                  }
+                },
+                {
+                  "key": "elevenlabs.user.text",
+                  "value": {
+                    "stringValue": "How much does an extra checked bag cost?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "9"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "23ff2fff15f847bd",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963412000000000",
+              "endTimeUnixNano": "1791963420000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent.text",
+                  "value": {
+                    "stringValue": "An extra checked bag costs sixty US dollars on international bookings. Let me know if you need info on anything else!"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "10"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.voice_id",
+                  "value": {
+                    "stringValue": "cjVigY5qzO86Huf0OWal"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttf_sentence_ms",
+                  "value": {
+                    "doubleValue": 541.1
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 496.4
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_tt_last_sentence_ms",
+                  "value": {
+                    "doubleValue": 644.2
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_tts_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 79.9
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_since_silence_ms",
+                  "value": {
+                    "doubleValue": 1066.2
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_silence_before_initiation_ms",
+                  "value": {
+                    "doubleValue": 192.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_asr_latency_ms",
+                  "value": {
+                    "doubleValue": 22.5
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_asr_excess_ms",
+                  "value": {
+                    "doubleValue": 22.5
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_unaccounted_ms",
+                  "value": {
+                    "doubleValue": 134.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.embedding_model",
+                  "value": {
+                    "stringValue": "multilingual_e5_large_instruct"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.retrieval_query",
+                  "value": {
+                    "stringValue": "What is the cost of an extra checked bag?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.latency_ms",
+                  "value": {
+                    "doubleValue": 96.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 160, \"price\": 6.4e-05}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 1024, \"price\": 0.00010240000000000001}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 24, \"price\": 3.8400000000000005e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "2e33e81cdb5a41a5",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.user_transcript",
+              "kind": 1,
+              "startTimeUnixNano": "1791963420000000000",
+              "endTimeUnixNano": "1791963424000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "user"
+                  }
+                },
+                {
+                  "key": "elevenlabs.user.text",
+                  "value": {
+                    "stringValue": "Great, thanks. That is all. Goodbye."
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "11"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "0b149a5fb9adeae388381ad44f0adae4",
+              "spanId": "a683f292447245ed",
+              "parentSpanId": "7c3f99f4f9b44264",
+              "name": "elevenlabs.recv.agent_response",
+              "kind": 1,
+              "startTimeUnixNano": "1791963424000000000",
+              "endTimeUnixNano": "1791963430000000000",
+              "attributes": [
+                {
+                  "key": "elevenlabs.event.type",
+                  "value": {
+                    "stringValue": "agent"
+                  }
+                },
+                {
+                  "key": "elevenlabs.agent.text",
+                  "value": {
+                    "stringValue": "You're welcome! Have a wonderful trip and goodbye!"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.index",
+                  "value": {
+                    "intValue": "12"
+                  }
+                },
+                {
+                  "key": "elevenlabs.producing_llm",
+                  "value": {
+                    "stringValue": "gpt-4.1-mini"
+                  }
+                },
+                {
+                  "key": "elevenlabs.voice_id",
+                  "value": {
+                    "stringValue": "cjVigY5qzO86Huf0OWal"
+                  }
+                },
+                {
+                  "key": "elevenlabs.ignored_as_backchannel",
+                  "value": {
+                    "boolValue": false
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.agent_id",
+                  "value": {
+                    "stringValue": "agent_5301m4wm9qtzeksbjexs72yxxxkf"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.branch_id",
+                  "value": {
+                    "stringValue": "agtbrch_8601m4wm9rx3f6wrctr3payvhrqt"
+                  }
+                },
+                {
+                  "key": "elevenlabs.turn.version_id",
+                  "value": {
+                    "stringValue": "agtvrsn_2701m4wne4bnfhxa55800y1a3tp4"
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttf_sentence_ms",
+                  "value": {
+                    "doubleValue": 476.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 354.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_llm_service_tt_last_sentence_ms",
+                  "value": {
+                    "doubleValue": 476.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_tts_service_ttfb_ms",
+                  "value": {
+                    "doubleValue": 72.8
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_since_silence_ms",
+                  "value": {
+                    "doubleValue": 1010.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_silence_before_initiation_ms",
+                  "value": {
+                    "doubleValue": 224.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_asr_latency_ms",
+                  "value": {
+                    "doubleValue": 62.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_turn_asr_excess_ms",
+                  "value": {
+                    "doubleValue": 62.3
+                  }
+                },
+                {
+                  "key": "elevenlabs.metric.convai_ttf_audio_unaccounted_ms",
+                  "value": {
+                    "doubleValue": 20.0
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.embedding_model",
+                  "value": {
+                    "stringValue": "multilingual_e5_large_instruct"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.retrieval_query",
+                  "value": {
+                    "stringValue": "What is the exchange rate from US dollars to British pounds and how much does an extra checked bag cost?"
+                  }
+                },
+                {
+                  "key": "elevenlabs.rag.latency_ms",
+                  "value": {
+                    "doubleValue": 155.2
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input",
+                  "value": {
+                    "stringValue": "{\"tokens\": 73, \"price\": 2.92e-05}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_read",
+                  "value": {
+                    "stringValue": "{\"tokens\": 1152, \"price\": 0.00011520000000000001}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.input_cache_write",
+                  "value": {
+                    "stringValue": "{\"tokens\": 0, \"price\": 0.0}"
+                  }
+                },
+                {
+                  "key": "elevenlabs.llm_usage.gpt-4.1-mini.output_total",
+                  "value": {
+                    "stringValue": "{\"tokens\": 11, \"price\": 1.76e-05}"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
