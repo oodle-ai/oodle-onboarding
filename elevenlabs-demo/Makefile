@@ -11,8 +11,11 @@ help: ## Show this help
 agent: ## Create the demo agent in your ElevenLabs workspace
 	$(DEMO) setup
 
-webhook: ## Send the agent's post-call traces straight to Oodle
-	$(DEMO) webhook
+webhook: ## Send the agent's post-call traces straight to Oodle (the tile's snippet)
+	@set -a; . ./.env; set +a; \
+	ELEVENLABS_AGENT_ID=$$(python3 -c 'import json; print(json.load(open("state/agent.json"))["agent_id"])') \
+		./setup_webhook.py
+	@echo "The agent's post-call webhook now goes straight to Oodle."
 
 chat: ## A short text-only conversation (lowest cost)
 	$(DEMO) chat

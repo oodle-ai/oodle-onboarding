@@ -7,8 +7,9 @@
 
   setup             Create the demo agent: a client tool, a webhook tool and a
                     knowledge base used through RAG. The ids go to state/.
-  webhook [URL]     Point the agent's post-call webhook (OpenTelemetry format)
-                    straight at Oodle, or at the forwarder reachable at URL.
+  webhook URL       Point the agent's post-call webhook (OpenTelemetry format)
+                    at the forwarder reachable at URL. To send straight to
+                    Oodle, run setup_webhook.py (make webhook) instead.
   chat              A short text-only conversation. No audio, lowest cost.
   voice             A real voice call: a synthetic caller speaks to the agent
                     over audio, so the agent runs speech-to-text, the LLM and
@@ -37,6 +38,7 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 from elevenlabs import ElevenLabs
+from elevenlabs.core.api_error import ApiError
 from elevenlabs.conversational_ai.conversation import (
     AudioInterface,
     ClientTools,
@@ -238,38 +240,31 @@ def oodle_endpoint() -> str:
     return endpoint.rstrip("/")
 
 
-def webhook(args) -> None:
-    """Send the agent's post-call traces to Oodle, or to the forwarder.
+WEBHOOK_NAME = "Oodle Agent Observability"
 
-    Without a URL the webhook goes straight to Oodle, which takes the trace
-    out of the webhook's envelope, and carries the Oodle headers itself.
-    With a URL it goes to the forwarder there, which checks the signature
-    and forwards the trace.
+
+def webhook(args) -> None:
+    """Send the agent's post-call traces to the forwarder reachable at URL.
+
+    `make webhook` points the webhook straight at Oodle with
+    setup_webhook.py, the tile's own snippet. This is the other path: the
+    webhook goes to the forwarder, which checks the signature with the
+    secret saved here and forwards the trace.
     """
     el = client()
     state = load_state()
     if "agent_id" not in state:
         sys.exit("No agent yet. Run: make agent")
-    settings = {"auth_type": "hmac", "name": "Oodle Agent Observability"}
-    if args.url:
-        settings["webhook_url"] = args.url.rstrip("/") + "/elevenlabs/post-call"
-    else:
-        settings["webhook_url"] = oodle_endpoint() + "/v1/otlp/traces/elevenlabs"
-        settings["request_headers"] = {
-            "X-API-KEY": os.environ["OODLE_API_KEY"],
-            "X-OODLE-INSTANCE": os.environ["OODLE_INSTANCE"],
-        }
-    created = el.webhooks.create(settings=settings)
+    url = args.url.rstrip("/") + "/elevenlabs/post-call"
+    created = el.webhooks.create(
+        settings={"auth_type": "hmac", "name": WEBHOOK_NAME, "webhook_url": url}
+    )
     # Retries are off on a new webhook. Without them a failed delivery
     # loses the call.
-    el.webhooks.update(
-        created.webhook_id, name=settings["name"], is_disabled=False, retry_enabled=True
-    )
+    el.webhooks.update(created.webhook_id, name=WEBHOOK_NAME, is_disabled=False, retry_enabled=True)
     STATE_DIR.mkdir(exist_ok=True)
     SECRET_FILE.write_text(created.webhook_secret)
     SECRET_FILE.chmod(0o600)
-    # Per agent, not workspace wide, so other agents in the workspace keep
-    # their own webhook settings.
     el.conversational_ai.agents.update(
         state["agent_id"],
         platform_settings={
@@ -282,14 +277,29 @@ def webhook(args) -> None:
             }
         },
     )
-    # Replace the webhook this demo made before (a quick tunnel gets a new
-    # URL each time it starts). ElevenLabs refuses to delete a webhook an
-    # agent still uses, so this comes after the agent has the new one.
-    if state.get("webhook_id"):
-        el.webhooks.delete(state["webhook_id"])
-    state["webhook_id"] = created.webhook_id
-    save_state(state)
-    print(f"Post-call webhook {created.webhook_id} -> {settings['webhook_url']}")
+    delete_unused_webhooks(el)
+    print(f"Post-call webhook {created.webhook_id} -> {url}")
+
+
+def delete_unused_webhooks(el: ElevenLabs) -> None:
+    """Delete this demo's webhooks that no agent uses any more. Each
+    `make webhook` or `make forwarder` makes a new one, and a quick tunnel
+    gets a new URL on every start. ElevenLabs refuses to delete a webhook
+    in use, so the one the agent has stays."""
+    for hook in el.webhooks.list().webhooks:
+        if hook.name != WEBHOOK_NAME:
+            continue
+        try:
+            el.webhooks.delete(hook.webhook_id)
+        except Exception:
+            pass  # still in use
+
+
+def agent_webhook_id(el: ElevenLabs) -> str | None:
+    agent = el.conversational_ai.agents.get(agent_id())
+    overrides = agent.platform_settings and agent.platform_settings.workspace_overrides
+    hooks = overrides and overrides.webhooks
+    return hooks and hooks.post_call_webhook_id
 
 
 # --- conversations ------------------------------------------------------------
@@ -470,7 +480,7 @@ def voice(args) -> None:
 
 def finish(conversation_id: str, args) -> None:
     print(f"Conversation: {conversation_id}")
-    if load_state().get("webhook_id") and not args.export:
+    if agent_webhook_id(client()) and not args.export:
         print("The post-call webhook forwards this trace once ElevenLabs has analyzed the call.")
         return
     export_conversation(conversation_id, args.save)
@@ -560,15 +570,29 @@ def replay(args) -> None:
 def teardown(_args) -> None:
     state = load_state()
     el = client()
+
+    def delete(what: str, call) -> None:
+        # Safe to run again after a partial teardown: gone is done.
+        try:
+            call()
+            print(f"Deleted {what}")
+        except ApiError as err:
+            if err.status_code != 404:
+                raise
+
     if state.get("agent_id"):
-        el.conversational_ai.agents.delete(state["agent_id"])
+        delete("the demo agent", lambda: el.conversational_ai.agents.delete(state["agent_id"]))
     if state.get("document_id"):
-        el.conversational_ai.knowledge_base.documents.delete(state["document_id"])
-    if state.get("webhook_id"):
-        el.webhooks.delete(state["webhook_id"])
+        delete(
+            "the knowledge base document",
+            lambda: el.conversational_ai.knowledge_base.documents.delete(
+                state["document_id"], force=True
+            ),
+        )
+    # With the agent gone, none of the demo's webhooks is in use.
+    delete_unused_webhooks(el)
     for f in (AGENT_FILE, SECRET_FILE):
         f.unlink(missing_ok=True)
-    print("Deleted the demo agent, its knowledge base document and its webhook")
 
 
 def main() -> None:
@@ -576,7 +600,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("setup").set_defaults(func=setup)
     p = sub.add_parser("webhook")
-    p.add_argument("url", nargs="?", help="the forwarder's public base URL; omit to send straight to Oodle")
+    p.add_argument("url", help="the forwarder's public base URL")
     p.set_defaults(func=webhook)
     for name, func in (("chat", chat), ("voice", voice)):
         p = sub.add_parser(name)

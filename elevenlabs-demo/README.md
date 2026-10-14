@@ -62,7 +62,7 @@ prints. That call is traced the same way.
 | Target | What it does |
 | --- | --- |
 | `make agent` | Create the demo agent, its tools and its knowledge base |
-| `make webhook` | Point the agent's post-call webhook straight at Oodle |
+| `make webhook` | Point the agent's post-call webhook straight at Oodle, by running `setup_webhook.py` |
 | `make chat` | A short text-only conversation: no audio, lowest cost |
 | `make voice` | A real voice call: the caller's lines are made with ElevenLabs text to speech and sent as the microphone, so the agent runs speech-to-text, the LLM and text-to-speech. Both sides are saved to `state/last-call.wav` |
 | `make replay` | Send `sample-trace.json`, a captured voice call, as a new trace. No ElevenLabs account needed |
@@ -75,7 +75,10 @@ prints. That call is traced the same way.
 
 **Straight to Oodle** (`make webhook`). The webhook's URL is Oodle's
 ElevenLabs endpoint, and its request headers carry the Oodle instance and
-API key. Nothing to run.
+API key. Nothing to run. [`setup_webhook.py`](setup_webhook.py) is the
+snippet the ElevenLabs Agents tile in Oodle shows, step for step: create
+the webhook, turn on retries, attach it to the agent in the OpenTelemetry
+format. The tile fills in your Oodle values; here they come from `.env`.
 
 **Through your own service** (`make forwarder`). The webhook goes to
 [`forwarder/app.py`](forwarder/app.py), which checks the webhook signature
@@ -93,7 +96,8 @@ default JSON format carries a transcript and no trace.
 
 | File | Purpose |
 | --- | --- |
-| `agent/demo.py` | The agent, the webhook setup, the text and voice conversations, export and replay. Runs with `uv`; no install step |
+| `setup_webhook.py` | The Oodle tile's setup snippet: the webhook straight to Oodle |
+| `agent/demo.py` | The agent, the forwarder webhook, the text and voice conversations, export and replay. Runs with `uv`; no install step |
 | `forwarder/` | The webhook forwarder and its image |
 | `docker-compose.yml` | The forwarder and the Cloudflare tunnel |
 | `sample-trace.json` | A captured voice call, for `make replay` |
