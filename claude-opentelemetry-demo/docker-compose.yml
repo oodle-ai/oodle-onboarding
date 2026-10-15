@@ -50,6 +50,67 @@ services:
     networks:
       - claude-otel-net
 
+  # mcp-backend: two long-running servers, a tunnel, and a one-shot driver.
+  mcp-web:
+    profiles: ["mcp"]
+    build: ./mcp-backend
+    command: ["opentelemetry-instrument", "uvicorn", "web:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: .env
+    environment: &mcp-otel
+      OTEL_SERVICE_NAME: claude-otel-mcp-web
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+    volumes:
+      - mcp-data:/data
+    depends_on:
+      - otel-collector
+    networks:
+      - claude-otel-net
+
+  mcp-app:
+    profiles: ["mcp"]
+    build: ./mcp-backend
+    command: ["opentelemetry-instrument", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
+    env_file: .env
+    environment:
+      <<: *mcp-otel
+      OTEL_SERVICE_NAME: claude-otel-mcp-app
+    volumes:
+      - mcp-data:/data
+    depends_on:
+      - otel-collector
+      - mcp-web
+      - mcp-tunnel
+    networks:
+      - claude-otel-net
+
+  # A cloudflared quick tunnel: a temporary public HTTPS URL for mcp-web,
+  # which Anthropic's MCP connector needs. No account. mcp-app reads the
+  # hostname from the metrics port's /quicktunnel endpoint.
+  mcp-tunnel:
+    profiles: ["mcp"]
+    image: cloudflare/cloudflared:2024.12.2
+    command: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "--url", "http://mcp-web:8000"]
+    depends_on:
+      - mcp-web
+    networks:
+      - claude-otel-net
+
+  mcp-backend:
+    profiles: ["mcp"]
+    build: ./mcp-backend
+    env_file: .env
+    depends_on:
+      - mcp-app
+    networks:
+      - claude-otel-net
+
+volumes:
+  mcp-data:
+
 networks:
   claude-otel-net:
     driver: bridge
