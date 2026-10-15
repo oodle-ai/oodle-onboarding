@@ -29,6 +29,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [pino-logs-demo](./pino-logs-demo) | Logs, traces | Pino logs from a Node.js app over OTLP, with the request trace id on every line |
 | [openai-demo](./openai-demo) | Traces, logs | OpenAI SDK auto-instrumented with the official OpenTelemetry GenAI instrumentation |
 | [litellm-demo](./litellm-demo) | Traces, logs | One LiteLLM call routed to any provider, traced through its `otel` callback |
+| [claude-opentelemetry-demo](./claude-opentelemetry-demo) | Traces | Claude's built-in OpenTelemetry tracing, three ways: the Messages API over plain HTTP traced server side by an API tracing destination, the Python SDK's own spans (create, stream, tool runner, conversations), and a Managed Agents session whose turns and sandbox tools only API tracing can see. One shared `.env` |
 | [litellm-laminar-demo](./litellm-laminar-demo) | Traces | Coding agent dual-writing to Laminar and Oodle: Laminar SDK spans mirrored to Oodle alongside LiteLLM GenAI spans, with a LiteLLM Router gateway and route-audit attributes |
 | [pipecat-demo](./pipecat-demo) | Traces | Pipecat voice agent dual-writing to Langfuse and Oodle, two ways: plain OpenTelemetry exporters on Pipecat's tracer provider, or the Langfuse SDK with Oodle as a second Langfuse destination. Conversation, turn, STT, LLM and TTS spans from a browser WebRTC session |
 | [livekit-demo](./livekit-demo) | Traces | LiveKit Agents voice traces. A replay of a captured call, and a live browser voice agent whose calls are traced with personal data (`lk.pii.*`, `gen_ai.*.messages`) or without it (`allow_pii=False`): same span tree, timings, models and tool names, no text |
@@ -60,6 +61,7 @@ end to end without wiring one up first.
 | Pydantic AI | [pydantic-ai-demo](./pydantic-ai-demo) | Python |
 | Google Gemini | [llmops-otel-demo](./llmops-otel-demo) | Python |
 | LiteLLM | [litellm-demo](./litellm-demo) | Python |
+| Claude | [claude-opentelemetry-demo](./claude-opentelemetry-demo) | Python |
 | LangChain | [langchain-agent-demo](./langchain-agent-demo) | Python |
 | LangGraph | [langgraph-agent-demo](./langgraph-agent-demo) | Python, TypeScript |
 | Traceloop | [traceloop-demo](./traceloop-demo) | Python |

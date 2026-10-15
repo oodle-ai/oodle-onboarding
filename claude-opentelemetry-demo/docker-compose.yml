@@ -1,0 +1,55 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    container_name: claude-otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4330:4318"
+      - "13145:13133"
+    environment:
+      - OODLE_INSTANCE=${OODLE_INSTANCE}
+      - OODLE_API_KEY=${OODLE_API_KEY}
+    networks:
+      - claude-otel-net
+
+  # The three sub-demos are one-shot scripts: `docker compose run --rm <service>`.
+  messages-api:
+    profiles: ["demo"]
+    build: ./messages-api
+    env_file: .env
+    environment:
+      - OTEL_SERVICE_NAME=claude-otel-messages-api
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - otel-collector
+    networks:
+      - claude-otel-net
+
+  claude-sdk:
+    profiles: ["demo"]
+    build: ./claude-sdk
+    env_file: .env
+    environment:
+      - OTEL_SERVICE_NAME=claude-otel-sdk
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - otel-collector
+    networks:
+      - claude-otel-net
+
+  managed-agents:
+    profiles: ["demo"]
+    build: ./managed-agents
+    env_file: .env
+    environment:
+      - OTEL_SERVICE_NAME=claude-otel-managed-agents
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      - otel-collector
+    networks:
+      - claude-otel-net
+
+networks:
+  claude-otel-net:
+    driver: bridge
