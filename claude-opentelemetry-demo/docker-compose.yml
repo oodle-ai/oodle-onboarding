@@ -77,7 +77,14 @@ services:
     environment: &mcp-otel
       DEMO_ROLE: web
       PORT: "8000"
-      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
+      # The extension adds the `mcpurl` propagator. It acts only on a request
+      # whose URL has `tp`, which mcp-app adds when MCP_TRACE_CONTEXT_IN_URL
+      # is true; listed last so it wins over the connector's traceparent.
+      JAVA_TOOL_OPTIONS: >-
+        -javaagent:/otel/opentelemetry-javaagent.jar
+        -Dotel.javaagent.extensions=/otel/mcp-url-propagator.jar
+      OTEL_PROPAGATORS: tracecontext,baggage,mcpurl
+      MCP_TRACE_CONTEXT_IN_URL: ${MCP_TRACE_CONTEXT_IN_URL:-false}
       OTEL_SERVICE_NAME: claude-otel-mcp-web
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=demo
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318

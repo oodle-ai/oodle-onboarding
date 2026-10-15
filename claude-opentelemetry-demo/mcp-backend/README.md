@@ -99,6 +99,43 @@ data. Stop it with `make down` when you're done.
 To use a URL of your own instead (ngrok, a deployed host), set
 `MCP_PUBLIC_URL=https://<host>/mcp` in `../.env`.
 
+## Fix to try: the session's trace context in the MCP URL
+
+Off by default, so the gaps above stay. With it on, the MCP server's spans
+join the session's trace, under the `POST /api/managedagents/rfpgonogo/create`
+span, instead of the connector's own trace.
+
+```bash
+MCP_TRACE_CONTEXT_IN_URL=true make mcp-backend
+```
+
+Why it is needed: Anthropic's MCP connector sends the MCP server a
+`traceparent` from its own connection trace, not from the session. The
+server span then has a remote parent that is never exported, and nothing
+joins it to the agent's `anthropic.mcp_tool_use` span.
+
+How it works, in two parts that a backend like the reference one can copy:
+
+1. **The app** (`ManagedAgentsController.withTraceContext`) adds the create
+   request's traceparent to the MCP URL as `?tp=…` when it makes the agent.
+   This works because the agent is made for one session.
+2. **The MCP server** loads a small Java agent extension
+   (`propagator/`, `-Dotel.javaagent.extensions`). It registers an `mcpurl`
+   propagator that reads `tp` from the query string. It is listed last in
+   `OTEL_PROPAGATORS=tracecontext,baggage,mcpurl`, so `tp` replaces the
+   connector's parent. A request without `tp` keeps the header's parent.
+
+Limits:
+
+- The server spans become children of the create request, not of the
+  tool call that caused them: the URL is fixed before any tool runs. To
+  tell the calls apart, the server span also needs the JSON-RPC method and
+  the tool name.
+- The URL holds a trace id and a span id, and Anthropic stores it with the
+  agent. Neither is a secret.
+- It needs an agent per session. A shared agent has one URL for all
+  sessions.
+
 ## Cost
 
 One go/no-go run is a full agent session on `CLAUDE_MODEL` with a few dozen
