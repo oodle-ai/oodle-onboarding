@@ -99,15 +99,20 @@ data. Stop it with `make down` when you're done.
 To use a URL of your own instead (ngrok, a deployed host), set
 `MCP_PUBLIC_URL=https://<host>/mcp` in `../.env`.
 
-## Fix to try: the session's trace context in the MCP URL
+## Fixes to try
 
-Off by default, so the gaps above stay. With it on, the MCP server's spans
-join the session's trace, under the `POST /api/managedagents/rfpgonogo/create`
-span, instead of the connector's own trace.
+Two switches, both off by default so the gaps above stay. Together they
+are the fix a backend like the reference one can make on its own side.
 
 ```bash
-MCP_TRACE_CONTEXT_IN_URL=true make mcp-backend
+MCP_TRACE_CONTEXT_IN_URL=true MCP_SERVER_SPAN_ATTRIBUTES=true make mcp-backend
 ```
+
+### The session's trace context in the MCP URL (`MCP_TRACE_CONTEXT_IN_URL`)
+
+With it on, the MCP server's spans join the session's trace, under the
+`POST /api/managedagents/rfpgonogo/create` span, instead of the
+connector's own trace.
 
 Why it is needed: Anthropic's MCP connector sends the MCP server a
 `traceparent` from its own connection trace, not from the session. The
@@ -128,13 +133,31 @@ How it works, in two parts that a backend like the reference one can copy:
 Limits:
 
 - The server spans become children of the create request, not of the
-  tool call that caused them: the URL is fixed before any tool runs. To
-  tell the calls apart, the server span also needs the JSON-RPC method and
-  the tool name.
+  tool call that caused them: the URL is fixed before any tool runs. The
+  next switch names each call, so the calls can be told apart.
 - The URL holds a trace id and a span id, and Anthropic stores it with the
   agent. Neither is a secret.
 - It needs an agent per session. A shared agent has one URL for all
   sessions.
+
+### Named calls on the server span (`MCP_SERVER_SPAN_ATTRIBUTES`)
+
+With it on, each `POST /mcp` span carries the JSON-RPC call, in the MCP
+semantic conventions: `mcp.method.name`, `jsonrpc.request.id`,
+`mcp.session.id` (when the request has an `Mcp-Session-Id` header) and,
+for `tools/call`, `gen_ai.tool.name`.
+
+Without them, every request is a bare `POST /mcp`. With them, the
+connector's requests read as they are:
+
+| Request | `mcp.method.name` |
+|---|---|
+| A probe before the handshake; this server answers it with "method not found" | `server/discover` |
+| The handshake | `initialize`, `notifications/initialized`, `tools/list` |
+| One per tool the agent calls | `tools/call`, with `gen_ai.tool.name` |
+
+Within one session trace, the tool name and the time pair each server
+span with the agent's `anthropic.mcp_tool_use` span.
 
 ## Cost
 
