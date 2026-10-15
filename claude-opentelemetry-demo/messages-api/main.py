@@ -50,6 +50,9 @@ def headers() -> dict[str, str]:
         "anthropic-beta": FALLBACK_BETA,
         "content-type": "application/json",
     }
+    # An API key not scoped to a workspace must name one on every request.
+    if workspace_id := os.environ.get("ANTHROPIC_WORKSPACE_ID"):
+        h["anthropic-workspace-id"] = workspace_id
     # Adds `traceparent: 00-<trace id>-<span id>-<flags>`. The flags' sampled
     # bit (01) must be on, or Anthropic emits no span for the request.
     propagator.inject(h)

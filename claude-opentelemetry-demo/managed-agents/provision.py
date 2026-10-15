@@ -16,6 +16,12 @@ When asked a question about data, write a short Python script to a file,
 run it, and report the result in two or three sentences."""
 
 
+def workspace_headers() -> dict[str, str]:
+    """An API key not scoped to a workspace must name one on every request."""
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
+
+
 def main() -> None:
     agent_id = os.environ.get("MANAGED_AGENT_ID")
     environment_id = os.environ.get("MANAGED_ENVIRONMENT_ID")
@@ -25,7 +31,7 @@ def main() -> None:
 
     # These setup calls are traced only if a tracer provider is registered;
     # this script registers none, so only main.py's runs show up in Oodle.
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(default_headers=workspace_headers())
 
     if not environment_id:
         environment = client.beta.environments.create(

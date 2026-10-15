@@ -40,6 +40,12 @@ TASK = (
 )
 
 
+def workspace_headers() -> dict[str, str]:
+    """An API key not scoped to a workspace must name one on every request."""
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
+
+
 def run(client: anthropic.Anthropic, session_id: str, task: str) -> None:
     """Send the task and print events until the agent is done."""
     # Open the stream first: it only delivers events that happen after it opens.
@@ -76,7 +82,7 @@ def main() -> None:
         sys.exit("Set MANAGED_AGENT_ID and MANAGED_ENVIRONMENT_ID in .env (run `make managed-agents-setup`).")
     task = " ".join(sys.argv[1:]) or TASK
 
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(default_headers=workspace_headers())
     with tracer.start_as_current_span("demo.managed_agent_task") as span:
         session = client.beta.sessions.create(
             agent=agent_id,
@@ -87,7 +93,8 @@ def main() -> None:
         print(f"session={session.id}")
         run(client, session.id, task)
         print(f"trace_id={span.get_span_context().trace_id:032x}")
-        print(f"Console: https://platform.claude.com/workspaces/default/sessions/{session.id}")
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID") or "default"
+        print(f"Console: https://platform.claude.com/workspaces/{workspace}/sessions/{session.id}")
     provider.shutdown()
 
 

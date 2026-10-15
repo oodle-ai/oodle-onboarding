@@ -2,8 +2,12 @@
 
 Calls `POST /v1/messages` with `httpx` and no Claude SDK. The app emits
 nothing about Claude itself. Every Claude span comes from Anthropic's side,
-through the API tracing destination (see the [parent README](../README.md#api-tracing-destination)).
-Without a destination this sub-demo produces only its own `demo.*` spans.
+through the Oodle destination added once for the organization with
+`make destination-create` (see the [parent README](../README.md#api-tracing-destination)).
+The destination is an Anthropic org setting, not app config, which is why
+nothing here points at Oodle for Claude spans. The app's own `demo.*` span
+goes to Oodle through the collector. Until the destination exists, that span
+is all you see.
 
 This shows that API tracing covers **any** client: curl, another language's
 HTTP library, or a third-party tool.

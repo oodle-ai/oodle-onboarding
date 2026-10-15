@@ -98,6 +98,7 @@ the trace up in Oodle. The collector also prints each span it forwards
 | `OODLE_INSTANCE`, `OODLE_API_KEY` | collector, destination script | Where spans go |
 | `ANTHROPIC_API_KEY` | all sub-demos | Anthropic credentials |
 | `CLAUDE_MODEL` | all sub-demos | Defaults to `claude-opus-5-5` |
+| `ANTHROPIC_WORKSPACE_ID` | all sub-demos | Sent as `anthropic-workspace-id`. Required when the API key isn't scoped to a workspace. The destination must cover this workspace |
 | `ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE` | claude-sdk, managed-agents | `metadata_only` (the SDK default) or `content` (prompts and responses on spans). The SDK reads it directly |
 | `DESTINATION_CONTENT_MODE` | destination script | The same choice, for the spans Anthropic sends |
 | `DESTINATION_WORKSPACES` | destination script | `all`, or comma-separated `wrkspc_...` ids |
@@ -164,6 +165,7 @@ metadata only whatever this is set to.
 
 | Symptom | Check |
 |---|---|
+| `400 ... must include the anthropic-workspace-id header` | The API key isn't scoped to a workspace. Set `ANTHROPIC_WORKSPACE_ID` in `.env` |
 | No SDK spans | The collector is up (`make up`); the tracer provider is registered before the first call; `ANTHROPIC_OPEN_TELEMETRY` is not `false` |
 | No `claude-platform` spans | `make destination-list`: the destination must be `enabled` and cover the workspace of `ANTHROPIC_API_KEY`. Allow about a minute after creating it |
 | Destination `Failing` with 401/403 | Wrong `X-API-KEY` / `X-OODLE-INSTANCE` |

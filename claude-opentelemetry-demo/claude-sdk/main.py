@@ -41,7 +41,14 @@ MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
 # Re-runs a declined request on Anthropic's recommended fallback model.
 FALLBACK = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
 
-client = anthropic.Anthropic()
+
+def workspace_headers() -> dict[str, str]:
+    """An API key not scoped to a workspace must name one on every request."""
+    workspace_id = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
+
+
+client = anthropic.Anthropic(default_headers=workspace_headers())
 
 
 def text_of(message) -> str:
