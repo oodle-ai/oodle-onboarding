@@ -12,7 +12,11 @@ its Anthropic-hosted sandbox. The trace needs both sources:
 
 The SDK sees only the requests, so without the
 [destination](../README.md#api-tracing-destination) you get the CLIENT spans
-and nothing about what the agent did.
+and nothing about what the agent did as spans. The app span still gets a
+summary from the event stream: an `agent.tool_use` span event per tool call,
+and `demo.session.*` token totals and stop reason. Those use the `demo.*`
+namespace, not `gen_ai.usage.*`, so they aren't counted twice once
+Anthropic's `anthropic.model_request` spans arrive under the same trace.
 
 ```
 demo.managed_agent_task                           claude-otel-managed-agents

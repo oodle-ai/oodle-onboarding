@@ -64,12 +64,18 @@ def text_of(message: dict) -> str:
 
 
 def record(span: trace.Span, response: httpx.Response, message: dict) -> None:
+    """Copy the response's summary onto the app span.
+
+    Deliberately not gen_ai.*: Anthropic's spans under this one already carry
+    gen_ai.usage.*, and a backend that sums them over every span would count
+    each token twice.
+    """
     span.set_attribute("anthropic.request_id", response.headers.get("request-id", ""))
-    span.set_attribute("gen_ai.response.model", message.get("model", ""))
-    span.set_attribute("gen_ai.response.finish_reasons", [message.get("stop_reason") or ""])
+    span.set_attribute("demo.response.model", message.get("model", ""))
+    span.set_attribute("demo.stop_reason", message.get("stop_reason") or "")
     usage = message.get("usage", {})
-    span.set_attribute("gen_ai.usage.input_tokens", usage.get("input_tokens", 0))
-    span.set_attribute("gen_ai.usage.output_tokens", usage.get("output_tokens", 0))
+    span.set_attribute("demo.usage.input_tokens", usage.get("input_tokens", 0))
+    span.set_attribute("demo.usage.output_tokens", usage.get("output_tokens", 0))
 
 
 def check_refusal(message: dict) -> None:
@@ -143,22 +149,24 @@ def stream(client: httpx.Client, span: trace.Span) -> None:
             {"role": "user", "content": "Write a four-line poem about distributed traces."}
         ],
     }
-    output_tokens = 0
+    message: dict = {}
     with client.stream("POST", API_URL, headers=headers(), json=body) as response:
         response.raise_for_status()
-        span.set_attribute("anthropic.request_id", response.headers.get("request-id", ""))
         for line in response.iter_lines():
             if not line.startswith("data: "):
                 continue
             event = json.loads(line[len("data: ") :])
-            if event["type"] == "content_block_delta" and event["delta"]["type"] == "text_delta":
+            if event["type"] == "message_start":
+                message = event["message"]
+            elif event["type"] == "content_block_delta" and event["delta"]["type"] == "text_delta":
                 print(event["delta"]["text"], end="", flush=True)
             elif event["type"] == "message_delta":
-                output_tokens = event["usage"].get("output_tokens", output_tokens)
-                if event["delta"].get("stop_reason") == "refusal":
-                    raise RuntimeError("request declined")
-    print()
-    span.set_attribute("gen_ai.usage.output_tokens", output_tokens)
+                # Cumulative usage and the stop reason arrive at the end.
+                message["usage"] = {**message.get("usage", {}), **event["usage"]}
+                message["stop_reason"] = event["delta"].get("stop_reason")
+        print()
+        record(span, response, message)
+        check_refusal(message)
 
 
 SCENARIOS = {"chat": chat, "web_search": web_search, "stream": stream}

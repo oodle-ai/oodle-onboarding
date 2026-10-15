@@ -46,8 +46,16 @@ def workspace_headers() -> dict[str, str]:
     return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
 
 
-def run(client: anthropic.Anthropic, session_id: str, task: str) -> None:
-    """Send the task and print events until the agent is done."""
+def run(client: anthropic.Anthropic, session_id: str, task: str, span: trace.Span) -> None:
+    """Send the task and print events until the agent is done.
+
+    The event stream reports what the agent does, so the app span records a
+    summary of it: one span event per tool call and the session's token
+    totals. That much is visible without API tracing. The model requests and
+    tool runs as spans of their own come only from API tracing, and the
+    totals are deliberately not gen_ai.usage.*, so they aren't counted twice.
+    """
+    usage = {"model_requests": 0, "input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
     # Open the stream first: it only delivers events that happen after it opens.
     with client.beta.sessions.events.stream(session_id=session_id) as stream:
         client.beta.sessions.events.send(
@@ -61,17 +69,27 @@ def run(client: anthropic.Anthropic, session_id: str, task: str) -> None:
                         print(block.text, end="", flush=True)
             elif event.type in ("agent.tool_use", "agent.mcp_tool_use"):
                 print(f"\n[tool] {event.name}", flush=True)
+                span.add_event("agent.tool_use", {"tool.name": event.name})
                 if event.evaluated_permission == "ask":
                     # Nobody is watching this run, so a call that needs approval is denied.
                     client.beta.sessions.events.send(
                         session_id=session_id,
                         events=[{"type": "user.tool_confirmation", "tool_use_id": event.id, "result": "deny"}],
                     )
+            elif event.type == "span.model_request_end":
+                usage["model_requests"] += 1
+                usage["input_tokens"] += event.model_usage.input_tokens
+                usage["output_tokens"] += event.model_usage.output_tokens
+                usage["cache_read_input_tokens"] += event.model_usage.cache_read_input_tokens
             elif event.type == "session.status_idle":
                 if event.stop_reason.type != "requires_action":
+                    span.set_attribute("demo.session.stop_reason", event.stop_reason.type)
                     break
             elif event.type == "session.status_terminated":
+                span.set_attribute("demo.session.stop_reason", "terminated")
                 break
+    for key, value in usage.items():
+        span.set_attribute(f"demo.session.{key}", value)
     print()
 
 
@@ -91,7 +109,7 @@ def main() -> None:
         )
         span.set_attribute("anthropic.session.id", session.id)
         print(f"session={session.id}")
-        run(client, session.id, task)
+        run(client, session.id, task, span)
         print(f"trace_id={span.get_span_context().trace_id:032x}")
         workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID") or "default"
         print(f"Console: https://platform.claude.com/workspaces/{workspace}/sessions/{session.id}")
