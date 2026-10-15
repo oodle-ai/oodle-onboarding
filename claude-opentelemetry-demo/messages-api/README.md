@@ -45,7 +45,7 @@ echo "search Oodle for trace $TRACE_ID"
 ## Scenarios
 
 ```bash
-make messages-api                                         # all three
+make messages-api                                         # all four
 docker compose run --rm --build messages-api web_search   # one
 ```
 
@@ -54,6 +54,23 @@ docker compose run --rm --build messages-api web_search   # one
 | `chat` | One message | `anthropic.messages.create` > `anthropic.model_request` |
 | `web_search` | `web_search_20260209` server tool | `anthropic.messages.create` > several `anthropic.model_request` + `anthropic.tool_use web_search` |
 | `stream` | `"stream": true`, read over SSE | `anthropic.messages.create` > `anthropic.model_request` |
+| `vision` | Three turns, one image each, with a system prompt, adaptive thinking (summaries shown) and effort `high` | Three `anthropic.messages.create` > `anthropic.model_request` |
+
+`vision` replays a captured multi-turn image chat. Each turn sends only the
+latest image; earlier turns stay in the history as text (the question and
+Claude's description). On Anthropic's span of each request, look for:
+
+| Attribute | Holds |
+|---|---|
+| `gen_ai.input.messages` | The history, with the image as a part of type `anthropic_image` (its data is never exported) |
+| `gen_ai.output.messages` | A `reasoning` part (the thinking summary) and the `text` answer |
+| `gen_ai.system_instructions` | `You are a helpful assistant.` |
+| `anthropic.thinking.type` | `adaptive` |
+| `gen_ai.request.reasoning.level` | `high` (the effort) |
+| `gen_ai.usage.reasoning.output_tokens` | Thinking tokens, part of the output tokens |
+
+The images are in `images/`. The captured trace used `claude-opus-4-8`; set
+`CLAUDE_MODEL` to match it exactly.
 
 `web_search` is the interesting one. The search runs inside Anthropic, so
 no client-side tracing could see it, but API tracing shows each model turn

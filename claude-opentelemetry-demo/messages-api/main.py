@@ -7,12 +7,14 @@ added with scripts/create-destination.sh. This app only opens one span of
 its own per scenario and passes its trace context in the `traceparent`
 header, so Anthropic's spans land in the same trace, under that span.
 
-Usage: python main.py [chat|web_search|stream ...]   (default: all three)
+Usage: python main.py [chat|web_search|stream|vision ...]   (default: all four)
 """
 
+import base64
 import json
 import os
 import sys
+from pathlib import Path
 
 import httpx
 from opentelemetry import trace
@@ -138,6 +140,37 @@ def web_search(client: httpx.Client, span: trace.Span) -> None:
     print(f"({searches} searches) {text_of(message)}")
 
 
+def read_stream(response: httpx.Response) -> dict:
+    """Print a streamed response as it arrives and return the whole message.
+
+    Thinking summaries (with `display: "summarized"`) arrive as thinking
+    deltas before the answer; they're printed dimmed.
+    """
+    message: dict = {}
+    for line in response.iter_lines():
+        if not line.startswith("data: "):
+            continue
+        event = json.loads(line[len("data: ") :])
+        if event["type"] == "message_start":
+            message = event["message"]
+        elif event["type"] == "content_block_start":
+            message["content"].append(event["content_block"])
+        elif event["type"] == "content_block_delta":
+            block, delta = message["content"][event["index"]], event["delta"]
+            if delta["type"] == "text_delta":
+                block["text"] += delta["text"]
+                print(delta["text"], end="", flush=True)
+            elif delta["type"] == "thinking_delta":
+                block["thinking"] += delta["thinking"]
+                print(f"\033[2m{delta['thinking']}\033[0m", end="", flush=True)
+        elif event["type"] == "message_delta":
+            # Cumulative usage and the stop reason arrive at the end.
+            message["usage"] = {**message.get("usage", {}), **event["usage"]}
+            message["stop_reason"] = event["delta"].get("stop_reason")
+    print()
+    return message
+
+
 def stream(client: httpx.Client, span: trace.Span) -> None:
     """A streamed response, read to the end over SSE."""
     body = {
@@ -149,27 +182,69 @@ def stream(client: httpx.Client, span: trace.Span) -> None:
             {"role": "user", "content": "Write a four-line poem about distributed traces."}
         ],
     }
-    message: dict = {}
     with client.stream("POST", API_URL, headers=headers(), json=body) as response:
         response.raise_for_status()
-        for line in response.iter_lines():
-            if not line.startswith("data: "):
-                continue
-            event = json.loads(line[len("data: ") :])
-            if event["type"] == "message_start":
-                message = event["message"]
-            elif event["type"] == "content_block_delta" and event["delta"]["type"] == "text_delta":
-                print(event["delta"]["text"], end="", flush=True)
-            elif event["type"] == "message_delta":
-                # Cumulative usage and the stop reason arrive at the end.
-                message["usage"] = {**message.get("usage", {}), **event["usage"]}
-                message["stop_reason"] = event["delta"].get("stop_reason")
-        print()
-        record(span, response, message)
+        message = read_stream(response)
+    record(span, response, message)
+    check_refusal(message)
+
+
+IMAGES = Path(__file__).parent / "images"
+
+# (image, question) per turn, in order.
+VISION_TURNS = [
+    ("eye.png", "Describe this image. Hint: its a body part"),
+    ("bee.png", "Describe this image. Hint: its an insect"),
+    ("letter-m.png", "Describe this image. Hint: its a letter of the alphabet"),
+]
+
+
+def image_block(name: str) -> dict:
+    data = base64.standard_b64encode((IMAGES / name).read_bytes()).decode()
+    return {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": data}}
+
+
+def vision(client: httpx.Client, span: trace.Span) -> None:
+    """A multi-turn image conversation, one request per turn.
+
+    Replays a captured chat: a system prompt, adaptive thinking with summaries
+    shown, effort high, and an image with each question. Only the latest turn
+    sends its image; earlier turns stay in the history as text, the question
+    and Claude's description, so the history doesn't resend every image.
+
+    Anthropic's span of each request records the image as a part of type
+    `anthropic_image` without its data, the thinking summary as a `reasoning`
+    part, the system prompt in gen_ai.system_instructions, and the effort in
+    gen_ai.request.reasoning.level.
+    """
+    history: list[dict] = []
+    for turn, (image, question) in enumerate(VISION_TURNS, start=1):
+        print(f"\n[turn {turn}] {question}")
+        body = {
+            "model": MODEL,
+            # A large max_tokens needs streaming, or the request can time out.
+            "max_tokens": 128000,
+            "stream": True,
+            "fallbacks": "default",
+            "system": "You are a helpful assistant.",
+            "thinking": {"type": "adaptive", "display": "summarized"},
+            "output_config": {"effort": "high"},
+            "messages": history
+            + [{"role": "user", "content": [image_block(image), {"type": "text", "text": question}]}],
+        }
+        with client.stream("POST", API_URL, headers=headers(), json=body) as response:
+            response.raise_for_status()
+            message = read_stream(response)
         check_refusal(message)
+        history += [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": text_of(message)},
+        ]
+    record(span, response, message)
+    span.set_attribute("demo.turns", len(VISION_TURNS))
 
 
-SCENARIOS = {"chat": chat, "web_search": web_search, "stream": stream}
+SCENARIOS = {"chat": chat, "web_search": web_search, "stream": stream, "vision": vision}
 
 
 def main() -> None:
