@@ -2,7 +2,9 @@ package ai.oodle.demo.proposals;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Context;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -87,6 +89,8 @@ public class ManagedAgentsController {
     private long pollSeconds;
     @Value("${SESSION_TIMEOUT_SECONDS:900}")
     private long timeoutSeconds;
+    @Value("${MCP_TRACE_CONTEXT_IN_URL:false}")
+    private boolean traceContextInUrl;
 
     public ManagedAgentsController(AnthropicApi api, FirmDb db, ObjectMapper json) {
         this.api = api;
@@ -111,6 +115,9 @@ public class ManagedAgentsController {
         }
 
         String mcpUrl = publicMcpUrl();
+        if (traceContextInUrl) {
+            mcpUrl = withTraceContext(mcpUrl);
+        }
         String stamp = ZonedDateTime.now(ZoneOffset.UTC).format(STAMP);
         String serverName = "mcp-ShortId__" + shortId();
         JsonNode agent = api.createAgent(Map.of(
@@ -264,6 +271,29 @@ public class ManagedAgentsController {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * Adds this request's W3C traceparent to the MCP URL as {@code tp}.
+     *
+     * <p>Anthropic's MCP connector sends a traceparent from its own
+     * connection trace, so without this the MCP server's spans land in a
+     * trace that no session span is part of. The agent is made for this one
+     * session, so its URL can carry the session's context; the server's
+     * {@code mcpurl} propagator reads it back and parents the server span on
+     * this request. The context is the create request's, not the tool
+     * call's: the URL is fixed before any tool runs.
+     */
+    private static String withTraceContext(String url) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        GlobalOpenTelemetry.getPropagators().getTextMapPropagator()
+                .inject(Context.current(), headers, Map::put);
+        String traceparent = headers.get("traceparent");
+        if (traceparent == null) {
+            // Not under the Java agent, or not sampled: nothing to carry.
+            return url;
+        }
+        return url + (url.contains("?") ? "&" : "?") + "tp=" + traceparent;
     }
 
     private static String shortId() {

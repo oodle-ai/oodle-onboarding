@@ -2,6 +2,7 @@ package ai.oodle.demo.proposals;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.opentelemetry.api.trace.Span;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -39,6 +41,8 @@ public class McpController {
     private final GenAi genAi;
     private final ObjectMapper json;
     private final String searchModel;
+    @Value("${MCP_SERVER_SPAN_ATTRIBUTES:false}")
+    private boolean spanAttributes;
 
     public McpController(FirmDb db, GenAi genAi, ObjectMapper json,
             @Value("${SEARCH_MODEL:claude-haiku-4-5}") String searchModel) {
@@ -49,11 +53,15 @@ public class McpController {
     }
 
     @PostMapping(value = "/mcp", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> mcp(@RequestBody JsonNode payload) {
+    public ResponseEntity<?> mcp(@RequestBody JsonNode payload,
+            @RequestHeader(value = "Mcp-Session-Id", required = false) String mcpSessionId) {
         try {
             Map<Integer, Map<String, String>> props = db.loadAllOrgProps();
             JsonNode id = payload.get("id");
             String method = payload.path("method").asText();
+            if (spanAttributes) {
+                nameCall(payload, method, mcpSessionId);
+            }
             if (id == null || id.isNull()) {
                 // A notification (notifications/initialized and the like).
                 return ResponseEntity.accepted().build();
@@ -82,6 +90,26 @@ public class McpController {
             // instrumentation, as the reference backend does. The span then
             // says 500 and nothing about the cause.
             return ResponseEntity.status(500).build();
+        }
+    }
+
+    /**
+     * Names the JSON-RPC call on the server span, with the MCP semantic
+     * conventions. Off by default: the bare {@code POST /mcp} is one of the
+     * gaps this demo keeps. Without these attributes, nothing tells a
+     * handshake request from a tool call, or one tool call from another.
+     */
+    private static void nameCall(JsonNode payload, String method, String mcpSessionId) {
+        Span server = Span.current();
+        server.setAttribute("mcp.method.name", method);
+        if (payload.hasNonNull("id")) {
+            server.setAttribute("jsonrpc.request.id", payload.get("id").asText());
+        }
+        if (mcpSessionId != null) {
+            server.setAttribute("mcp.session.id", mcpSessionId);
+        }
+        if ("tools/call".equals(method)) {
+            server.setAttribute("gen_ai.tool.name", payload.path("params").path("name").asText());
         }
     }
 
