@@ -31,7 +31,7 @@
   .me { align-self:flex-end; background:var(--green); color:#fff; border-bottom-right-radius:4px; }
   .bot { align-self:flex-start; background:#f1f2f3; border-bottom-left-radius:4px; }
   .meta { align-self:flex-start; font-size:11px; color:var(--muted); margin-top:-6px; }
-  .meta b.bad { color:var(--bad); } .meta b.ok { color:var(--green); }
+  .meta a { color:inherit; }
   .chips { padding:8px 12px 0; display:flex; flex-wrap:wrap; gap:6px; }
   .chips .chip { font-size:12px; border:1px solid var(--line); background:#fff; color:var(--ink); font-weight:400; border-radius:999px; padding:4px 10px; cursor:pointer; }
   .chip:hover { border-color:var(--green); }
@@ -83,7 +83,7 @@ async function load() {
 
 async function send(text, id) {
   $("send").disabled = true; add("msg me", text);
-  const wait = add("typing", "Agent is working (model calls and tool calls run as Temporal activities)…");
+  const wait = add("typing", "Agent is working…");
   try {
     const r = await fetch("/api/ticket", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({text, id})});
     const res = r.ok ? await r.json() : {error: await r.text()};
@@ -91,8 +91,7 @@ async function send(text, id) {
     if (res.error) { add("msg bot", "Sorry, something went wrong: " + res.error); return; }
     add("msg bot", res.reply || "(the agent ran out of turns)");
     const m = add("meta", "");
-    m.innerHTML = `prompt v${res.prompt_version} · ${res.turns} model turns · ` +
-      `<b class="${res.tool_errors ? "bad" : "ok"}">${res.tool_errors} bad tool calls</b> · trace ${res.trace_id.slice(0, 12)}…`;
+    m.innerHTML = `trace <a href="${res.trace_url}" target="_blank" rel="noopener">${res.trace_id.slice(0, 12)}…</a>`;
   } finally { $("send").disabled = false; load(); }
 }
 

@@ -52,7 +52,7 @@ async def ticket(request):
         raise web.HTTPBadRequest(text="empty message")
     ticket_id = body.get("id") or f"W-{int(time.time())}"
     result = await submit(request.app["client"], {"id": ticket_id, "text": text})
-    return web.json_response(result)
+    return web.json_response({**result, "trace_url": oodle.ui_trace_url(result["trace_id"])})
 
 
 @routes.get("/api/improver")
