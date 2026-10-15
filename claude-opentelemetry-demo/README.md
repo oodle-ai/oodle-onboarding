@@ -160,6 +160,12 @@ metadata only whatever this is set to.
 - For token counts, sum `gen_ai.usage.*` on `anthropic.model_request` spans when
   API tracing is on, or on the SDK's `anthropic.messages.create` spans when it's
   off. Don't add the two together, or each token is counted twice.
+- With both sources on, Oodle's GenAI view currently counts an SDK request
+  twice: once for the SDK's `CLIENT` span and once for Anthropic's `SERVER`
+  span (generations, tokens and cost all doubled; reported to Oodle). Until
+  that's fixed, read totals with the GenAI view filtered to
+  `service.name = claude-platform`. Messages API and Managed Agents traces
+  aren't affected: their only `chat` spans come from Anthropic.
 
 ## Troubleshooting
 

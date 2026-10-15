@@ -55,7 +55,13 @@ def run(client: anthropic.Anthropic, session_id: str, task: str, span: trace.Spa
     tool runs as spans of their own come only from API tracing, and the
     totals are deliberately not gen_ai.usage.*, so they aren't counted twice.
     """
-    usage = {"model_requests": 0, "input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0}
+    usage = {
+        "model_requests": 0,
+        "input_tokens": 0,  # uncached input only; cache reads and writes are counted apart
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "output_tokens": 0,
+    }
     # Open the stream first: it only delivers events that happen after it opens.
     with client.beta.sessions.events.stream(session_id=session_id) as stream:
         client.beta.sessions.events.send(
@@ -81,6 +87,7 @@ def run(client: anthropic.Anthropic, session_id: str, task: str, span: trace.Spa
                 usage["input_tokens"] += event.model_usage.input_tokens
                 usage["output_tokens"] += event.model_usage.output_tokens
                 usage["cache_read_input_tokens"] += event.model_usage.cache_read_input_tokens
+                usage["cache_creation_input_tokens"] += event.model_usage.cache_creation_input_tokens
             elif event.type == "session.status_idle":
                 if event.stop_reason.type != "requires_action":
                     span.set_attribute("demo.session.stop_reason", event.stop_reason.type)
