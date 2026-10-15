@@ -1,6 +1,6 @@
 # Claude OpenTelemetry Demo
 
-Claude's built-in OpenTelemetry tracing, sent to Oodle. Three sub-demos
+Claude's built-in OpenTelemetry tracing, sent to Oodle. Four sub-demos
 share one `.env`:
 
 | Sub-demo | What it calls | Where its spans come from |
@@ -8,9 +8,11 @@ share one `.env`:
 | [messages-api](./messages-api) | `POST /v1/messages` with plain `httpx`, no SDK | **API tracing**: Anthropic sends them |
 | [claude-sdk](./claude-sdk) | The Python SDK: create, stream, tool runner, count tokens, a conversation | **SDK tracing**: the app sends them, plus API tracing when it's on |
 | [managed-agents](./managed-agents) | A Claude Managed Agents session that runs code in its sandbox | **Both**: the SDK sends the request spans, and Anthropic sends the turns and sandbox tools |
+| [mcp-backend](./mcp-backend) | A production-shaped backend: one agent per session that reads the firm's data through the app's own MCP server, plus an in-house chat that calls the same server | **API tracing**, plus the OpenTelemetry Java agent on a Spring Boot backend and MCP server (no Claude SDK). Keeps a real customer's tracing gaps on purpose |
 
-No third-party instrumentation is used. The spans follow the OpenTelemetry
-GenAI conventions (`gen_ai.*`).
+The first three use no third-party instrumentation. The spans follow the
+OpenTelemetry GenAI conventions (`gen_ai.*`). mcp-backend adds the
+OpenTelemetry Java agent, the way the production app it copies has it.
 
 ## Two sources of spans
 
@@ -61,6 +63,9 @@ messages-api ────┘                                                ▲
 api.anthropic.com ─────── API tracing (OTLP/HTTP, server side) ───┘
 ```
 
+mcp-backend's two servers send their spans through the same collector. Its
+[README](./mcp-backend/README.md) has its own diagram.
+
 ## Prerequisites
 
 - Docker and Docker Compose
@@ -85,6 +90,9 @@ make messages-api             # spans arrive from Anthropic's side
 
 make managed-agents-setup     # once: create the agent and environment, paste the ids into .env
 make managed-agents
+
+make mcp-backend-setup        # once: an environment that allows MCP egress, paste the id into .env
+make mcp-backend              # opens a public quick tunnel to the demo MCP server while it runs
 ```
 
 Each run prints a `trace_id` for every scenario, which you can use to look
@@ -103,6 +111,9 @@ the trace up in Oodle. The collector also prints each span it forwards
 | `DESTINATION_CONTENT_MODE` | destination script | The same choice, for the spans Anthropic sends |
 | `DESTINATION_WORKSPACES` | destination script | `all`, or comma-separated `wrkspc_...` ids |
 | `MANAGED_AGENT_ID`, `MANAGED_ENVIRONMENT_ID` | managed-agents | Printed by `make managed-agents-setup` |
+| `MCP_ENVIRONMENT_ID` | mcp-backend | Printed by `make mcp-backend-setup` |
+| `MCP_PUBLIC_URL` | mcp-backend | Optional. Your own public URL for the MCP server, instead of the quick tunnel |
+| `CHAT_MODEL`, `SEARCH_MODEL` | mcp-backend | Models of the in-house chat and of the MCP server's search step. Default `claude-haiku-4-5` |
 
 ## API tracing destination
 
