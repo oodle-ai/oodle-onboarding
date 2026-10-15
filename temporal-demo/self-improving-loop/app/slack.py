@@ -80,6 +80,8 @@ def approval_message(state: dict, workflow_url: str) -> dict:
         for i in state["insights"])
 
     blocks = [
+        # Slack shows the blocks, not the fallback text, so the mention goes in a block too.
+        {"type": "section", "text": {"type": "mrkdwn", "text": "<!channel>"}},
         {"type": "header", "text": {"type": "plain_text", "emoji": True,
                                     "text": f":robot_face: Prompt v{cand} is waiting for your approval"}},
         {"type": "card",
@@ -108,7 +110,7 @@ def approval_message(state: dict, workflow_url: str) -> dict:
             f"<{oodle.ui_insight_url()}|All Oodle insights>  ·  "
             f"Approving moves the `production` label. Nothing is redeployed.")}]},
     ]
-    text = f"Prompt {PROMPT_NAME} v{cand} is waiting for approval: {DEMO_UI_URL}/approval"
+    text = f"<!channel> Prompt {PROMPT_NAME} v{cand} is waiting for approval: {DEMO_UI_URL}/approval"
     return {"text": text, "blocks": blocks}
 
 

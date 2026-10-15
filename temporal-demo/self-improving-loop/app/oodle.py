@@ -87,6 +87,10 @@ def ui_insight_url(fingerprint: str | None = None) -> str:
     return f"{url}&insight={fingerprint}" if fingerprint else url
 
 
+def ui_trace_url(trace_id: str) -> str:
+    return f"{APP_URL}/traces/lookup?traceId={trace_id}"
+
+
 # --------------------------------------------------------------------------
 # Experiments: Oodle runs a dataset through OUR agent by calling a webhook.
 # --------------------------------------------------------------------------
