@@ -8,11 +8,11 @@ share one `.env`:
 | [messages-api](./messages-api) | `POST /v1/messages` with plain `httpx`, no SDK | **API tracing**: Anthropic sends them |
 | [claude-sdk](./claude-sdk) | The Python SDK: create, stream, tool runner, count tokens, a conversation | **SDK tracing**: the app sends them, plus API tracing when it's on |
 | [managed-agents](./managed-agents) | A Claude Managed Agents session that runs code in its sandbox | **Both**: the SDK sends the request spans, and Anthropic sends the turns and sandbox tools |
-| [mcp-backend](./mcp-backend) | A production-shaped backend: one agent per session that reads the firm's data through the app's own MCP server, plus an in-house chat that calls the same server | **Both**, plus zero-code OpenTelemetry on the backend and the MCP server. Keeps a real customer's tracing gaps on purpose |
+| [mcp-backend](./mcp-backend) | A production-shaped backend: one agent per session that reads the firm's data through the app's own MCP server, plus an in-house chat that calls the same server | **API tracing**, plus the OpenTelemetry Java agent on a Spring Boot backend and MCP server (no Claude SDK). Keeps a real customer's tracing gaps on purpose |
 
 The first three use no third-party instrumentation. The spans follow the
 OpenTelemetry GenAI conventions (`gen_ai.*`). mcp-backend adds the
-OpenTelemetry Python auto-instrumentation, the way a production app has it.
+OpenTelemetry Java agent, the way the production app it copies has it.
 
 ## Two sources of spans
 

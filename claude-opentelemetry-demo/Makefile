@@ -40,10 +40,10 @@ managed-agents: up ## Sub-demo 3: run a Managed Agents session
 	$(RUN) --build managed-agents
 
 mcp-backend-setup: ## Sub-demo 4, once: create an environment that allows MCP egress
-	$(RUN) --build --no-deps mcp-backend python -u provision.py
+	$(RUN) --build --no-deps -e DEMO_ROLE=provision mcp-backend
 
 mcp-backend: up ## Sub-demo 4: backend + MCP server + managed agent (needs the destination)
-	docker compose --profile mcp up -d --build mcp-web mcp-tunnel mcp-app
+	docker compose --profile mcp up -d --build mcp-mariadb mcp-web mcp-tunnel mcp-app
 	$(RUN) --build mcp-backend
 
 mcp-backend-logs: ## Sub-demo 4: tail the backend, the MCP server and the tunnel

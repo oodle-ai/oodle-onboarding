@@ -1,17 +1,15 @@
-FROM python:3.12-slim
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+COPY src ./src
+RUN mvn -B -q package -DskipTests
 
+FROM eclipse-temurin:21-jre
 WORKDIR /app
-
-COPY requirements.txt .
-# opentelemetry-bootstrap installs the instrumentation for every library it
-# finds (FastAPI, httpx, sqlite3, threading ...): zero-code tracing, as the
-# reference backend gets from the OpenTelemetry Java agent.
-RUN pip install --no-cache-dir -r requirements.txt \
-    && opentelemetry-bootstrap -a install
-
-COPY db.py web.py app.py provision.py run.py ./
-COPY bid_docs ./bid_docs
-
-# Each compose service picks its command: the two servers run under
-# opentelemetry-instrument, the one-shot scripts run plain.
-CMD ["python", "-u", "run.py"]
+# The same OpenTelemetry Java agent release the reference backend runs.
+# Compose turns it on for the two servers through JAVA_TOOL_OPTIONS; the
+# one-shot roles run without it.
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.32.0/opentelemetry-javaagent.jar /otel/opentelemetry-javaagent.jar
+COPY --from=build /build/target/app.jar ./app.jar
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

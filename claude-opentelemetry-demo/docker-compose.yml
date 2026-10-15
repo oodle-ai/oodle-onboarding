@@ -51,39 +51,65 @@ services:
       - claude-otel-net
 
   # mcp-backend: two long-running servers, a tunnel, and a one-shot driver.
+  # The firm database, seeded once from db/init.sql on first start.
+  mcp-mariadb:
+    profiles: ["mcp"]
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_USER: lxuser
+      MARIADB_PASSWORD: lxpass
+    volumes:
+      - mcp-db:/var/lib/mysql
+      - ./mcp-backend/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 30
+    networks:
+      claude-otel-net:
+        aliases: [mariadb]
+
   mcp-web:
     profiles: ["mcp"]
     build: ./mcp-backend
-    command: ["opentelemetry-instrument", "uvicorn", "web:app", "--host", "0.0.0.0", "--port", "8000"]
     env_file: .env
     environment: &mcp-otel
+      DEMO_ROLE: web
+      PORT: "8000"
+      JAVA_TOOL_OPTIONS: -javaagent:/otel/opentelemetry-javaagent.jar
       OTEL_SERVICE_NAME: claude-otel-mcp-web
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=demo
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_TRACES_EXPORTER: otlp
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
-    volumes:
-      - mcp-data:/data
     depends_on:
-      - otel-collector
+      otel-collector:
+        condition: service_started
+      mcp-mariadb:
+        condition: service_healthy
     networks:
       - claude-otel-net
 
   mcp-app:
     profiles: ["mcp"]
     build: ./mcp-backend
-    command: ["opentelemetry-instrument", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
     env_file: .env
     environment:
       <<: *mcp-otel
+      DEMO_ROLE: app
+      PORT: "8001"
       OTEL_SERVICE_NAME: claude-otel-mcp-app
-    volumes:
-      - mcp-data:/data
     depends_on:
-      - otel-collector
-      - mcp-web
-      - mcp-tunnel
+      otel-collector:
+        condition: service_started
+      mcp-mariadb:
+        condition: service_healthy
+      mcp-web:
+        condition: service_started
+      mcp-tunnel:
+        condition: service_started
     networks:
       - claude-otel-net
 
@@ -99,17 +125,22 @@ services:
     networks:
       - claude-otel-net
 
+  # The one-shot roles: the driver (the default) and `provision`. No Java
+  # agent, no web server.
   mcp-backend:
     profiles: ["mcp"]
     build: ./mcp-backend
     env_file: .env
+    environment:
+      DEMO_ROLE: driver
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
     depends_on:
       - mcp-app
     networks:
       - claude-otel-net
 
 volumes:
-  mcp-data:
+  mcp-db:
 
 networks:
   claude-otel-net:
