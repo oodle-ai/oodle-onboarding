@@ -1,5 +1,5 @@
 .PHONY: help build up down logs-collector destination-create destination-list \
-	messages-api sdk managed-agents-setup managed-agents mcp-backend-setup \
+	messages-api sdk managed-agents-setup managed-agents managed-agents-logs mcp-backend-setup \
 	mcp-backend mcp-backend-logs all clean
 
 RUN = docker compose run --rm
@@ -36,8 +36,12 @@ sdk: up ## Sub-demo 2: Python SDK tracing
 managed-agents-setup: ## Sub-demo 3, once: create the agent and environment
 	$(RUN) --build --no-deps managed-agents provision.py
 
-managed-agents: up ## Sub-demo 3: run a Managed Agents session
+managed-agents: up ## Sub-demo 3: run a Managed Agents session (starts the warehouse)
+	docker compose --profile demo up -d --build --wait warehouse
 	$(RUN) --build managed-agents
+
+managed-agents-logs: ## Sub-demo 3: tail the warehouse service
+	docker compose --profile demo logs -f warehouse
 
 mcp-backend-setup: ## Sub-demo 4, once: create an environment that allows MCP egress
 	$(RUN) --build --no-deps -e DEMO_ROLE=provision mcp-backend

@@ -7,10 +7,12 @@ share one `.env`:
 |---|---|---|
 | [messages-api](./messages-api) | `POST /v1/messages` with plain `httpx`, no SDK | **API tracing**: Anthropic sends them |
 | [claude-sdk](./claude-sdk) | The Python SDK: create, stream, tool runner, count tokens, a conversation | **SDK tracing**: the app sends them, plus API tracing when it's on |
-| [managed-agents](./managed-agents) | A Claude Managed Agents session that runs code in its sandbox | **Both**: the SDK sends the request spans, and Anthropic sends the turns and sandbox tools |
+| [managed-agents](./managed-agents) | A Claude Managed Agents session that queries a custom tool's Python service and runs code in its sandbox | **Both**: the SDK sends the request spans, and Anthropic sends the turns and sandbox tools. The custom tool's service is traced by OpenTelemetry zero-code auto-instrumentation, in the same trace |
 | [mcp-backend](./mcp-backend) | A production-shaped backend: one agent per session that reads the firm's data through the app's own MCP server, plus an in-house chat that calls the same server | **API tracing**, plus the OpenTelemetry Java agent on a Spring Boot backend and MCP server (no Claude SDK). Keeps a real customer's tracing gaps on purpose |
 
-The first three use no third-party instrumentation. The spans follow the
+The first three use no third-party instrumentation for Claude itself
+(managed-agents' warehouse service uses OpenTelemetry's FastAPI and sqlite3
+auto-instrumentation). The spans follow the
 OpenTelemetry GenAI conventions (`gen_ai.*`). mcp-backend adds the
 OpenTelemetry Java agent, the way the production app it copies has it.
 
@@ -166,6 +168,9 @@ metadata only whatever this is set to.
 - `service.name = claude-otel-sdk`: `anthropic.messages.create`,
   `anthropic.messages.tool_runner`, `anthropic.custom_tool_use get_weather`,
   `anthropic.messages.count_tokens`.
+- `service.name = claude-otel-warehouse`: the managed-agents custom tool's
+  service (`POST /query`, `SELECT`), in the session's trace under
+  `anthropic.custom_tool_use query_warehouse`.
 - `service.name = claude-platform`: Anthropic's spans. Each one shares a
   trace ID with the app span whose `traceparent` it received.
 - For token counts, sum `gen_ai.usage.*` on `anthropic.model_request` spans when
