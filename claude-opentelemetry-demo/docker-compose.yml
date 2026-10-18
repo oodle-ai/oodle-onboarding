@@ -45,6 +45,35 @@ services:
     environment:
       - OTEL_SERVICE_NAME=claude-otel-managed-agents
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - WAREHOUSE_URL=http://warehouse:8080
+    depends_on:
+      otel-collector:
+        condition: service_started
+      warehouse:
+        condition: service_healthy
+    networks:
+      - claude-otel-net
+
+  # The service behind managed-agents' query_warehouse custom tool. No tracing
+  # code: opentelemetry-instrument (zero-code) traces FastAPI and sqlite3.
+  warehouse:
+    profiles: ["demo"]
+    build: ./managed-agents/warehouse
+    environment:
+      - OTEL_SERVICE_NAME=claude-otel-warehouse
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_PYTHON_FASTAPI_EXCLUDED_URLS=healthz
+      # Records the incoming traceparent on the request span
+      # (http.request.header.traceparent), to show where its parent came from.
+      - OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST=traceparent
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 2s
+      retries: 30
     depends_on:
       - otel-collector
     networks:
