@@ -352,6 +352,26 @@ def tool_trim_checks(rows: list[Row], backend: str, with_content: bool) -> list[
     ] if with_content else [])
 
 
+def turn_checks(rows: list[Row], backend: str, trace_ids: list[str]) -> list[tuple[str, bool]]:
+    """Check turn attributes after export because the mirror filters attributes."""
+    roots = [row for row in rows if row.name == "session_workflow"]
+    keys = {"agent.trigger", "agent.outcome", "agent.stop_reason",
+            "agent.batch_count", "agent.mid_run_human_input"}
+    expected = {"agent.trigger": "human", "agent.outcome": "ended",
+                "agent.batch_count": 1, "agent.mid_run_human_input": False}
+    return [
+        (f"{backend}: each trace has one session_workflow root",
+         Counter(row.trace_id for row in roots) == Counter(trace_ids)
+         and all(not row.parent_id for row in roots)),
+        (f"{backend}: each root records one completed human turn",
+         bool(roots) and all(
+             {key: _value(value) for key, value in row.attributes.items() if key in keys} == expected
+             for row in roots)),
+        (f"{backend}: child spans do not carry turn attributes",
+         not any(keys.intersection(row.attributes) for row in rows if row.name != "session_workflow")),
+    ]
+
+
 def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_id: str) -> bool:
     laminar = [r for r in laminar if r.trace_id in trace_ids]
     oodle = [r for r in oodle if r.trace_id in trace_ids]
@@ -391,6 +411,8 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
     # Identity is not message content, so it must survive with capture off.
     checks += identity_checks(laminar, "Laminar")
     checks += identity_checks([r for r in oodle if r.span_id in lam_ids], "Oodle")
+    checks += turn_checks(laminar, "Laminar", trace_ids)
+    checks += turn_checks(oodle, "Oodle", trace_ids)
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")

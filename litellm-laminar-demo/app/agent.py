@@ -41,6 +41,7 @@ import compaction
 import gateway
 import tool_trim
 import tracing
+from turn_attribution import trace_turn
 from route_audit import CallPurpose, ExecutionScope, RouteAttempt, attribute_current_span, input_batch
 
 MAX_TURNS = 6
@@ -431,6 +432,7 @@ async def run_session(
     for message_id, text in enumerate([prompt, *(followups or [])], start=1):
         with (
             Laminar.start_as_current_span(name="session_workflow", session_id=session_id, metadata=metadata),
+            trace_turn() as turn,
             Laminar.start_as_current_span(name="agent_session", session_id=session_id, metadata=metadata),
             # Entered last so it stamps agent_session, and names every span underneath for
             # the Agent Name and User ID views; Laminar's span type alone gives Oodle no
@@ -444,6 +446,8 @@ async def run_session(
             result = await run_agent_with_messages(
                 config, [{"role": "user", "content": text}], [message_id], conversation
             )
+            if result.interrupted:
+                turn.stop_reason = "max_turns"
     return {
         "session_id": session_id,
         "trace_id": trace_ids[0],
