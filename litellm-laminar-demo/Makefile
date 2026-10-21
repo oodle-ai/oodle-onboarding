@@ -1,4 +1,4 @@
-.PHONY: help build up down logs test-session test-long-session test-all verify-local verify-local-capture clean
+.PHONY: help build up down logs test-session test-long-session test-all test-unit verify-local verify-local-capture clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -31,6 +31,9 @@ test-long-session: ## Run one session of nine messages that compacts its context
 		| python3 -m json.tool
 
 test-all: test-session test-long-session ## Run all test requests
+
+test-unit: ## Check turn outcomes without external services
+	docker compose run --rm --no-deps app python -m unittest -v test_turn_attribution
 
 verify-local: ## Offline check: both exports captured locally, no accounts needed
 	docker compose run --rm --no-deps app python verify_local.py

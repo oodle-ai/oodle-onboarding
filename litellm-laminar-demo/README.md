@@ -58,6 +58,7 @@ session_workflow
 | Group | Spans | Keys |
 |---|---|---|
 | Session association | every Laminar span | `lmnr.association.properties.session_id`, `...metadata.account_id`, `...metadata.environment` |
+| Turn attribution | `session_workflow` root only | `agent.trigger`, `agent.outcome`, `agent.stop_reason`, `agent.batch_count`, `agent.mid_run_human_input` |
 | Agent and user identity | every Laminar span; the run span also gets the operation name | `gen_ai.agent.name`, `user.id`, and `gen_ai.operation.name` = `invoke_agent` on `agent_session` and `subagent [*]` |
 | Route audit (27 fields) | LLM spans get `route_started`; the enclosing turn loop or `agent_session` gets `route_completed` | `agent.route.event`, `purpose`, `route`, `provider`, `model`, `reason`, `selection_reason`, `attempt_id`, `logical_call_id`, `parent_attempt_id`, `input_batch_id`, `input_message_ids`, `input_message_count`, `started`, `fallback`, `forced_api`, `quota`, `auth`, ... |
 | Usage and cache | `llm_call`, `llm_call_stream` | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `llm.usage.total_tokens`, `llm.usage.visible_output_tokens`, `cache.read_tokens`, `cache.creation_tokens`, `cache.hit_pct`; reasoning and cache token counts when non-zero |
@@ -78,6 +79,31 @@ Set `ROUTE_ATTRIBUTE_PREFIX` to rename the route-audit namespace, for
 example to match an existing platform's attribute names.
 
 ## How the pieces work
+
+**Turn attribution** (`app/turn_attribution.py`). This uses the root attributes
+from [Cosmos #14695](https://github.com/vorflux-eng/cosmos/pull/14695).
+The helper keeps the root span handle while model calls, tools, and subagents
+create child spans. Attribute failures do not change the run result.
+
+| Attribute | Demo behavior |
+|---|---|
+| `agent.trigger` | `human`: each message represents a user prompt. |
+| `agent.outcome` | `ended` for a normal return, `failed` for an exception, or `cancelled` for external cancellation. |
+| `agent.stop_reason` | `max_turns` when the loop reaches `MAX_TURNS`. Absent otherwise. |
+| `agent.batch_count` | `1`: each trace processes one input batch. |
+| `agent.mid_run_human_input` | `false`: each follow-up starts a new trace. |
+
+A normal return can occur without a final answer. When the loop reaches its
+limit, the outcome remains `ended` and the stop reason identifies the limit.
+Automatic compaction and inline subagent work do not start new turns.
+Their elapsed time remains part of the root duration.
+
+Cosmos also handles approvals, integration events, automation, control commands,
+input polling, and billing stops. This demo has none of those paths, so it does
+not emit their trigger values or the `blocked` outcome.
+It does not measure idle gaps between turns. These attributes alone do not
+measure time spent waiting for a person.
+Both exports retain turn attributes when message content capture is off.
 
 **Route audit** (`app/route_audit.py`). Every model call runs inside a
 `RouteAttempt`. It emits `route_selected` before the LLM span opens,
@@ -194,8 +220,10 @@ Oodle for `agent.compaction.round` to see the session's timeline, and for
 ## Verify without any accounts
 
 ```bash
-make verify-local            # all 37 checks pass; Oodle gets no content
-make verify-local-capture    # all 41 checks pass; Oodle gets content too
+make build
+make test-unit               # turn outcomes and telemetry failures
+make verify-local            # Oodle receives no message content
+make verify-local-capture    # Oodle receives message content
 ```
 
 This runs one mocked session of six messages inside the container against
@@ -211,7 +239,10 @@ to the one before, and every inference span marked with the round it
 runs in. It also checks the trims: one per compaction cycle at most,
 `trimmed_tool_call_ids` received as a string array, a smaller context
 after each trim and, where tool payloads are captured, only ids of tool
-calls made before the trim.
+calls made before the trim. Turn checks require one root per trace, one
+completed human input batch per root, and no turn attributes on child spans.
+The unit tests check real Laminar spans for failures, cancellation, and the
+loop limit. They also check that telemetry failures do not replace run errors.
 
 ## Verification
 
