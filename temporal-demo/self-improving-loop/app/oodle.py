@@ -88,7 +88,7 @@ def ui_insight_url(fingerprint: str | None = None) -> str:
 
 
 def ui_trace_url(trace_id: str) -> str:
-    return f"{APP_URL}/traces/lookup?traceId={trace_id}"
+    return f"{APP_URL}/traces/lookup?traceId={trace_id}&tdtab=transcript"
 
 
 # --------------------------------------------------------------------------
