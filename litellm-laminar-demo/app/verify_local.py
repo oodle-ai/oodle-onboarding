@@ -391,7 +391,8 @@ def tool_outcome_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]
         (f"{backend}: every tool span names its tool",
          bool(tools) and all(
              row.name == f"tool_call [{attr(row, 'gen_ai.tool.name')}]"
-             and attr(row, "gen_ai.operation.name") == "execute_tool"
+             # An operation name next to the tool name makes Laminar rename the span.
+             and attr(row, "gen_ai.operation.name") is None
              and attr(row, "gen_ai.tool.call.id")
              for row in tools)),
         (f"{backend}: each scripted shell command exits 0 and is not an error",

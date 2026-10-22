@@ -4,8 +4,16 @@ Ported from Cosmos ``common_py/observability/tool_span.py``; only the logger dif
 
 Tool spans carried only a display name such as ``tool_call [bash_execute]``,
 and every call looked successful, so traces could not be grouped by tool or
-filtered to the calls that failed. These helpers write the OTel GenAI
-``execute_tool`` attributes and mark failed calls.
+filtered to the calls that failed. These helpers write the OTel GenAI tool
+attributes and mark failed calls.
+
+``gen_ai.operation.name`` is deliberately not written. When a span carries
+both ``gen_ai.operation.name = execute_tool`` and ``gen_ai.tool.name``,
+Laminar renames it to the bare tool name at ingest (``tool_call
+[bash_execute]`` becomes ``bash_execute``), which breaks every query that
+matches tool spans by name, such as ``name LIKE 'tool_call [%]'`` in the
+regression evaluators. Oodle already derives ``execute_tool`` from the
+span's ``TOOL`` type, so the attribute adds nothing there.
 
 A failed call gets ERROR status and an exception event. Laminar counts a span
 as failed only when it has the exception event, so both are written. Neither
@@ -22,8 +30,6 @@ from opentelemetry.trace import Span, Status, StatusCode
 
 logger = logging.getLogger(__name__)
 
-OPERATION_NAME_ATTRIBUTE = "gen_ai.operation.name"
-EXECUTE_TOOL_OPERATION = "execute_tool"
 TOOL_NAME_ATTRIBUTE = "gen_ai.tool.name"
 TOOL_CALL_ID_ATTRIBUTE = "gen_ai.tool.call.id"
 # OTel process semconv: a shell tool call runs one process, so its exit code
@@ -36,11 +42,10 @@ class ToolCallFailedError(Exception):
 
 
 def name_tool_span(span: Optional[Span], tool_name: str, tool_call_id: str = "") -> None:
-    """Write the GenAI ``execute_tool`` identity attributes on a tool span."""
+    """Write the GenAI tool identity attributes on a tool span."""
     if span is None:
         return
     try:
-        span.set_attribute(OPERATION_NAME_ATTRIBUTE, EXECUTE_TOOL_OPERATION)
         span.set_attribute(TOOL_NAME_ATTRIBUTE, tool_name)
         if tool_call_id:
             span.set_attribute(TOOL_CALL_ID_ATTRIBUTE, tool_call_id)

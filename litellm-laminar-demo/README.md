@@ -59,7 +59,7 @@ session_workflow
 |---|---|---|
 | Session association | every Laminar span | `lmnr.association.properties.session_id`, `...metadata.account_id`, `...metadata.environment` |
 | Turn attribution | `session_workflow` root only | `agent.trigger`, `agent.outcome`, `agent.stop_reason`, `agent.batch_count`, `agent.mid_run_human_input` |
-| Tool identity and outcome | `tool_call [*]` | `gen_ai.operation.name` = `execute_tool`, `gen_ai.tool.name`, `gen_ai.tool.call.id`; `process.exit.code` on `bash_execute`, with ERROR status and an `exception` event when it is non-zero |
+| Tool identity and outcome | `tool_call [*]` | `gen_ai.tool.name`, `gen_ai.tool.call.id`; `process.exit.code` on `bash_execute`, with ERROR status and an `exception` event when it is non-zero |
 | Finish reason | `llm_call_stream` | `gen_ai.response.finish_reasons` (string array) |
 | Agent and user identity | every Laminar span; the run span also gets the operation name | `gen_ai.agent.name`, `user.id`, and `gen_ai.operation.name` = `invoke_agent` on `agent_session` and `subagent [*]` |
 | Route audit (27 fields) | LLM spans get `route_started`; the enclosing turn loop or `agent_session` gets `route_completed` | `agent.route.event`, `purpose`, `route`, `provider`, `model`, `reason`, `selection_reason`, `attempt_id`, `logical_call_id`, `parent_attempt_id`, `input_batch_id`, `input_message_ids`, `input_message_count`, `started`, `fallback`, `forced_api`, `quota`, `auth`, ... |
@@ -103,7 +103,10 @@ Their elapsed time remains part of the root duration.
 **Tool outcomes and finish reasons** (`app/tool_span.py`, `app/finish_reason.py`).
 These port the tool and model-call attributes from
 [Cosmos #14859](https://github.com/vorflux-eng/cosmos/pull/14859). Each
-`tool_call [*]` span names its tool. A `bash_execute` call records its exit
+`tool_call [*]` span names its tool. It does not set `gen_ai.operation.name`:
+with both that and `gen_ai.tool.name`, Laminar renames the span to the bare
+tool name at ingest, and Oodle already derives `execute_tool` from the
+`TOOL` span type. A `bash_execute` call records its exit
 code, and a non-zero exit marks the span ERROR with an `exception` event,
 because Laminar counts a span as failed only when it has one. The status
 text and the event message are fixed strings such as `exited with code 127`,

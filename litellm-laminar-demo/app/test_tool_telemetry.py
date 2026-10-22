@@ -54,7 +54,8 @@ class ToolSpanTests(unittest.IsolatedAsyncioTestCase):
         )
         for span in tool_spans:
             self.assertEqual(span.name, f"tool_call [{span.attributes['gen_ai.tool.name']}]")
-            self.assertEqual(span.attributes["gen_ai.operation.name"], "execute_tool")
+            # With an operation name next to the tool name, Laminar renames the span.
+            self.assertNotIn("gen_ai.operation.name", span.attributes)
             self.assertTrue(span.attributes["gen_ai.tool.call.id"])
         for span in self.spans("tool_call [bash_execute]"):
             self.assertEqual(span.attributes["process.exit.code"], 0)
