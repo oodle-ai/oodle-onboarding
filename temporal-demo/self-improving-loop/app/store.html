@@ -40,6 +40,24 @@
   button { background:var(--green); color:#fff; border:0; border-radius:8px; padding:0 16px; font-weight:600; cursor:pointer; }
   button:disabled { opacity:.5; cursor:default; }
   .typing { align-self:flex-start; color:var(--muted); font-size:12px; }
+  /* Who runs the support desk: a toddler on prompt v1, a plumber on any later version. */
+  .track { margin-left:auto; width:110px; height:44px; position:relative; overflow:hidden; }
+  .track::after { content:""; position:absolute; left:0; right:0; bottom:2px; height:2px;
+    background:repeating-linear-gradient(90deg,var(--line) 0 8px,transparent 8px 14px);
+    animation:ground var(--ground) linear infinite; }
+  .track svg { position:absolute; bottom:4px; left:50%; transform:translateX(-50%); shape-rendering:crispEdges; image-rendering:pixelated; }
+  .track .f1 { animation:leg-a var(--step) steps(1) infinite; }
+  .track .f2 { opacity:0; animation:leg-b var(--step) steps(1) infinite; }
+  .track.toddler { --step:.5s; --ground:2.4s; }
+  .track.toddler svg { animation:wobble 1s ease-in-out infinite; }
+  .track.plumber { --step:.14s; --ground:.35s; }
+  .track.plumber svg { animation:bob .28s steps(1) infinite; }
+  @keyframes leg-a { 0% { opacity:1; } 50%,100% { opacity:0; } }
+  @keyframes leg-b { 0% { opacity:0; } 50%,100% { opacity:1; } }
+  @keyframes ground { to { background-position:-14px 0; } }
+  @keyframes wobble { 0%,100% { transform:translateX(-50%) rotate(-5deg); } 50% { transform:translateX(-50%) rotate(5deg); } }
+  @keyframes bob { 0% { transform:translateX(-50%); } 50% { transform:translateX(-50%) translateY(-2px); } }
+  @media (prefers-reduced-motion:reduce) { .track *, .track::after { animation:none !important; } .track .f2 { opacity:0; } }
 </style>
 </head>
 <body>
@@ -56,7 +74,7 @@
     <div class="orders" id="orders"></div>
   </section>
   <aside class="chat">
-    <div class="chat-head"><div class="avatar">S</div><div><b>ShopWorld support</b><div class="muted">AI assistant, runs on Temporal</div></div></div>
+    <div class="chat-head"><div class="avatar">S</div><div><b>ShopWorld support</b></div><div class="track" id="runner"></div></div>
     <div class="log" id="log"><div class="msg bot">Hi! Tell me what went wrong with your order and I will sort it out.</div></div>
     <div class="chips" id="chips"></div>
     <form id="form"><textarea id="text" placeholder="Describe your problem..."></textarea><button id="send">Send</button></form>
@@ -65,11 +83,43 @@
 <script>
 const ICONS = {"ORD-78432":"🫖","ORD-51907":"🧦","ORD-66120":"💡","ORD-40388":"🧊"};
 const $ = id => document.getElementById(id);
+
+// Pixel sprites, one character per pixel. The body is shared, the legs alternate.
+const SPRITES = {
+  toddler: {px: 3, colors: {H:"#7a4a1e", S:"#f6c9a0", K:"#222", P:"#e0707a", B:"#5aa0e6", W:"#fff", O:"#e85d75"},
+    title: "Prompt v1: still learning to walk. About 5 model calls and 2 failed tool calls per ticket.",
+    body: ["....HHHH....", "...HHHHHH...", "..HSSSSSSH..", "..SSKSSKSS..", "..SSSSSSSS..", "..SSSPPSSS..",
+           "...SSSSSS...", "....BBBB....", "..SBBBBBBS..", ".SS.BBBB.SS.", "....WWWW....", "...WWWWWW..."],
+    legs: [["...SS..SS...", "..SS....SS..", "..OO....OO.."], ["....SSSS....", "....SS.SS...", "....OO.OO..."]]},
+  plumber: {px: 2.4, colors: {R:"#e52521", N:"#6b3a12", S:"#f8c48c", K:"#1b1b1b", M:"#3b1d0a", B:"#2b5fd9", Y:"#ffd400"},
+    title: "Improved prompt: running at full speed. Right tool arguments first time.",
+    body: ["....RRRRRR....", "...RRRRRRRRR..", "...RRRRRRRRRRR", "...NNSSSKS....", "..NSSSSSKSSS..", "..NSSSSSSSSSS.",
+           "...SSSSMMMMM..", "....SSSSSSS...", "...RRBRRBRR...", "..RRRBBBBRRR..", "..SSBBYBYBBSS.", "..SSBBBBBBBSS.",
+           "....BBBBBBB..."],
+    legs: [["...BBB..BBB...", "..NNN....NNN..", ".NNNN....NNNN."], ["....BBBBBB....", ".....NNNNN....", "....NNNNNNN..."]]},
+};
+
+function sprite(name) {
+  const sp = SPRITES[name], w = sp.body[0].length, h = sp.body.length + sp.legs[0].length;
+  const rects = rows => rows.map((row, y) => [...row].map((c, x) => sp.colors[c]
+    ? `<rect x="${x}" y="${y}" width="1.05" height="1.05" fill="${sp.colors[c]}"/>` : "").join("")).join("");
+  const frame = (legs, cls) => `<g class="${cls}">${rects([...sp.body, ...legs])}</g>`;
+  return `<svg width="${w * sp.px}" height="${h * sp.px}" viewBox="0 0 ${w} ${h}" aria-hidden="true">` +
+    frame(sp.legs[0], "f1") + frame(sp.legs[1], "f2") + `</svg>`;
+}
+
+function showRunner(version) {
+  const name = version === 1 ? "toddler" : "plumber", el = $("runner");
+  if (el.dataset.name === name) return;  // keep the animation running across refreshes
+  el.dataset.name = name; el.className = "track " + name;
+  el.title = SPRITES[name].title; el.innerHTML = sprite(name);
+}
 function add(cls, text) { const d = document.createElement("div"); d.className = cls; d.textContent = text; $("log").append(d); $("log").scrollTop = 1e9; return d; }
 
 async function load() {
   const s = await (await fetch("/api/store")).json();
   $("prompt").textContent = "live prompt v" + s.prompt_version; $("prompt").href = s.prompt_url;
+  showRunner(s.prompt_version);
   $("orders").innerHTML = Object.entries(s.orders).map(([id, o]) =>
     `<div class="card"><div class="thumb">${ICONS[id] || "📦"}</div><b>${o.item}</b>
      <div class="muted">${id} · ${o.total}</div><span class="status">${o.status.replace("_", " ")}</span></div>`).join("");
