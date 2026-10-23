@@ -1,0 +1,89 @@
+# Gateway collector:
+#
+#   otlp (delta gauges from every Lambda execution environment)
+#     -> batch: hand input to the connector one batch at a time (see below)
+#     -> signal_to_metrics: one exponential histogram observation per gauge point
+#     -> deltatocumulative: merge the per-batch delta histograms into one
+#                           running cumulative histogram per series
+#     -> interval: emit each series once every 15s
+#     -> Oodle (and a local file, so verify.py can tell collector error
+#        apart from storage/query error)
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  signal_to_metrics:
+    error_mode: ignore
+    datapoints:
+      - name: lambda.request.duration
+        description: Request latency, aggregated from per-invocation gauges.
+        unit: ms
+        conditions:
+          - metric.name == "lambda.request.latency" and metric.type == METRIC_DATA_TYPE_GAUGE
+        # Keep only resource attributes that are the same for every execution
+        # environment, so all environments fan in to one series. faas.instance
+        # (the log stream, one per environment) is dropped on purpose.
+        include_resource_attributes:
+          - key: service.name
+          - key: faas.name
+          - key: cloud.region
+        attributes:
+          - key: http.route
+          - key: run_id
+        exponential_histogram:
+          max_size: 160
+          count: "1"
+          value: datapoint.value_double
+
+processors:
+  # Serializes the input. signal_to_metrics stamps each delta it emits with
+  # time.Now(), and deltatocumulative drops a delta that is not newer than the
+  # last one (delta.ErrOutOfOrder). Without batch, concurrent OTLP requests
+  # from many environments race, and a few deltas are dropped (2-5 per 6000
+  # at ~200 invocations/s in this demo). batch hands its batches to the
+  # connector one at a time, so the stamps only go forward.
+  batch:
+    timeout: 1s
+  deltatocumulative:
+    max_stale: 10m
+  interval:
+    interval: 15s
+
+exporters:
+  otlp_http/oodle:
+    endpoint: https://${env:OODLE_INSTANCE}-otlp.collector.oodle.ai
+    headers:
+      X-OODLE-INSTANCE: ${env:OODLE_INSTANCE}
+      X-API-KEY: ${env:OODLE_API_KEY}
+  file/exported:
+    path: /out/exported.jsonl
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    metrics/in:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [signal_to_metrics]
+    metrics/out:
+      receivers: [signal_to_metrics]
+      processors: [deltatocumulative, interval]
+      exporters: [otlp_http/oodle, file/exported, debug]
+  telemetry:
+    logs:
+      level: info
+    # The collector's own metrics, on gateway:8888/metrics. Watch
+    # otelcol_deltatocumulative_datapoints{error!=""}: points dropped there
+    # (for example as out of order) are not logged.
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888

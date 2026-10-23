@@ -1,0 +1,22 @@
+# Collector extension config for the local emulator only. It is
+# collector.yaml without the decouple processor.
+#
+# The emulator runs the extension in lambda-managed-instances mode (see
+# docker-compose.yml). In that mode the extension gets no INVOKE events, and
+# decouple only forwards data between INVOKE and the end of the invocation,
+# so with decouple nothing would ever leave the extension.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: localhost:4318
+
+exporters:
+  otlp_http/gateway:
+    endpoint: ${env:GATEWAY_OTLP_ENDPOINT}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp_http/gateway]
