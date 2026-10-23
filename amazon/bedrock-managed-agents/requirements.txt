@@ -1,0 +1,4 @@
+boto3==1.43.117
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1
+python-dotenv==1.2.4
