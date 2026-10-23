@@ -33,24 +33,16 @@ OTel Collector (OTLP :4318) --> Oodle (traces)
 eve puts its session id on each span as `gen_ai.conversation.id`, so
 every turn of one thread groups together in Oodle.
 
-## Two settings decide whether this works
+## The channel audience decides the transcript
 
-Both fail silently, so they are worth reading before you copy this
-demo into your own agent.
+This setting fails silently, so read this section before you copy
+this demo into your own agent.
 
-### 1. `experimental.instrumentationProviders`
-
-`agent/instrumentation/` is read only behind this flag in
-`agent/agent.ts`. Without it both instrumentation files compile,
-`eve build` succeeds, and no span is ever exported.
-
-The flag also selects the layout that matters. eve's other layout
-(a single `agent/instrumentation.ts` that calls `registerOTel`
-itself) registers the global tracer provider, so Vercel Workflow
-internals export beside the agent spans: a two-turn conversation
-arrives as roughly 60 spans instead of 9.
-
-### 2. The channel audience
+The demo uses eve 0.62.0 or later. eve reads every file in
+`agent/instrumentation/`, so `agent/agent.ts` needs no flag. Earlier
+versions read that directory only behind
+`experimental.instrumentationProviders`, and later versions reject
+that flag.
 
 eve withholds model messages for every conversation its channel does
 not classify as `public`. Without that classification the spans still
@@ -122,7 +114,7 @@ Health check served by eve's built-in channel.
 
 ```
 agent/
-├── agent.ts                    model and the experimental flag
+├── agent.ts                    model
 ├── instructions.md             system prompt
 ├── channels/support.ts         HTTP entry point, public audience
 ├── instrumentation/otel.ts     process-wide OTel settings

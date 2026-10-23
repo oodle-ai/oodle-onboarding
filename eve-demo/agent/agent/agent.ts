@@ -19,8 +19,4 @@ export default defineAgent({
   // against any of them.
   model: openai.chat(process.env.MODEL ?? 'gpt-4o-mini'),
   modelContextWindowTokens: 128000,
-
-  // `agent/instrumentation/` is read only behind this flag.
-  // Without it the instrumentation files compile and never run.
-  experimental: { instrumentationProviders: true },
 });
