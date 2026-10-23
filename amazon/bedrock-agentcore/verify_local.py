@@ -47,7 +47,7 @@ def main():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     os.environ.update({
-        "OODLE_INSTANCE": "offline-test",
+        "TOOL_DATA_SOURCE": "fixture", "OODLE_INSTANCE": "offline-test",
         "OODLE_API_KEY": "offline-test-key",
         "OODLE_OTLP_ENDPOINT": f"http://127.0.0.1:{server.server_port}",
         "AWS_EC2_METADATA_DISABLED": "true",
@@ -76,6 +76,7 @@ def main():
             stub.add_response("converse", response([
                 {"toolUse": {"toolUseId": "order", "name": "lookup_order", "input": {"order_id": "ORD-1001"}}},
                 {"toolUse": {"toolUseId": "policy", "name": "get_return_policy", "input": {}}},
+                {"toolUse": {"toolUseId": "docs", "name": "search_aws_docs", "input": {"search_phrase": "DynamoDB recovery"}}},
             ], "tool_use"))
             stub.add_response("converse", response([{"text": "Delivered 7 days ago; eligible for a return within 30 days."}], "end_turn"))
             stub.add_response("converse", response([
@@ -83,7 +84,8 @@ def main():
             ], "tool_use"))
             stub.add_response("converse", response([{"text": "The order backend is unavailable. Please try again later."}], "end_turn"))
 
-            with patch("support_agent.BedrockModel", return_value=model):
+            with patch("support_agent.BedrockModel", return_value=model), patch(
+                    "mcp_tools.search_aws_docs", return_value={"results": "offline documentation"}) as docs:
                 if is_agentcore:
                     from starlette.testclient import TestClient
 
@@ -98,6 +100,7 @@ def main():
                 else:
                     results.append(run_agent(DEFAULT_PROMPT))
                     results.append(run_agent("Look up ORD-ERROR"))
+            docs.assert_called_once_with("DynamoDB recovery")
             stub.assert_no_pending_responses()
         provider.force_flush()
 
@@ -116,7 +119,7 @@ def main():
         operations = [a["gen_ai.operation.name"].string_value for a in attrs if "gen_ai.operation.name" in a]
         assert "invoke_agent" in operations, operations
         assert operations.count("chat") == 4, operations
-        assert operations.count("execute_tool") == 3, operations
+        assert operations.count("execute_tool") == 4, operations
         assert any(s.status.code == 2 and "lookup_order" in s.name for s in spans), "Tool failure was not marked ERROR"
         assert any(a.get("gen_ai.usage.input_tokens") and a["gen_ai.usage.input_tokens"].int_value == 20 for a in attrs)
         content = [a[k].string_value for a in attrs for k in ("gen_ai.input.messages", "gen_ai.output.messages") if k in a]

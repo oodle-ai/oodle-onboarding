@@ -12,7 +12,7 @@ from opentelemetry.trace import SpanKind, Status, StatusCode
 
 from tools import execute
 
-DEFAULT_PROMPT = "Where is order ORD-1001, and can I return it? Check the order and return policy."
+DEFAULT_PROMPT = "Where is order ORD-1001, and can I return it? Check the order and return policy. Also find AWS documentation on DynamoDB point-in-time recovery and include a source link."
 
 
 def capture_content():

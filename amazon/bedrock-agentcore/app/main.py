@@ -13,6 +13,7 @@ provider = setup_telemetry("amazon-bedrock-agentcore-demo")
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 from support_agent import DEFAULT_PROMPT, run_agent  # noqa: E402
+from check_tools import run_tool_checks  # noqa: E402
 
 
 @asynccontextmanager
@@ -31,6 +32,8 @@ def invoke(payload, context):
     # The Runtime session identifier is authoritative in the hosted version.
     session_id = context.session_id or str(uuid.uuid4())
     try:
+        if payload.get("mode") == "tool-check":
+            return run_tool_checks(session_id)
         return run_agent(payload.get("prompt", DEFAULT_PROMPT), session_id)
     finally:
         # Runtime can suspend the process after responding. Export before return.

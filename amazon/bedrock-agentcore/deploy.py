@@ -47,6 +47,10 @@ def main():
         "OODLE_API_KEY": api_key,
         "OODLE_OTLP_ENDPOINT": os.environ.get("OODLE_OTLP_ENDPOINT") or f"https://{instance}-otlp.collector.oodle.ai",
         "CAPTURE_CONTENT": os.environ.get("CAPTURE_CONTENT", "true"),
+        "TOOL_DATA_SOURCE": os.environ.get("TOOL_DATA_SOURCE", "aws"),
+        "TOOLS_STACK_NAME": os.environ.get("TOOLS_STACK_NAME", "oodle-bedrock-agentcore-tools"),
+        "ORDERS_TABLE_NAME": os.environ.get("ORDERS_TABLE_NAME", ""),
+        "RETURN_POLICY_PARAMETER": os.environ.get("RETURN_POLICY_PARAMETER", ""),
     })
     print(f"AgentCore runtime: {result.agent_arn}")
     print("Run make invoke to send a request, or make status to check readiness.")

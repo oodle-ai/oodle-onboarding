@@ -24,3 +24,14 @@ error:
 
 test:
 	$(RUN) verify_local.py
+	$(RUN) verify_tools.py
+
+.PHONY: tools-deploy tools-status tools-destroy tools-check
+tools-deploy:
+	$(RUN) manage_tools.py deploy
+tools-status:
+	$(RUN) manage_tools.py status
+tools-destroy:
+	$(RUN) manage_tools.py destroy
+tools-check:
+	$(RUN) app/check_tools.py

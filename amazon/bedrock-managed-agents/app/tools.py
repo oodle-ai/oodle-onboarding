@@ -1,20 +1,14 @@
-"""Read-only fictional order tools, executed only on Bedrock return-control requests."""
+"""Allowlisted AWS and MCP tools for managed-agent return control."""
 
-ORDERS = {
-    "ORD-1001": {"item": "wireless headphones", "status": "delivered", "days_since_delivery": 7},
-    "ORD-1002": {"item": "coffee grinder", "status": "in transit", "estimated_delivery": "in 2 days"},
-    "ORD-1003": {"item": "desk lamp", "status": "delivered", "days_since_delivery": 45},
-}
+from aws_tools import get_return_policy, lookup_order
+from mcp_tools import search_aws_docs
 
 
 def execute(function: str, arguments: dict) -> dict:
     if function == "get_return_policy" and not arguments:
-        return {"return_window_days": 30, "condition": "Item must be undamaged", "shipping": "Free returns"}
+        return get_return_policy()
     if function == "lookup_order" and set(arguments) == {"order_id"}:
-        order_id = arguments["order_id"]
-        if order_id == "ORD-ERROR":
-            raise RuntimeError("Simulated order backend outage")
-        if order_id not in ORDERS:
-            raise ValueError(f"Order {order_id} was not found")
-        return {"order_id": order_id, **ORDERS[order_id]}
+        return lookup_order(arguments["order_id"])
+    if function == "search_aws_docs" and set(arguments) == {"search_phrase"}:
+        return search_aws_docs(arguments["search_phrase"])
     raise ValueError("Unsupported function or invalid arguments")

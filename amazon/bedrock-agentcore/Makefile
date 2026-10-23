@@ -27,7 +27,7 @@ local:
 demo:
 	curl --fail-with-body -sS http://localhost:8080/invocations \
 		-H 'Content-Type: application/json' \
-		-d '{"prompt":"Where is order ORD-1001, and can I return it? Check the order and return policy."}'
+		-d '{"prompt":"Where is order ORD-1001, and can I return it? Check the order and return policy. Also find AWS documentation on DynamoDB point-in-time recovery and include a source link."}'
 
 error:
 	curl --fail-with-body -sS http://localhost:8080/invocations \
@@ -36,15 +36,30 @@ error:
 
 test:
 	$(RUN) verify_local.py
+	$(RUN) verify_tools.py
 
 deploy:
 	$(RUN) deploy.py
 
 invoke:
-	$(RUN) manage.py invoke '{"prompt":"Where is order ORD-1001, and can I return it? Check the order and return policy."}'
+	$(RUN) manage.py invoke '{"prompt":"Where is order ORD-1001, and can I return it? Check the order and return policy. Also find AWS documentation on DynamoDB point-in-time recovery and include a source link."}'
 
 status:
 	$(RUN) manage.py status
 
 destroy:
 	$(RUN) manage.py destroy
+
+.PHONY: tools-deploy tools-status tools-destroy tools-check
+tools-deploy:
+	$(RUN) manage_tools.py deploy
+tools-status:
+	$(RUN) manage_tools.py status
+tools-destroy:
+	$(RUN) manage_tools.py destroy
+tools-check:
+	$(RUN) app/check_tools.py
+
+.PHONY: invoke-tools
+invoke-tools:
+	$(RUN) manage.py invoke '{"mode":"tool-check"}'

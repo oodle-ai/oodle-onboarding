@@ -28,9 +28,9 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [langgraph-agent-demo](./langgraph-agent-demo) | Traces | Graphs built directly on LangGraph's `StateGraph`, traced node by node through the LangChain OTel instrumentor |
 | [pino-logs-demo](./pino-logs-demo) | Logs, traces | Pino logs from a Node.js app over OTLP, with the request trace id on every line |
 | [openai-demo](./openai-demo) | Traces, logs | OpenAI SDK auto-instrumented with the official OpenTelemetry GenAI instrumentation |
-| [amazon/bedrock](./amazon/bedrock) | Traces | Python Strands order-support agent on Bedrock Converse, with model/tool spans and transcripts sent directly to Oodle |
-| [amazon/bedrock-agentcore](./amazon/bedrock-agentcore) | Traces | The order-support agent on AgentCore Runtime, with local serving, direct Python deployment, and native Strands traces exported to Oodle |
-| [amazon/bedrock-managed-agents](./amazon/bedrock-managed-agents) | Traces | AWS-managed Bedrock agent with return-control tools; service model trace events and local tool spans exported to Oodle |
+| [amazon/bedrock](./amazon/bedrock) | Traces | Strands agent on Bedrock Converse with DynamoDB/SSM tools, AWS Knowledge MCP, and Oodle traces |
+| [amazon/bedrock-agentcore](./amazon/bedrock-agentcore) | Traces | AgentCore Runtime with AWS service tools, managed Knowledge MCP, and native Strands traces exported to Oodle |
+| [amazon/bedrock-managed-agents](./amazon/bedrock-managed-agents) | Traces | AWS-managed Bedrock agent with DynamoDB/SSM and MCP return-control tools; model and tool spans exported to Oodle |
 | [litellm-demo](./litellm-demo) | Traces, logs | One LiteLLM call routed to any provider, traced through its `otel` callback |
 | [claude-opentelemetry-demo](./claude-opentelemetry-demo) | Traces | Claude's built-in OpenTelemetry tracing, three ways: the Messages API over plain HTTP traced server side by an API tracing destination, the Python SDK's own spans (create, stream, tool runner, conversations), a Managed Agents session whose turns and sandbox tools only API tracing can see, and a production-shaped backend with its own MCP server that keeps a real customer's tracing gaps. One shared `.env` |
 | [litellm-laminar-demo](./litellm-laminar-demo) | Traces | Coding agent dual-writing to Laminar and Oodle: Laminar SDK spans mirrored to Oodle alongside LiteLLM GenAI spans, with a LiteLLM Router gateway and route-audit attributes |

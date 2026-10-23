@@ -8,6 +8,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 import botocore.session
 from botocore.exceptions import EventStreamError
@@ -91,6 +92,8 @@ def control(order_id):
         {"functionInvocationInput": {"actionGroup": "OrderSupport", "function": "lookup_order",
                                      "parameters": [{"name": "order_id", "type": "string", "value": order_id}]}},
         {"functionInvocationInput": {"actionGroup": "OrderSupport", "function": "get_return_policy"}},
+        {"functionInvocationInput": {"actionGroup": "OrderSupport", "function": "search_aws_docs",
+                                     "parameters": [{"name": "search_phrase", "type": "string", "value": "DynamoDB recovery"}]}},
     ]}}
 
 
@@ -98,7 +101,7 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", 0), Receiver)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    os.environ.update({"OODLE_INSTANCE": "offline-test", "OODLE_API_KEY": "offline-key",
+    os.environ.update({"TOOL_DATA_SOURCE": "fixture", "OODLE_INSTANCE": "offline-test", "OODLE_API_KEY": "offline-key",
                        "OODLE_OTLP_ENDPOINT": f"http://127.0.0.1:{server.server_port}"})
     provider = setup_telemetry("amazon-bedrock-managed-agents-demo")
     try:
@@ -110,7 +113,9 @@ def main():
             first.append(control(order_id))
             client = Client(first, model_events("step2") + [{"chunk": {"bytes": "Answer: café".encode()[:-1]}},
                                                           {"chunk": {"bytes": "Answer: café".encode()[-1:]}}])
-            result = run_agent(client, "ABCDEFGHIJ", "TSTALIASID", f"Check {order_id}")
+            with patch("tools.search_aws_docs", return_value={"results": "offline documentation"}) as docs:
+                result = run_agent(client, "ABCDEFGHIJ", "TSTALIASID", f"Check {order_id}")
+                docs.assert_called_once_with("DynamoDB recovery")
             assert result["answer"] == "Answer: café"
             assert len(client.calls) == 2
             first_call, continuation = client.calls
@@ -118,8 +123,9 @@ def main():
             assert "inputText" not in continuation
             state = continuation["sessionState"]
             assert state["invocationId"] == "invocation-001"
-            lookup, policy = [x["functionResult"] for x in state["returnControlInvocationResults"]]
+            lookup, policy, documentation = [x["functionResult"] for x in state["returnControlInvocationResults"]]
             assert policy["function"] == "get_return_policy"
+            assert json.loads(documentation["responseBody"]["TEXT"]["body"])["results"] == "offline documentation"
             assert json.loads(policy["responseBody"]["TEXT"]["body"])["return_window_days"] == 30
             if order_id == "ORD-ERROR":
                 assert lookup["responseState"] == "REPROMPT"
@@ -140,7 +146,8 @@ def main():
 
         client = Client([control("ORD-1001")])
         try:
-            run_agent(client, "ABCDEFGHIJ", "TSTALIASID", max_rounds=1)
+            with patch("tools.search_aws_docs", return_value={"results": "offline documentation"}):
+                run_agent(client, "ABCDEFGHIJ", "TSTALIASID", max_rounds=1)
             raise AssertionError("Unbounded return-control loop")
         except RuntimeError as exc:
             assert "exceeded" in str(exc)

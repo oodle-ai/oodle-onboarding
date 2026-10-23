@@ -25,5 +25,16 @@ error:
 	$(RUN) app/main.py --prompt 'Look up order ORD-ERROR. Do not retry if the lookup fails.'
 test:
 	$(RUN) verify_local.py
+	$(RUN) verify_tools.py
 destroy:
 	$(RUN) manage.py destroy
+
+.PHONY: tools-deploy tools-status tools-destroy tools-check
+tools-deploy:
+	$(RUN) manage_tools.py deploy
+tools-status:
+	$(RUN) manage_tools.py status
+tools-destroy:
+	$(RUN) manage_tools.py destroy
+tools-check:
+	$(RUN) app/check_tools.py
