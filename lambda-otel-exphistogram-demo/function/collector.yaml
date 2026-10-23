@@ -1,0 +1,25 @@
+# Collector extension config (the collector Lambda layer reads it through
+# OPENTELEMETRY_COLLECTOR_CONFIG_URI). It forwards the function's OTLP data
+# to the gateway collector, which does the aggregation. The extension itself
+# keeps no state across invocations, since Lambda can freeze or drop the
+# execution environment at any time.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: localhost:4318
+
+processors:
+  # Answer the SDK's flush at once instead of waiting for the export.
+  decouple:
+
+exporters:
+  otlp_http/gateway:
+    endpoint: ${env:GATEWAY_OTLP_ENDPOINT}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [decouple]
+      exporters: [otlp_http/gateway]
