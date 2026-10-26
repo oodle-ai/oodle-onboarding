@@ -12,6 +12,7 @@ Usage:
 
 import base64
 import hashlib
+import html
 import http.server
 import json
 import os
@@ -91,8 +92,8 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/html")
         self.end_headers()
-        html = f"<html><body><h2>{message}</h2></body></html>"
-        self.wfile.write(html.encode())
+        body = f"<html><body><h2>{html.escape(message)}</h2></body></html>"
+        self.wfile.write(body.encode())
 
     def log_message(self, format, *args):
         pass
