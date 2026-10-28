@@ -4,7 +4,10 @@
   "private": true,
   "main": "server.js",
   "dependencies": {
-    "dd-trace": "^6",
+    "dd-trace": "^6.20.1",
     "express": "^5"
+  },
+  "overrides": {
+    "body-parser": "2.4.0"
   }
 }

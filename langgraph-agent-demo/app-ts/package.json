@@ -20,6 +20,6 @@
     "@opentelemetry/sdk-trace-node": "^2.8.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@traceloop/instrumentation-langchain": "^0.27.0",
-    "zod": "^3.25.0"
+    "zod": "^4.6.6"
   }
 }

@@ -17,6 +17,9 @@
     "@opentelemetry/sdk-trace-node": "^2.11.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "ai": "^7.0.82",
-    "zod": "^4.1.8"
+    "zod": "^4.6.6"
+  },
+  "overrides": {
+    "undici": "7.30.1"
   }
 }
