@@ -17,9 +17,12 @@ Span tree for one user message:
             summarizing_get_summary
               compaction_call_model_api
                 llm_call
-          llm_call_stream               usage, cache, content, tool definitions, route
+          llm_call_stream               usage, cache, content, tool definitions, route,
+                                        gen_ai.response.finish_reasons
           tool_call [bash_execute]      input: {tool_id, tool_name, args}
                                         output: {stdout, stderr, exitCode, ...}
+                                        gen_ai.tool.name, process.exit.code;
+                                        ERROR status when the command exits non-zero
           llm_call_stream
           tool_call [add_task]
             subagent [explore]
@@ -41,6 +44,8 @@ import compaction
 import gateway
 import tool_trim
 import tracing
+from finish_reason import FinishReasonTracker
+from tool_span import name_tool_span, record_tool_outcome
 from turn_attribution import trace_turn
 from route_audit import CallPurpose, ExecutionScope, RouteAttempt, attribute_current_span, input_batch
 
@@ -214,7 +219,9 @@ async def _stream_turn(
     """One streaming model call through the Router, inside a route attempt."""
     attempt = RouteAttempt(scope, SELECTION.model_key, SELECTION.provider, provider_instance_id="hosted")
     with attempt.observe():
-        with Laminar.start_as_current_span(name="llm_call_stream", span_type="LLM", session_id=scope.session_id):
+        with Laminar.start_as_current_span(
+            name="llm_call_stream", span_type="LLM", session_id=scope.session_id
+        ) as span:
             attribute_current_span()
             stream = await ROUTER.acompletion(
                 model=SELECTION.alias,
@@ -225,6 +232,10 @@ async def _stream_turn(
                 **_mock_kwargs(mock),
             )
             chunks = [chunk async for chunk in stream]
+            finish_reasons = FinishReasonTracker()
+            for chunk in chunks:
+                finish_reasons.observe(chunk)
+            finish_reasons.record_on(span)
             response = litellm.stream_chunk_builder(chunks, messages=messages)
             message = _attach_mock_tool_call(response.choices[0].message.model_dump(), mock)
             gateway.record_llm_span(SELECTION, response.usage, messages, message, TOOLS)
@@ -332,6 +343,7 @@ async def _run_tool(scope: ExecutionScope, call: dict) -> str:
         span_type="TOOL",
         input={"tool_id": call["id"], "tool_name": name, "args": args},
     ) as span:
+        name_tool_span(span, name, call["id"])
         if name == "add_task" and scope.subagent_id is None:
             result = await _run_subagent(scope, args.get("question", ""))
             span.set_output({"result": result})
@@ -344,6 +356,7 @@ async def _run_tool(scope: ExecutionScope, call: dict) -> str:
             "outputExceededThreshold": False,
         }
         span.set_output(output)
+        record_tool_outcome(span, failed=False, exit_code=output["exitCode"])
         return output["stdout"] or output["stderr"]
 
 
