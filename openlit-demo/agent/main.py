@@ -176,9 +176,13 @@ async def chat(message: str = Query(default="whats the weather in San Francisco?
     agent = _create_research_agent()
     config = {"configurable": {"thread_id": _next_thread_id()}}
     logger.info("Chat request: provider=%s", PROVIDER)
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=message)]}, config,
-    )
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=message)]}, config,
+        )
+    except Exception as e:
+        logger.error("Chat failed: provider=%s, error=%s", PROVIDER, e)
+        raise
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
     logger.info("Chat completed: model=%s, reply_length=%d", model, len(reply))
@@ -205,9 +209,13 @@ async def plan_trip(
         f"estimate the budget. "
         f"Provide a structured summary."
     )
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=prompt)]}, config,
-    )
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=prompt)]}, config,
+        )
+    except Exception as e:
+        logger.error("Trip planning failed: provider=%s, city=%s, error=%s", PROVIDER, city, e)
+        raise
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
     logger.info("Trip plan completed: city=%s, model=%s", city, model)
@@ -220,9 +228,13 @@ async def research(query: str = Query(default="latest developments in AI observa
     logger.info("Research request: query=%s", query)
     agent = _create_research_agent()
     config = {"configurable": {"thread_id": _next_thread_id()}}
-    result = await agent.ainvoke(
-        {"messages": [HumanMessage(content=query)]}, config,
-    )
+    try:
+        result = await agent.ainvoke(
+            {"messages": [HumanMessage(content=query)]}, config,
+        )
+    except Exception as e:
+        logger.error("Research failed: provider=%s, error=%s", PROVIDER, e)
+        raise
     reply = result["messages"][-1].content
     model = ANTHROPIC_MODEL if PROVIDER == "anthropic" else GEMINI_MODEL
     logger.info("Research completed: model=%s", model)

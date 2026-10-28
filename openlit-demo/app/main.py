@@ -190,6 +190,7 @@ def safe_chat():
                 "You are a helpful assistant. Keep responses concise.",
             )
         except Exception as e:
+            logger.error("Gemini safe-chat call failed: %s", e)
             return jsonify({"error": str(e)}), 502
 
         return jsonify({"reply": reply, "model": model, "guard_passed": True})
@@ -300,6 +301,7 @@ def mcp_search():
         answer = final.text
 
     except Exception as e:
+        logger.error("MCP search failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
     return jsonify({"answer": answer, "tool_result": tool_result})
