@@ -28,6 +28,7 @@ SWIGGY_MCP_BASE = "https://mcp.swiggy.com"
 CALLBACK_PORT = 8765
 REDIRECT_URI = f"http://localhost:{CALLBACK_PORT}/callback"
 SCOPES = "mcp:tools mcp:resources mcp:prompts"
+HTTP_TIMEOUT_SECONDS = 30
 
 _auth_code = None  # type: Optional[str]
 _auth_error = None  # type: Optional[str]
@@ -37,7 +38,7 @@ _server_done = threading.Event()
 def _http_get_json(url: str) -> dict:
     """GET a URL and parse the JSON response."""
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
         if resp.status >= 400:
             raise RuntimeError(f"HTTP {resp.status} from {url}")
         return json.loads(resp.read())
@@ -49,7 +50,7 @@ def _http_post_json(url: str, payload: dict) -> dict:
     req = urllib.request.Request(
         url, data=data, headers={"Content-Type": "application/json"}
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
         if resp.status >= 400:
             raise RuntimeError(f"HTTP {resp.status} from {url}")
         return json.loads(resp.read())
@@ -63,7 +64,7 @@ def _http_post_form(url: str, payload: dict) -> dict:
         data=data,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
-    with urllib.request.urlopen(req) as resp:
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
         if resp.status >= 400:
             raise RuntimeError(f"HTTP {resp.status} from {url}")
         return json.loads(resp.read())
