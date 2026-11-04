@@ -201,6 +201,43 @@ reconnecting when the session starts, the Console shows a red
 The database is in the container, so anything that recreates `apac-orders`
 also undoes the incident. That includes `make managed-agents`.
 
+## The MCP incident: an error that points the wrong way
+
+The incident above hides the failure. This one shows it, with no cause:
+
+```bash
+make managed-agents-mcp-incident   # rename a column, then run a session that needs it
+make managed-agents-mcp-fix        # rename it back
+```
+
+It needs the tunnel, an agent that uses its URL (see
+[Adding the MCP server](#adding-the-mcp-server)), and `MCP_TRACE_CONTEXT=true` in
+`.env`, so that the tool's spans join the agent's trace (see
+[Joining the agent's trace](../mcp-backend/README.md#joining-the-agents-trace)).
+
+A migration renames `role` to `job_title` in `meta_db.org_54_employees`, and
+`FirmDb.employees()` still selects `role`. There's no injected error. Only
+`getEmployeeList` breaks, and the other tools still work:
+
+1. `mcp-web` catches the SQL error and answers 500.
+2. Anthropic's connector gives the agent `upstream server error (HTTP 502)`.
+3. A 502 looks like a network or gateway fault, so the agent retries and then
+   reports an outage. The server is up, and retrying can't help.
+
+The Console shows the failed calls and that 502, and nothing else. The cause is
+in the trace, on the failed tool call:
+
+```
+anthropic.mcp_tool_use getEmployeeList      claude-platform
+└─ tools/call getEmployeeList        ERROR  claude-otel-mcp-web
+   └─ SELECT ... org_54_employees    ERROR  Unknown column 'role'
+```
+
+To find it in Oodle, open the `trace_id=` value the run prints and go to a failed
+`tools/call getEmployeeList`. Each MCP request reads every org's props, so a
+session that retries has hundreds of spans. Filter on errors first. How often the
+agent retries changes from run to run.
+
 ## Cleanup
 
 Nothing is deleted automatically. To remove what the demo created:

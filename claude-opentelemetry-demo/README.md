@@ -94,6 +94,7 @@ make managed-agents-setup     # once: create the agent and environment, paste th
 make managed-agents
 
 make managed-agents-incident  # the same session with a broken downstream service: a wrong answer, all green
+make managed-agents-mcp-incident  # a broken MCP tool: an error with no cause in the Console
 make managed-agents-fix       # undo the incident
 make mcp-backend-setup        # once: an environment that allows MCP egress, paste the id into .env
 make mcp-backend              # opens a public quick tunnel to the demo MCP server while it runs
