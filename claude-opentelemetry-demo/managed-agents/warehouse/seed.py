@@ -3,7 +3,7 @@
 Runs at image build time, before any instrumentation is loaded, so seeding
 adds no spans.
 
-Usage: python seed.py <path>
+Usage: python seed.py <warehouse path> <apac path>
 """
 
 import random
@@ -25,9 +25,13 @@ PRODUCTS = [
 # Monthly growth per region, so the data has a story to find.
 REGIONS = {"North America": 0.01, "EMEA": 0.02, "APAC": 0.06, "LATAM": -0.01}
 CHANNELS = ["web", "retail", "marketplace"]
+EVENT_TYPES = ["placed", "paid", "packed", "shipped", "delivered"]
+# Enough rows that a scan per order outlasts the warehouse's timeout with
+# room to spare: a run that finishes in time would answer with APAC.
+EVENTS_PER_ORDER = 120
 
 
-def main(path: str) -> None:
+def main(path: str, apac_path: str) -> None:
     rng = random.Random(7)
     db = sqlite3.connect(path)
     db.executescript(
@@ -77,9 +81,36 @@ def main(path: str) -> None:
                 )
         day += timedelta(days=1)
     db.commit()
+    move_apac(db, apac_path)
     db.close()
-    print(f"seeded {order_id} orders into {path}")
+    print(f"seeded {order_id} orders into {path} and {apac_path}")
+
+
+def move_apac(db: sqlite3.Connection, apac_path: str) -> None:
+    """Move APAC's orders to their own file, with the order events its service filters on."""
+    db.execute("ATTACH DATABASE ? AS apac", (apac_path,))
+    db.executescript(
+        """
+        CREATE TABLE apac.orders AS SELECT * FROM main.orders WHERE region = 'APAC';
+        DELETE FROM main.orders WHERE region = 'APAC';
+        CREATE TABLE apac.order_events (
+            event_id INTEGER PRIMARY KEY,
+            order_id INTEGER NOT NULL,
+            type     TEXT NOT NULL
+        );
+        """
+    )
+    # Its own generator, so the orders stay the same. No order is cancelled:
+    # the filter costs time but never changes the revenue.
+    rng = random.Random(11)
+    order_ids = [row[0] for row in db.execute("SELECT order_id FROM apac.orders")]
+    db.executemany(
+        "INSERT INTO apac.order_events (order_id, type) VALUES (?, ?)",
+        ((order_id, rng.choice(EVENT_TYPES)) for order_id in order_ids for _ in range(EVENTS_PER_ORDER)),
+    )
+    db.execute("CREATE INDEX apac.order_events_order ON order_events(order_id)")
+    db.commit()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])

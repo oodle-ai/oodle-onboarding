@@ -7,9 +7,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && opentelemetry-bootstrap -a install
 
 COPY seed.py .
-RUN mkdir /data && python seed.py /data/warehouse.db
+RUN mkdir /data && python seed.py /data/warehouse.db /data/apac.db
 
-COPY app.py .
+COPY app.py apac_orders.py migrate.py ./
 
 EXPOSE 8080
 

@@ -54,10 +54,43 @@ sub-demo is for.
 | The model wrapper records no prompt, response, agent or conversation | `GenAi` | `chat <model>` spans with tokens only, not tied to any agent |
 | The in-house chat calls MCP over raw JSON-RPC | `ChatController` | A bare `POST` client span (`Java-http-client`) and no `execute_tool` span, so Oodle counts zero tool calls on that path |
 
+`MCP_TRACE_CONTEXT=true` in `../.env` closes the first two gaps for a tool
+call (see [Joining the agent's trace](#joining-the-agents-trace)). It is off by
+default, so a plain run still shows every gap in this table.
+
 Some gaps come from Anthropic's side and show up on their own: tool output
 is in `anthropic.tool_result.content`, not `gen_ai.tool.call.result`;
 `anthropic.model_request` spans carry no agent name; and `claude-platform`
 spans have no environment, so Oodle files them under `unset`.
+
+## Joining the agent's trace
+
+Anthropic's MCP connector sends the agent's trace context in the JSON-RPC body,
+as `params._meta.traceparent` on `tools/call`, and not as an HTTP header. The
+Java agent reads headers only, and it starts `POST /mcp` before the body is
+parsed, so that span always starts a trace of its own.
+
+With `MCP_TRACE_CONTEXT=true`, `McpTracing` starts a second server span from
+`_meta`. The handler runs inside it, so the tool's SQL and model calls join the
+agent's trace:
+
+```
+anthropic.mcp_tool_use getOrgEntryDetails     claude-platform
+└─ tools/call getOrgEntryDetails              claude-otel-mcp-web
+   ├─ SELECT fed_db.actors_list
+   ├─ SELECT meta_db.org_<n>_props            one per org
+   └─ SELECT meta_db.org_54_corp
+```
+
+The span has `mcp.method.name`, `mcp.session.id`, `jsonrpc.request.id`,
+`gen_ai.tool.name` and `anthropic.session.id` (from the connector's
+`X-Anthropic-Cma-Session-Id` header). A failed call records the exception on
+it. `POST /mcp` stays in its own trace, with a span link from the new span. The
+new span has no `gen_ai.operation.name`: `anthropic.mcp_tool_use` is already the
+`execute_tool` span, and a second one would count the call twice.
+
+Only `tools/call` carries the context, so `initialize` and `tools/list` stay in
+their own traces.
 
 ## Run
 

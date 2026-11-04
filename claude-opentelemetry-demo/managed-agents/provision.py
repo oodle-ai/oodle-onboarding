@@ -40,6 +40,8 @@ QUERY_WAREHOUSE = {
     },
 }
 
+MCP_SERVER_NAME = "firm-mcp"
+
 TOOLS = [
     {
         "type": "agent_toolset_20260401",
@@ -59,14 +61,35 @@ def workspace_headers() -> dict[str, str]:
     return {"anthropic-workspace-id": workspace_id} if workspace_id else {}
 
 
+def mcp_config() -> dict:
+    """The firm's MCP server, when MCP_PUBLIC_URL names it. Sessions then need MCP_ENVIRONMENT_ID."""
+    url = os.environ.get("MCP_PUBLIC_URL")
+    if not url:
+        return {"mcp_servers": [], "tools": TOOLS}
+    return {
+        "mcp_servers": [{"type": "url", "name": MCP_SERVER_NAME, "url": url}],
+        "tools": [
+            *TOOLS,
+            {
+                "type": "mcp_toolset",
+                "mcp_server_name": MCP_SERVER_NAME,
+                # main.py denies any call that asks for approval.
+                "default_config": {"permission_policy": {"type": "always_allow"}},
+            },
+        ],
+    }
+
+
 def update_agent(client: anthropic.Anthropic, agent_id: str) -> None:
-    """Give an agent made before the custom tool existed the current prompt and tools."""
+    """Bring an existing agent up to the current prompt, tools and MCP server."""
     agent = client.beta.agents.retrieve(agent_id)
+    config = mcp_config()
     has_tool = any(getattr(t, "name", None) == QUERY_WAREHOUSE["name"] for t in agent.tools)
-    if agent.system == SYSTEM and has_tool:
+    urls = [getattr(s, "url", None) for s in agent.mcp_servers or []]
+    if agent.system == SYSTEM and has_tool and urls == [s["url"] for s in config["mcp_servers"]]:
         return
-    agent = client.beta.agents.update(agent_id, version=agent.version, system=SYSTEM, tools=TOOLS)
-    print(f"Updated {agent_id} to version {agent.version}: added {QUERY_WAREHOUSE['name']}")
+    agent = client.beta.agents.update(agent_id, version=agent.version, system=SYSTEM, **config)
+    print(f"Updated {agent_id} to version {agent.version}: MCP servers {[s['url'] for s in config['mcp_servers']]}")
 
 
 def main() -> None:
@@ -95,7 +118,7 @@ def main() -> None:
             name="claude-otel-demo-analyst",
             model=MODEL,
             system=SYSTEM,
-            tools=TOOLS,
+            **mcp_config(),
         )
         agent_id = agent.id
 

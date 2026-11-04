@@ -93,6 +93,9 @@ make messages-api             # spans arrive from Anthropic's side
 make managed-agents-setup     # once: create the agent and environment, paste the ids into .env
 make managed-agents
 
+make managed-agents-incident  # the same session with a broken downstream service: a wrong answer, all green
+make managed-agents-mcp-incident  # a broken MCP tool: an error with no cause in the Console
+make managed-agents-fix       # undo the incident
 make mcp-backend-setup        # once: an environment that allows MCP egress, paste the id into .env
 make mcp-backend              # opens a public quick tunnel to the demo MCP server while it runs
 ```
@@ -113,8 +116,9 @@ the trace up in Oodle. The collector also prints each span it forwards
 | `DESTINATION_CONTENT_MODE` | destination script | The same choice, for the spans Anthropic sends |
 | `DESTINATION_WORKSPACES` | destination script | `all`, or comma-separated `wrkspc_...` ids |
 | `MANAGED_AGENT_ID`, `MANAGED_ENVIRONMENT_ID` | managed-agents | Printed by `make managed-agents-setup` |
-| `MCP_ENVIRONMENT_ID` | mcp-backend | Printed by `make mcp-backend-setup` |
+| `MCP_ENVIRONMENT_ID` | mcp-backend, managed-agents | Printed by `make mcp-backend-setup`. managed-agents uses it instead of `MANAGED_ENVIRONMENT_ID` when set |
 | `MCP_PUBLIC_URL` | mcp-backend | Optional. Your own public URL for the MCP server, instead of the quick tunnel |
+| `MCP_TRACE_CONTEXT` | mcp-backend | `true`: MCP tool calls join the agent's trace. Off by default, which keeps the [gaps](./mcp-backend/README.md#the-gaps-it-keeps) |
 | `CHAT_MODEL`, `SEARCH_MODEL` | mcp-backend | Models of the in-house chat and of the MCP server's search step. Default `claude-haiku-4-5` |
 
 ## API tracing destination
@@ -168,6 +172,8 @@ metadata only whatever this is set to.
 - `service.name = claude-otel-sdk`: `anthropic.messages.create`,
   `anthropic.messages.tool_runner`, `anthropic.custom_tool_use get_weather`,
   `anthropic.messages.count_tokens`.
+- `service.name = claude-otel-apac-orders`: the service the warehouse calls
+  for APAC's orders, and the source of `make managed-agents-incident`
 - `service.name = claude-otel-warehouse`: the managed-agents custom tool's
   service (`POST /query`, `SELECT`), in the session's trace under
   `anthropic.custom_tool_use query_warehouse`.
