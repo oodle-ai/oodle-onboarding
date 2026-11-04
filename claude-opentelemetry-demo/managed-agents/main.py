@@ -183,7 +183,8 @@ def run(client: anthropic.Anthropic, session_id: str, task: str, span: trace.Spa
 
 def main() -> None:
     agent_id = os.environ.get("MANAGED_AGENT_ID")
-    environment_id = os.environ.get("MANAGED_ENVIRONMENT_ID")
+    # MANAGED_ENVIRONMENT_ID blocks MCP egress, so an agent with an MCP server needs the MCP one.
+    environment_id = os.environ.get("MCP_ENVIRONMENT_ID") or os.environ.get("MANAGED_ENVIRONMENT_ID")
     if not agent_id or not environment_id:
         sys.exit("Set MANAGED_AGENT_ID and MANAGED_ENVIRONMENT_ID in .env (run `make managed-agents-setup`).")
     task = " ".join(sys.argv[1:]) or TASK

@@ -9,10 +9,12 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -31,58 +33,67 @@ import org.springframework.web.bind.annotation.RestController;
  *       org, before it looks at the method.</li>
  *   <li>GET /mcp answers 405: there is no server-to-client stream.</li>
  * </ul>
+ *
+ * <p>{@link McpTracing} closes the first two for a {@code tools/call} when
+ * MCP_TRACE_CONTEXT is true.
  */
 @RestController
 @ConditionalOnProperty(name = "demo.role", havingValue = "web")
 public class McpController {
     private final FirmDb db;
     private final GenAi genAi;
+    private final McpTracing tracing;
     private final ObjectMapper json;
     private final String searchModel;
 
-    public McpController(FirmDb db, GenAi genAi, ObjectMapper json,
+    public McpController(FirmDb db, GenAi genAi, McpTracing tracing, ObjectMapper json,
             @Value("${SEARCH_MODEL:claude-haiku-4-5}") String searchModel) {
         this.db = db;
         this.genAi = genAi;
+        this.tracing = tracing;
         this.json = json;
         this.searchModel = searchModel;
     }
 
     @PostMapping(value = "/mcp", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> mcp(@RequestBody JsonNode payload) {
+    public ResponseEntity<?> mcp(@RequestBody JsonNode payload, @RequestHeader HttpHeaders headers) {
         try {
-            Map<Integer, Map<String, String>> props = db.loadAllOrgProps();
-            JsonNode id = payload.get("id");
-            String method = payload.path("method").asText();
-            if (id == null || id.isNull()) {
-                // A notification (notifications/initialized and the like).
-                return ResponseEntity.accepted().build();
-            }
-            JsonNode params = payload.path("params");
-            return switch (method) {
-                case "initialize" -> ResponseEntity.ok()
-                        .header("Mcp-Session-Id", UUID.randomUUID().toString().replace("-", ""))
-                        .body(result(id, Map.of(
-                                "protocolVersion", params.path("protocolVersion").asText("2025-06-18"),
-                                "capabilities", Map.of("tools", Map.of("listChanged", false)),
-                                "serverInfo", Map.of("name", "firm-mcp", "version", "1.0.0"))));
-                case "ping" -> ResponseEntity.ok(result(id, Map.of()));
-                case "tools/list" -> ResponseEntity.ok(result(id, Map.of("tools", Tools.LIST)));
-                case "tools/call" -> {
-                    Object out = callTool(props, params.path("name").asText(), params.path("arguments"));
-                    yield ResponseEntity.ok(result(id, Map.of(
-                            "content", List.of(Map.of("type", "text", "text", json.writeValueAsString(out))),
-                            "isError", false)));
-                }
-                default -> ResponseEntity.ok(Map.of("jsonrpc", "2.0", "id", id,
-                        "error", Map.of("code", -32601, "message", "no method " + method)));
-            };
+            return tracing.inCallerTrace(payload, headers, () -> handle(payload));
         } catch (Exception e) {
             // Deliberate: answer 500 without letting the exception reach the
             // instrumentation, as the reference backend does. The span then
             // says 500 and nothing about the cause.
             return ResponseEntity.status(500).build();
         }
+    }
+
+    private ResponseEntity<?> handle(JsonNode payload) throws Exception {
+        Map<Integer, Map<String, String>> props = db.loadAllOrgProps();
+        JsonNode id = payload.get("id");
+        String method = payload.path("method").asText();
+        if (id == null || id.isNull()) {
+            // A notification (notifications/initialized and the like).
+            return ResponseEntity.accepted().build();
+        }
+        JsonNode params = payload.path("params");
+        return switch (method) {
+            case "initialize" -> ResponseEntity.ok()
+                    .header("Mcp-Session-Id", UUID.randomUUID().toString().replace("-", ""))
+                    .body(result(id, Map.of(
+                            "protocolVersion", params.path("protocolVersion").asText("2025-06-18"),
+                            "capabilities", Map.of("tools", Map.of("listChanged", false)),
+                            "serverInfo", Map.of("name", "firm-mcp", "version", "1.0.0"))));
+            case "ping" -> ResponseEntity.ok(result(id, Map.of()));
+            case "tools/list" -> ResponseEntity.ok(result(id, Map.of("tools", Tools.LIST)));
+            case "tools/call" -> {
+                Object out = callTool(props, params.path("name").asText(), params.path("arguments"));
+                yield ResponseEntity.ok(result(id, Map.of(
+                        "content", List.of(Map.of("type", "text", "text", json.writeValueAsString(out))),
+                        "isError", false)));
+            }
+            default -> ResponseEntity.ok(Map.of("jsonrpc", "2.0", "id", id,
+                    "error", Map.of("code", -32601, "message", "no method " + method)));
+        };
     }
 
     private Object callTool(Map<Integer, Map<String, String>> props, String name, JsonNode args) {

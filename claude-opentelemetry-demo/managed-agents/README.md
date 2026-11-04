@@ -93,7 +93,9 @@ the first turn's `gen_ai.output.messages` and the next turn's
 `gen_ai.input.messages`.
 
 The warehouse is a SQLite file of 2025 orders (`orders`, `products`), built
-from a fixed seed at image build time, so seeding adds no spans. Queries are
+from a fixed seed at image build time, so seeding adds no spans. APAC's orders
+are in the `apac-orders` service, which the warehouse fetches them from on
+each query. Queries are
 read-only (an authorizer allows `SELECT` only), capped at 200 rows and 5
 seconds. A bad query answers 400; `main.py` passes the message back with
 `is_error: true` so the agent can fix its SQL, and the tool span is marked
@@ -105,7 +107,7 @@ seconds. A bad query answers 400; `main.py` passes the message back with
 make managed-agents-setup   # once: prints MANAGED_AGENT_ID / MANAGED_ENVIRONMENT_ID
 # paste both into ../.env
 make managed-agents         # starts the warehouse, then runs a session
-make managed-agents-logs    # tail the warehouse
+make managed-agents-logs    # tail the warehouse and apac-orders
 
 # your own task:
 docker compose run --rm --build managed-agents main.py "Compute the first 20 primes and their sum"
@@ -130,9 +132,74 @@ with it, and an up-to-date one is left alone.
 
 A tool call that needs approval is denied, because nobody is watching.
 
+### Adding the MCP server
+
+To give the agent `mcp-backend`'s MCP tools as well, start `mcp-web` with a
+public URL, set `MCP_ENVIRONMENT_ID` (`make mcp-backend-setup`), and update the
+agent:
+
+```bash
+docker compose run --rm --no-deps -e MCP_PUBLIC_URL=https://<host>/mcp managed-agents provision.py
+```
+
+`main.py` uses `MCP_ENVIRONMENT_ID` when it's set, because the managed-agents
+environment blocks MCP egress. The agent keeps that URL, so a quick tunnel's
+new hostname needs this update again.
+
 The run prints the `trace_id` and the session's Console URL. The Console's
 session viewer shows the same session with no setup, which is useful for
 comparing against the trace.
+
+## The incident: a wrong answer with nothing red
+
+The agent can be wrong while every step of its session succeeds:
+
+```bash
+make managed-agents-incident   # drop an index on apac-orders, then run a session
+make managed-agents-fix        # put the index back
+```
+
+APAC's orders aren't in the warehouse. They live in `apac-orders`, a separate
+service the warehouse calls on each query. The incident is one schema change:
+`migrate.py` drops the index on `order_events(order_id)`. There's no injected
+delay or fake error. The query really does get slow:
+
+1. `apac-orders` now scans `order_events` once per order and takes about 14
+   seconds instead of a few tens of milliseconds.
+2. The warehouse's 8 second timeout fires. Its bug: it logs the failure and
+   answers **200 without APAC**, with nothing in the body saying so.
+3. `query_warehouse` returns a normal result with three regions, and the agent
+   reports EMEA as the fastest growing region (+21.4%). The right answer is
+   APAC (+86.3%).
+
+From the session's side this is a successful tool call with a plausible
+result: `is_error` is false and the session ends normally. The Console shows
+the symptom, a `query_warehouse` call of about 8 seconds where a healthy one
+takes about half a second, but no error and no reason. The cause is in a
+service the session knows nothing about. The trace has the whole chain:
+
+```
+anthropic.custom_tool_use query_warehouse  8.0s  OK     claude-otel-managed-agents
+└─ POST                                    8.0s  200
+   └─ POST /query                          8.0s  200    claude-otel-warehouse
+      ├─ GET apac-orders/orders            8.0s  ERROR  httpx.ReadTimeout
+      │  └─ GET /orders                    ~14s  200    claude-otel-apac-orders
+      │     └─ SELECT ... NOT EXISTS       ~14s         the slow query
+      └─ SELECT region, ...                2ms          ran without APAC
+```
+
+To find it in Oodle, open the `trace_id=` value the run prints and follow the
+error under the green tool span. A filter on `span::anthropic.session.id` also
+matches the API requests that read the session, so it can show those first.
+Compare the `SELECT` with a healthy run's, where the same statement takes a few
+tens of milliseconds.
+
+The agent's MCP server goes through the tunnel. If the tunnel is down or
+reconnecting when the session starts, the Console shows a red
+`mcp_connection_failed_error` that has nothing to do with this incident.
+
+The database is in the container, so anything that recreates `apac-orders`
+also undoes the incident. That includes `make managed-agents`.
 
 ## Cleanup
 

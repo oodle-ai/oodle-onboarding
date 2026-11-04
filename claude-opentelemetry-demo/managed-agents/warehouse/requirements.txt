@@ -1,6 +1,7 @@
 fastapi>=0.115.0
 uvicorn>=0.30.0
+httpx>=0.27.0
 # Zero-code instrumentation: `opentelemetry-bootstrap -a install` (Dockerfile)
-# adds the instrumentations for what's installed (FastAPI, sqlite3, ...).
+# adds the instrumentations for what's installed (FastAPI, httpx, sqlite3, ...).
 opentelemetry-distro>=0.51b0
 opentelemetry-exporter-otlp-proto-http>=1.30.0

@@ -1,5 +1,6 @@
 .PHONY: help build up down logs-collector destination-create destination-list \
-	messages-api sdk managed-agents-setup managed-agents managed-agents-logs mcp-backend-setup \
+	messages-api sdk managed-agents-setup managed-agents managed-agents-incident managed-agents-fix \
+	managed-agents-logs mcp-backend-setup \
 	mcp-backend mcp-backend-logs all clean
 
 RUN = docker compose run --rm
@@ -40,8 +41,18 @@ managed-agents: up ## Sub-demo 3: run a Managed Agents session (starts the wareh
 	docker compose --profile demo up -d --build --wait warehouse
 	$(RUN) --build managed-agents
 
-managed-agents-logs: ## Sub-demo 3: tail the warehouse service
-	docker compose --profile demo logs -f warehouse
+managed-agents-incident: up ## Sub-demo 3: break apac-orders, then run a session (a wrong answer, all green)
+	docker compose --profile demo build managed-agents
+	docker compose --profile demo up -d --build --wait warehouse
+	docker compose --profile demo exec apac-orders python migrate.py drop-index
+	@# --no-deps: `run` would otherwise recreate apac-orders, which brings the index back.
+	$(RUN) --no-deps managed-agents
+
+managed-agents-fix: ## Sub-demo 3: undo the incident
+	docker compose --profile demo exec apac-orders python migrate.py restore-index
+
+managed-agents-logs: ## Sub-demo 3: tail the warehouse and apac-orders
+	docker compose --profile demo logs -f warehouse apac-orders
 
 mcp-backend-setup: ## Sub-demo 4, once: create an environment that allows MCP egress
 	$(RUN) --build --no-deps -e DEMO_ROLE=provision mcp-backend
