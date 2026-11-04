@@ -10,6 +10,7 @@ services:
     environment:
       - OODLE_INSTANCE=${OODLE_INSTANCE}
       - OODLE_API_KEY=${OODLE_API_KEY}
+      - OODLE_OTLP_ENDPOINT=${OODLE_OTLP_ENDPOINT:-https://${OODLE_INSTANCE}-otlp.collector.oodle.ai}
     networks:
       - claude-otel-net
 
