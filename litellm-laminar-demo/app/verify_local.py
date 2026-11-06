@@ -49,6 +49,8 @@ class Row:
     attributes: dict
     start_time: int = 0
     scope: str = ""
+    # OTLP status code: 0 unset, 1 ok, 2 error.
+    status_code: int = 0
 
 
 class Capture:
@@ -66,7 +68,7 @@ class Capture:
                     rows.append(
                         Row(
                             service, s.name, s.trace_id.hex(), s.span_id.hex(), s.parent_span_id.hex(), attrs,
-                            s.start_time_unix_nano, ss.scope.name,
+                            s.start_time_unix_nano, ss.scope.name, s.status.code,
                         )
                     )
         with self._lock:
@@ -372,6 +374,35 @@ def turn_checks(rows: list[Row], backend: str, trace_ids: list[str]) -> list[tup
     ]
 
 
+def tool_outcome_checks(rows: list[Row], backend: str) -> list[tuple[str, bool]]:
+    """Check tool names, exit codes and finish reasons after export, since the mirror filters attributes."""
+    tools = [row for row in rows if row.name.startswith("tool_call [")]
+    shells = [row for row in tools if row.name == "tool_call [bash_execute]"]
+    streams = [row for row in rows if row.name == "llm_call_stream"]
+
+    def attr(row: Row, key: str):
+        return _value(row.attributes.get(key, _EMPTY))
+
+    def finish_reasons(row: Row) -> list[str]:
+        value = attr(row, "gen_ai.response.finish_reasons")
+        return [_value(v) for v in value.values] if value is not None else []
+
+    return [
+        (f"{backend}: every tool span names its tool",
+         bool(tools) and all(
+             row.name == f"tool_call [{attr(row, 'gen_ai.tool.name')}]"
+             # An operation name next to the tool name makes Laminar rename the span.
+             and attr(row, "gen_ai.operation.name") is None
+             and attr(row, "gen_ai.tool.call.id")
+             for row in tools)),
+        (f"{backend}: each scripted shell command exits 0 and is not an error",
+         bool(shells) and all(
+             attr(row, "process.exit.code") == 0 and row.status_code != 2 for row in shells)),
+        (f"{backend}: every streamed model call records one finish reason",
+         bool(streams) and all(len(finish_reasons(row)) == 1 for row in streams)),
+    ]
+
+
 def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_id: str) -> bool:
     laminar = [r for r in laminar if r.trace_id in trace_ids]
     oodle = [r for r in oodle if r.trace_id in trace_ids]
@@ -413,6 +444,8 @@ def report(laminar: list[Row], oodle: list[Row], trace_ids: list[str], session_i
     checks += identity_checks([r for r in oodle if r.span_id in lam_ids], "Oodle")
     checks += turn_checks(laminar, "Laminar", trace_ids)
     checks += turn_checks(oodle, "Oodle", trace_ids)
+    checks += tool_outcome_checks(laminar, "Laminar")
+    checks += tool_outcome_checks(oodle, "Oodle")
     print()
     for label, ok in checks:
         print(f"[{'PASS' if ok else 'FAIL'}] {label}")
