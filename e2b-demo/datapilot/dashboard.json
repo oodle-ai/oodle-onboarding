@@ -1,0 +1,403 @@
+{
+  "dashboard": {
+    "uid": "datapilot-e2b-oom",
+    "title": "DataPilot on E2B",
+    "description": "DataPilot agent signals next to the E2B sandbox signals, for the OOM demo.",
+    "tags": [
+      "e2b",
+      "datapilot",
+      "demo"
+    ],
+    "editable": true,
+    "schemaVersion": 39,
+    "refresh": "30s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "Prometheus",
+            "value": "prometheus"
+          },
+          "hide": 2,
+          "label": "Data source",
+          "name": "datasource",
+          "query": "prometheus",
+          "type": "datasource"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "type": "row",
+        "title": "What the agent sees (service datapilot-agent)",
+        "collapsed": false,
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 1
+        },
+        "panels": []
+      },
+      {
+        "id": 2,
+        "type": "timeseries",
+        "title": "Questions per minute, by outcome and error",
+        "description": "Each failed question shows the last error that the E2B SDK gave the agent.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 1,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 15,
+              "stacking": {
+                "mode": "normal"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "sum by (outcome, error_type) (increase(datapilot_analysis_requests[1m]))",
+            "legendFormat": "{{outcome}} {{error_type}}",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "type": "timeseries",
+        "title": "Failed questions per minute, by tenant, question and planner",
+        "description": "The failures come from one tenant, one question, and planner v2 only.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 1,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "stacking": {
+                "mode": "none"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "sum by (tenant, question, planner_version) (increase(datapilot_analysis_requests{outcome=\"error\"}[1m]))",
+            "legendFormat": "{{tenant}} {{question}} {{planner_version}}",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "type": "row",
+        "title": "What the sandbox shows (E2B OTel export and datapilot-kernel)",
+        "collapsed": false,
+        "gridPos": {
+          "x": 0,
+          "y": 9,
+          "w": 24,
+          "h": 1
+        },
+        "panels": []
+      },
+      {
+        "id": 5,
+        "type": "timeseries",
+        "title": "Sandboxes: the agent's count and E2B's count",
+        "description": "The agent stops to count a session when the session fails, but it does not kill the sandbox. E2B counts the sandbox until its timeout ends.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 10,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "stacking": {
+                "mode": "none"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "sum(datapilot_sessions_active)",
+            "legendFormat": "agent: sessions that hold a sandbox",
+            "range": true,
+            "editorMode": "code"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "B",
+            "expr": "sum(e2b_team_sandbox_running)",
+            "legendFormat": "E2B: sandboxes running",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "type": "timeseries",
+        "title": "Sandbox memory used (E2B, sampled every 5s)",
+        "description": "Memory of the whole sandbox VM, measured from outside the VM. A drop to the idle level in the middle of a session means that the kernel was killed and restarted.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 10,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "stacking": {
+                "mode": "none"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "max by (sandbox_id) (last_over_time(e2b_sandbox_ram_used[30s]))",
+            "legendFormat": "{{sandbox_id}}",
+            "range": true,
+            "editorMode": "code"
+          },
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "B",
+            "expr": "max(last_over_time(e2b_sandbox_ram_total[30s]))",
+            "legendFormat": "memory limit",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "type": "timeseries",
+        "title": "Kernel memory as the kernel reports it (datapilot-kernel, every 10s)",
+        "description": "The kernel reports its own memory on a timer. A kernel that is killed between two reports never reports the peak.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 0,
+          "y": 18,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 0,
+              "stacking": {
+                "mode": "none"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "max by (sandbox_id, tenant) (last_over_time(datapilot_kernel_rss[30s]))",
+            "legendFormat": "{{tenant}} {{sandbox_id}}",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "type": "timeseries",
+        "title": "Sessions per minute, by outcome",
+        "description": "failed means that the session could not start a sandbox, for example because the team reached its limit of concurrent E2B sandboxes.",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "gridPos": {
+          "x": 12,
+          "y": 18,
+          "w": 12,
+          "h": 8
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineWidth": 2,
+              "fillOpacity": 15,
+              "stacking": {
+                "mode": "normal"
+              },
+              "spanNulls": false
+            }
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
+            "refId": "A",
+            "expr": "sum by (outcome, error_type) (increase(datapilot_sessions[1m]))",
+            "legendFormat": "{{outcome}} {{error_type}}",
+            "range": true,
+            "editorMode": "code"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

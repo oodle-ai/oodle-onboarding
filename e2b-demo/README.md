@@ -7,6 +7,10 @@ Oodle.
 E2B sends the telemetry, not this demo. The demo only makes sandboxes run,
 because E2B exports metrics and logs only while sandboxes run.
 
+For a realistic application, see [`datapilot/`](datapilot/README.md). It is
+an AI data analyst that runs its code in E2B sandboxes. It makes an
+out-of-memory (OOM) incident and shows how the E2B telemetry finds its cause.
+
 ## Prerequisites
 
 - An E2B team with the

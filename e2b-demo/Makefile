@@ -1,4 +1,5 @@
-.PHONY: help run run-forever smoke verify verify-logs
+.PHONY: help run run-forever smoke verify verify-logs \
+	datapilot-template datapilot-incident datapilot-baseline datapilot-oom-once datapilot-cleanup
 
 SANDBOXES ?= 3
 PHASE_SECS ?= 90
@@ -12,6 +13,13 @@ help:
 	@echo "  make run-forever  - Run rounds until you stop it (Ctrl+C)"
 	@echo "  make verify       - Check that E2B metrics reached Oodle"
 	@echo "  make verify-logs  - Check that E2B logs reached Oodle"
+	@echo ""
+	@echo "DataPilot OOM scenario (see datapilot/README.md):"
+	@echo "  make datapilot-template  - Build the datapilot-analyst E2B template (once)"
+	@echo "  make datapilot-incident  - 5 min healthy traffic, then the planner v2 rollout"
+	@echo "  make datapilot-baseline  - Healthy traffic only (planner v1)"
+	@echo "  make datapilot-oom-once  - One globex session on planner v2 (one OOM)"
+	@echo "  make datapilot-cleanup   - Kill all DataPilot sandboxes"
 
 check-env:
 	@test -f .env || { echo "Error: .env not found. Run: cp .env.example .env"; exit 1; }
@@ -49,3 +57,25 @@ verify-logs: check-oodle
 		> /tmp/e2b-logs-query.ndjson; \
 	oodle logs query -f /tmp/e2b-logs-query.ndjson --start -30m -o json 2>/dev/null \
 		| python3 -c 'import json,sys; r=json.load(sys.stdin)["responses"][0]; b=r["aggregations"]["m"]["buckets"]; [print("  %5d  %s" % (x["doc_count"], x["key"])) for x in b] or print("  (none yet, start a sandbox first)")'
+
+USERS ?= 4
+MINUTES ?= 16
+ROLLOUT_AFTER ?= 300
+
+check-oodle-env: check-env
+	@grep -q '^OODLE_API_KEY=' .env || { echo "Error: set OODLE_INSTANCE and OODLE_API_KEY in .env"; exit 1; }
+
+datapilot-template: check-env
+	cd datapilot && uv run build_template.py
+
+datapilot-incident: check-oodle-env
+	cd datapilot && uv run agent.py --users $(USERS) --minutes $(MINUTES) --rollout-after $(ROLLOUT_AFTER)
+
+datapilot-baseline: check-oodle-env
+	cd datapilot && uv run agent.py --users $(USERS) --minutes $(MINUTES) --rollout-after -1
+
+datapilot-oom-once: check-oodle-env
+	cd datapilot && uv run agent.py --users 1 --minutes 0.1 --planner v2 --rollout-after -1 --tenant globex
+
+datapilot-cleanup: check-env
+	cd datapilot && uv run cleanup.py
