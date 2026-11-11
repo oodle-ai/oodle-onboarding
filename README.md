@@ -37,6 +37,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [laminar-litellm-demo](./laminar-litellm-demo) | Traces | One LiteLLM coding agent traced by LiteLLM's own `otel` callback and by Laminar's callback, side by side, into Oodle or a self-hosted Laminar |
 | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | Traces | Vercel AI SDK 7 agents, steps and tool calls through `@ai-sdk/otel` |
 | [eve-demo](./eve-demo) | Traces | Agents on Vercel's eve framework: durable sessions, tools and full transcripts |
+| [flue-demo](./flue-demo) | Traces | Agents on the Flue framework through `@flue/opentelemetry`: model turns, tool calls, a subagent task and conversations |
 | [openclaw-demo](./openclaw-demo) | Traces | Real OpenClaw agent traced through the real Langfuse SDK: observations described in the `langfuse.*` namespace instead of the GenAI semconv one, exported over OTLP |
 | [opencode-demo](./opencode-demo) | Traces | Real OpenCode CLI traced through the Langfuse OpenCode plugin into Oodle's Langfuse-compatible endpoint: turns, model steps, tool calls, sub-agents, sessions. Keeps OpenCode's native OTLP export as a repro of why the plugin is used |
 | [k8s-otel-operator](./k8s-otel-operator) | Traces, metrics, logs | Zero-code auto-instrumentation on Kubernetes via the OpenTelemetry Operator |
@@ -56,6 +57,7 @@ end to end without wiring one up first.
 | Langfuse | [langfuse-demo](./langfuse-demo), [langfuse-native-demo](./langfuse-native-demo) | Python, TypeScript |
 | Vercel AI SDK | [vercel-ai-sdk-demo](./vercel-ai-sdk-demo) | TypeScript |
 | eve | [eve-demo](./eve-demo) | TypeScript |
+| Flue | [flue-demo](./flue-demo) | TypeScript |
 | OpenLIT | [openlit-demo](./openlit-demo) | Python |
 | OpenAI | [openai-demo](./openai-demo) | Python |
 | Pydantic AI | [pydantic-ai-demo](./pydantic-ai-demo) | Python |
