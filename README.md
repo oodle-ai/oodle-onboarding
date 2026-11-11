@@ -43,6 +43,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [temporal-demo](./temporal-demo) | Metrics, traces, logs | Temporal workflow observability with self-hosted server, Python SDK, and OTel |
 | [cockroachdb-demo](./cockroachdb-demo) | Metrics | Three-node CockroachDB cluster under `movr` load; OTel Collector scrapes each node's built-in `/_status/vars` Prometheus endpoint; no database config changes |
 | [lambda-demo](./lambda-demo) | Metrics, logs, traces | Python AWS Lambda function with the OpenTelemetry collector layer and the Python layer, which loads only the instrumentations the function needs. It sends straight to Oodle, with no CloudWatch in the path. |
+| [lambda-otel-exphistogram-demo](./lambda-otel-exphistogram-demo) | Metrics | Lambda latency gauges (OpenTelemetry layers, delta temporality) turned into one exponential histogram by a gateway collector (`signal_to_metrics`, `deltatocumulative`, 15s `interval`). `verify.py` checks count, sum and quantiles in Oodle against the true values |
 | [convox-demo](./convox-demo) | Logs | Deploy a Rails app on Convox v2 (AWS ECS) and route each app's logs to Oodle via a host-local Fluent Bit agent (per-app identity resolved from ECS introspection); dual-write to CloudWatch during migration, then single-write to Oodle — no app code changes |
 
 ## Agent Observability demos
