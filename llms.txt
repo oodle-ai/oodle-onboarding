@@ -30,6 +30,7 @@ Pick by your current stack and what you want to send:
 | Langfuse SDK + OpenInference | Traces | Langfuse `generation` around an OpenInference-instrumented OpenAI call with hidden payloads; tokens on the child, messages on the wrapper | [langfuse-openinference-demo](langfuse-openinference-demo/README.md) |
 | Pipecat (voice agents) + Langfuse | Traces | Voice agent dual-writing to Langfuse and Oodle two ways: plain OTel exporters on Pipecat's provider, or the Langfuse SDK with Oodle as a second destination | [pipecat-demo](pipecat-demo/README.md) |
 | LiveKit Agents (voice agents) | Traces | Live browser voice agent traced per call with personal data (`lk.pii.*`, `gen_ai.*.messages`) or without it (`allow_pii=False`); plus a replay of a captured call | [livekit-demo](livekit-demo/README.md) |
+| None (greenfield) | Traces | AI agent observability (Flue + `@flue/opentelemetry`) | [flue-demo](flue-demo/README.md) |
 | OpenCode + Langfuse OpenCode plugin | Traces | Real OpenCode CLI traced into Oodle's Langfuse-compatible endpoint; native OTLP export kept as a repro | [opencode-demo](opencode-demo/README.md) |
 | None (Kubernetes) | Traces, metrics, logs | Zero-code auto-instrumentation via OTel Operator | [k8s-otel-operator](k8s-otel-operator/README.md) |
 | None (Temporal) | Metrics, traces, logs | Temporal workflow observability (Python SDK + server) | [temporal-demo](temporal-demo/README.md) |
@@ -271,6 +272,18 @@ A LiveKit Agents 1.8 voice agent (browser WebRTC through a local LiveKit server,
 - Spans emitted: `agent_session`, `agent_turn`, `user_turn`, `llm_node`, `llm_fallback_adapter`, `llm_request`, `function_tool`, `tts_node`, `tts_request` and the rest of LiveKit's tree, scope `livekit-agents`
 - Env: `DEFAULT_PII_MODE=allow|withhold` for clients that do not ask; `OTEL_SERVICE_NAME` (default `livekit-voice-worker`); `AGENT_NAME` must match between the agent and the token server
 - Gotcha: `LIVEKIT_TELEMETRY_ALLOW_PII` only applies when `allow_pii` is not passed; a LiveKit Cloud project that mandates redaction strips PII for every exporter and `allow_pii=True` cannot override it
+
+### flue-demo
+
+A Flue agent (`@flue/runtime` 2.3, Node target, built with `vite build`) traced through Flue's own OpenTelemetry adapter, `@flue/opentelemetry`. `src/telemetry.ts` builds a `NodeTracerProvider` with an OTLP exporter and registers `createOpenTelemetryInstrumentation()` with `instrument()`; `src/app.ts` imports it first. The `TripPlanner` agent has two tools and a `packing` subagent, so one message produces `invoke_agent TripPlanner`, a `chat <model>` span per model turn (messages, system instructions, tool definitions, `gen_ai.usage.*`), `execute_tool` spans and a child `invoke_agent packing`. Only `chat` spans carry tokens. Every turn of one conversation shares `gen_ai.conversation.id` (Flue's `conv_...` id); the URL id is `flue.instance.id`. This is the setup the Flue tile on the Oodle Integrations page ships.
+
+- Languages: TypeScript (Node.js)
+- Infra: Docker Compose (agent + OTel Collector)
+- Signals: Traces (LLM agent-specific)
+- Instrumentation: `@flue/opentelemetry`, OTLP through a collector (direct mode is an env change)
+- Requires: Oodle credentials + an OpenAI API key
+- Config files: `agent/src/telemetry.ts`, `agent/src/app.ts`, `otel-collector-config.yaml`, `docker-compose.yml`
+- Gotcha: `flue run` loads only the agent module and never `app.ts`, so telemetry imported there does not run under the CLI; pin the OTel packages (the newest exporter and `sdk-trace-node` 2.x need different `@opentelemetry/api` versions) and `@earendil-works/pi-ai` 1.4.0 (`@flue/runtime` 2.3.0 imports `Type`, which pi-ai 1.5.0 removed)
 
 ### opencode-demo
 
