@@ -72,9 +72,12 @@ Read this before you copy the demo into your own agent.
   starts (an HTTP call, a database query) is sent only when the
   provider is global, and it then joins the agent trace under that
   tool.
-- **Flush, but do not exit, on SIGTERM.** The Flue server drains
-  active work on that signal and then exits. `telemetry.ts` only
-  flushes the last batch.
+- **Flush when each submission settles, not on SIGTERM.** The Flue
+  server calls `process.exit` as soon as it has stopped, so a flush
+  started from a signal listener never ends. A three-turn run lost its
+  last two turns that way. `telemetry.ts` flushes on
+  `submission_settled`, so each turn is sent when it ends. A turn that
+  a restart interrupts sends no spans.
 - **Content is on by default.** Prompts, replies, tool arguments and
   results are sent. Set `FLUE_TRACE_CONTENT=false` to send spans with
   the model, tokens and tool names only.
@@ -120,7 +123,7 @@ make help        # view available commands
    ```bash
    make test-chat      # one turn: two tools and the packing subagent
    make test-followup  # a second turn on the same conversation
-   make test-unknown   # a city with no forecast: the tool result carries an error
+   make test-unknown   # a mythical city: the model answers without the tools
    make test-all       # all three, in order
    ```
 

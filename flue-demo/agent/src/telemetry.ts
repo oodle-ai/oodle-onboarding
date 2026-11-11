@@ -14,7 +14,7 @@
  * no-op global meter.
  */
 import { createOpenTelemetryInstrumentation } from '@flue/opentelemetry';
-import { instrument } from '@flue/runtime';
+import { instrument, observe } from '@flue/runtime';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { BatchSpanProcessor, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
@@ -40,19 +40,18 @@ tracerProvider.register();
 // default. Set FLUE_TRACE_CONTENT=false to send spans without it.
 const content = process.env.FLUE_TRACE_CONTENT === 'false' ? false : undefined;
 
-instrument(
-  createOpenTelemetryInstrumentation({
-    tracer: tracerProvider.getTracer('@flue/opentelemetry'),
-    content,
-  }),
-);
+const instrumentation = createOpenTelemetryInstrumentation({
+  tracer: tracerProvider.getTracer('@flue/opentelemetry'),
+  content,
+});
 
-// The batch processor holds the spans of the latest turns until its
-// next export, so flush when the container stops. The Flue server owns
-// the process exit: it drains active work and then exits, so this
-// listener only flushes and must not call process.exit itself.
-for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-  process.on(signal, () => {
-    void tracerProvider.forceFlush();
-  });
-}
+instrument(instrumentation);
+
+// The batch processor holds spans until its next export, and the Flue
+// server calls process.exit as soon as it has stopped on
+// SIGTERM. An async flush started from a signal listener does not end
+// before that, so the spans of the last turns were lost. Flush when
+// each submission settles instead: every turn is sent when it ends.
+observe((event) => {
+  if (event.type === 'submission_settled') void tracerProvider.forceFlush();
+});

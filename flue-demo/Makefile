@@ -34,7 +34,7 @@ test-chat: ## One turn: two tools and a packing subagent
 test-followup: ## Second turn on the same conversation
 	@$(CHAT) "And what about Tokyo?"
 
-test-unknown: ## A city with no forecast: the tool result carries an error
+test-unknown: ## A city with no forecast: the model answers without the tools
 	@$(CHAT) "Plan a day in Atlantis."
 
 test-all: ## Run a three-turn conversation

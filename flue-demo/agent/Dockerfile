@@ -13,6 +13,5 @@ RUN npx vite build
 
 ENV PORT=8099
 EXPOSE 8099
-# Exec form, so SIGTERM reaches the Flue server. It drains active work
-# before it exits, and telemetry.ts flushes the last spans on that signal.
+# Exec form, so SIGTERM reaches the Flue server and it stops cleanly.
 CMD ["node", "dist/server.mjs"]
