@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Fictional order data for the Oodle AWS tool demos
+Parameters:
+  RuntimeRoleName:
+    Type: String
+    Default: ''
+    Description: Optional existing AgentCore runtime role to grant read-only tool access
+Conditions:
+  HasRuntimeRole: !Not [!Equals [!Ref RuntimeRoleName, '']]
+Resources:
+  Orders:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-orders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH
+  ReturnPolicy:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${AWS::StackName}/return-policy
+      Type: String
+      Value: '{"return_window_days":30,"condition":"Item must be undamaged","shipping":"Free returns"}'
+  RuntimeToolAccess:
+    Type: AWS::IAM::Policy
+    Condition: HasRuntimeRole
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-read-tools
+      Roles: [!Ref RuntimeRoleName]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: dynamodb:GetItem
+            Resource: !GetAtt Orders.Arn
+          - Effect: Allow
+            Action: ssm:GetParameter
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/return-policy
+Outputs:
+  OrdersTableName:
+    Value: !Ref Orders
+  ReturnPolicyParameter:
+    Value: !Ref ReturnPolicy
