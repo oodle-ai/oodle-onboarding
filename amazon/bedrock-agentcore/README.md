@@ -17,27 +17,38 @@ Client → AgentCore Runtime → Strands agent → Bedrock Converse
 
 ## How traces work
 
-The guide starts the agent under ADOT with `opentelemetry-instrument python
-main.py`.  This demo uses direct-code deployment (no Dockerfile), so the same
-instrumentors are installed programmatically in `telemetry.py`.  A Docker
-deployment would replace the CMD with the guide's wrapper and set the OTEL_*
-env vars listed in `deploy.py`.
+The guide's agent (`07-observability/agent/`) is a hand-written
+`ThreadingHTTPServer` started under ADOT via `opentelemetry-instrument python
+main.py` in the Dockerfile.  ADOT creates the TracerProvider, installs
+botocore instrumentation, and provides a BaggageSpanProcessor that copies
+baggage onto spans — all before user code runs.  The guide's `main.py` uses a
+`traced()` context manager on every request to extract the runtime's trace
+context from HTTP headers and set `session.id` as baggage.  The guide's
+`trail.py` is a Strands hook that records the tool calls the model makes and
+enforces a tool-call budget per turn; it is not telemetry code.
+
+This demo uses `BedrockAgentCoreApp` with direct-code deployment (no
+Dockerfile), so the same instrumentors are installed programmatically in
+`telemetry.py`.  A Docker deployment would replace the CMD with the guide's
+`opentelemetry-instrument` wrapper and set the OTEL_* env vars listed in
+`deploy.py`.
 
 **Botocore auto-instrumentation** — ADOT's `BotocoreInstrumentor` adds a span
 for every AWS SDK call (DynamoDB, SSM, Bedrock Converse).  The agent's own tool
 code does not create manual SDK spans; the instrumentor handles it.
 
 **BaggageSpanProcessor** — the entrypoint sets `session.id` as OTel baggage.
-A custom `SpanProcessor` copies it onto every child span so that every span in
-a turn's trace carries the session identifier.  Plain OpenTelemetry leaves
-baggage off spans; the guide adds this processor so queries can filter by
+In the guide's Docker path, ADOT provides the processor natively.  This demo
+installs it explicitly in `telemetry.py` for the programmatic setup.  The
+processor copies session.id onto every child span so queries can filter by
 session.
 
-**`traced()` context manager** — propagates the runtime's trace context from
-HTTP request headers and sets session baggage.  `BedrockAgentCoreApp` is built
-on Starlette, which ADOT instruments automatically, so trace context flows
-without this helper.  `traced()` is provided for hand-written HTTP servers or
-when the runtime headers are not propagated by the framework.
+**`traced()` context manager** — extracts the runtime's trace context from HTTP
+request headers and sets session baggage.  The guide uses it because its
+hand-written HTTP server is not auto-instrumented by ADOT.
+`BedrockAgentCoreApp` runs on Starlette, which ADOT instruments automatically,
+so trace context flows without this helper.  `traced()` is provided in
+`telemetry.py` for the same pattern when using a hand-written server.
 
 ## Run locally first
 

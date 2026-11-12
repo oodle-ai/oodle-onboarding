@@ -1,23 +1,26 @@
 """ADOT auto-instrumentation with Oodle OTLP export.
 
-Follows the AgentCore observability guide: ADOT instruments botocore,
-a BaggageSpanProcessor copies session.id onto every span, and traced()
-propagates the runtime's trace context for hand-written servers.
+Follows the AgentCore observability guide (levantar-ai/demos/agentcore/
+07-observability). The guide's agent is a hand-written ThreadingHTTPServer
+started under ADOT via ``opentelemetry-instrument python main.py`` in the
+Dockerfile. ADOT handles TracerProvider creation, botocore instrumentation,
+and copies baggage onto spans (the BaggageSpanProcessor) before user code
+runs. The ``traced()`` context manager in the guide's main.py extracts the
+runtime's trace context from request headers and sets session.id as baggage
+so ADOT's processor copies it onto every child span.
 
-The guide's Dockerfile uses ``opentelemetry-instrument`` to bootstrap ADOT.
-This demo uses direct-code deployment, so the same instrumentors are
-installed programmatically below; a Docker deployment would replace the
-CMD with ``["opentelemetry-instrument", "python", "main.py"]`` and set
+This demo uses direct-code deployment with BedrockAgentCoreApp (no
+Dockerfile), so the same instrumentors are installed programmatically below.
+A Docker deployment would replace the CMD with the guide's wrapper and set
 the OTEL_* env vars listed in deploy.py.
 """
 
 import os
 from contextlib import contextmanager
 
-from opentelemetry import baggage, context, trace
+from opentelemetry import baggage, context, propagate, trace
 from opentelemetry.exporter.otlp.proto.http import Compression
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.propagate import extract
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -26,9 +29,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 class BaggageSpanProcessor(SpanProcessor):
     """Copy session.id from OTel baggage onto every span.
 
-    Plain OpenTelemetry leaves baggage off spans.  This processor propagates
-    the session identifier set in the entrypoint so every span in the trace
-    carries it and queries can filter by session.
+    In the guide's Docker path, ADOT provides this natively. This demo
+    installs it explicitly for the programmatic setup path.
     """
 
     def on_start(self, span, parent_context=None):
@@ -39,15 +41,18 @@ class BaggageSpanProcessor(SpanProcessor):
 
 @contextmanager
 def traced(headers, session):
-    """Propagate the runtime's trace context and set session.id as baggage.
+    """Run the block inside the trace the runtime started for this request.
+
+    The runtime sends its trace context on the request's headers. This
+    extracts it and sets the session id as baggage so the
+    BaggageSpanProcessor copies it onto every span started inside the block.
 
     BedrockAgentCoreApp runs on Starlette, which ADOT instruments, so trace
-    context flows without this helper.  Use traced() when running a
-    hand-written HTTP server or when the runtime headers are not propagated
-    automatically.
+    context flows without this helper. The guide's hand-written HTTP server
+    uses this on every request (see 07-observability/agent/main.py).
     """
-    ctx = extract(dict(headers) if headers else {})
-    if session and baggage.get_baggage("session.id", ctx) != session:
+    ctx = propagate.extract(headers)
+    if baggage.get_baggage("session.id", ctx) != session:
         ctx = baggage.set_baggage("session.id", session, ctx)
     token = context.attach(ctx)
     try:
@@ -57,7 +62,7 @@ def traced(headers, session):
 
 
 def setup_telemetry(service_name: str) -> TracerProvider:
-    """Install ADOT instrumentors, configure Oodle export, add BaggageSpanProcessor."""
+    """Programmatic equivalent of the guide's ``opentelemetry-instrument`` wrapper."""
     instance = os.environ.get("OODLE_INSTANCE", "").strip()
     api_key = os.environ.get("OODLE_API_KEY", "").strip()
     if not instance or not api_key or instance == "your-instance-id" or api_key == "your-api-key":
