@@ -2,6 +2,7 @@ temporalio[opentelemetry]==1.11.0
 opentelemetry-exporter-otlp-proto-grpc>=1.33.0
 opentelemetry-exporter-otlp-proto-http>=1.33.0
 opentelemetry-instrumentation-google-genai==0.7b1
-google-genai>=1.0.0
+# The GenAI instrumentation does not support google-genai 3 yet, and skips itself on it.
+google-genai>=1.0.0,<3
 httpx>=0.27
 aiohttp>=3.9
