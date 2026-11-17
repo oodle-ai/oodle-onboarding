@@ -148,8 +148,15 @@ that layer.
 
 ## Limitations
 
+> **Important**: As of Codex CLI 0.167.2, the `[otel]` config section is parsed
+> and validated, but the actual OTLP export pipeline is gated behind an OpenAI
+> server-side feature flag. The config in this demo is correct and will activate
+> when OAI enables the gate. Until then, Codex telemetry flows only to OpenAI's
+> internal backend.
+
 | Required for Agent Observability | Available? | Notes |
 |---|---|---|
+| OTLP export to custom endpoint | ⏳ Gated | Config accepted but export is server-side gated by OAI |
 | `gen_ai.operation.name` | ❌ | Codex native spans do not set GenAI semantic conventions |
 | Prompt/response content | Opt-in | Enable `log_user_prompt` / `log_agent_responses` |
 | Cost per turn | ❌ | Not exposed. Use token counts × model pricing. |
