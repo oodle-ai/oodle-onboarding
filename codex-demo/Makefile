@@ -24,12 +24,12 @@ stop:
 enable-codex-otel:
 	@echo 'Adding [otel] section to ~/.codex/config.toml ...'
 	@grep -q '^\[otel\]' ~/.codex/config.toml 2>/dev/null || \
-		printf '\n[otel]\nenvironment = "demo"\nexporter = "otlp-http"\n\n[otel.otlp-http]\nendpoint = "http://localhost:4318"\n' >> ~/.codex/config.toml
+		printf '\n[otel]\nenvironment = "demo"\n\n[otel.exporter.otlp-http]\nendpoint = "http://localhost:4318"\n' >> ~/.codex/config.toml
 	@echo "✓ Codex native OTel enabled → http://localhost:4318"
 	@echo "  Restart any running Codex session for changes to take effect."
 
 disable-codex-otel:
-	@echo "To disable: remove the [otel] and [otel.otlp-http] sections from ~/.codex/config.toml."
+	@echo "To disable: remove the [otel] and [otel.exporter.otlp-http] sections from ~/.codex/config.toml."
 
 # ── Smoke test ──────────────────────────────────────────────
 # Runs a one-shot Codex task against the disposable workspace.

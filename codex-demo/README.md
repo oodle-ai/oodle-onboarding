@@ -95,22 +95,21 @@ All signals carry: `auth_mode`, `originator`, `session_source`, `model`, `app.ve
 ```toml
 [otel]
 environment = "demo"
-exporter = "otlp-http"
 
-[otel.otlp-http]
+[otel.exporter.otlp-http]
 endpoint = "http://localhost:4318"
 ```
 
-Full options:
+Full options under `[otel]`:
 
 | Key | Values | Default | Notes |
 |---|---|---|---|
-| `exporter` | `"none"`, `"otlp-http"`, `"otlp-grpc"` | `"none"` | Transport to the collector |
 | `environment` | any string | `"dev"` | Sets `deployment.environment` |
 | `log_user_prompt` | `true` / `false` | `false` | Capture prompt text in events |
 | `log_agent_responses` | `true` / `false` | `false` | Capture response text in events |
 | `log_guardian_assessments` | `true` / `false` | `false` | Capture guardian decisions |
-| `metrics_exporter` | `"none"` / exporter name | `"none"` | Separate metrics exporter if needed |
+
+The exporter is configured as a table: `[otel.exporter.otlp-http]` or `[otel.exporter.otlp-grpc]`, each with an `endpoint` key. Omit the `[otel.exporter.*]` section to disable export.
 
 > **Note**: `[otel]` can only be set in the user config (`~/.codex/config.toml`),
 > not in project-level configs.
