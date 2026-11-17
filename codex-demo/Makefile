@@ -1,8 +1,8 @@
-.PHONY: setup collector stop smoke-test clean enable-codex-otel disable-codex-otel
+.PHONY: setup collector stop smoke-test clean enable-codex-otel disable-codex-otel install-client client-test
 
 # ── Setup ───────────────────────────────────────────────────
 setup: .env
-	@echo "✓ .env ready. Run 'make collector' then 'make enable-codex-otel'."
+	@echo "✓ .env ready. Run 'make collector' then 'make install-client'."
 
 .env:
 	@if [ ! -f .env ]; then \
@@ -18,21 +18,29 @@ collector:
 stop:
 	docker compose down
 
-# ── Codex native OTel ───────────────────────────────────────
+# ── Instrumented app-server client ──────────────────────────
+install-client:
+	cd client && npm install
+	@echo "✓ Client dependencies installed."
+
+client-test:
+	cd client && CODEX_CWD=$(CURDIR)/workspace \
+		node index.mjs "Read hello.txt and tell me what it says"
+
+# ── Codex native OTel (optional) ────────────────────────────
 # Enable Codex's built-in OTLP export pointing at the local collector.
 # This modifies ~/.codex/config.toml — back it up first if needed.
 enable-codex-otel:
 	@echo 'Adding [otel] section to ~/.codex/config.toml ...'
 	@grep -q '^\[otel\]' ~/.codex/config.toml 2>/dev/null || \
-		printf '\n[otel]\nenvironment = "demo"\n\n[otel.exporter.otlp-http]\nprotocol = "binary"\nendpoint = "http://localhost:4318"\n' >> ~/.codex/config.toml
+		printf '\n[otel]\nenvironment = "demo"\n\n[otel.trace_exporter.otlp-http]\nprotocol = "binary"\nendpoint = "http://localhost:4318"\n\n[otel.metrics_exporter.otlp-http]\nprotocol = "binary"\nendpoint = "http://localhost:4318"\n' >> ~/.codex/config.toml
 	@echo "✓ Codex native OTel enabled → http://localhost:4318"
-	@echo "  Restart any running Codex session for changes to take effect."
+	@echo "  Restart the Codex desktop app for changes to take effect."
 
 disable-codex-otel:
-	@echo "To disable: remove the [otel] and [otel.exporter.otlp-http] sections from ~/.codex/config.toml."
+	@echo "To disable: remove the [otel], [otel.trace_exporter.otlp-http], and [otel.metrics_exporter.otlp-http] sections from ~/.codex/config.toml."
 
-# ── Smoke test ──────────────────────────────────────────────
-# Runs a one-shot Codex task against the disposable workspace.
+# ── Smoke test (codex exec, no instrumentation) ─────────────
 smoke-test:
 	cd workspace && codex exec \
 		--sandbox read-only \
