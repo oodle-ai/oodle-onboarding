@@ -96,8 +96,8 @@ All signals carry: `auth_mode`, `originator`, `session_source`, `model`, `app.ve
 [otel]
 environment = "demo"
 
-[otel.exporter]
-protocol = "otlp-http"
+[otel.exporter.otlp-http]
+protocol = "binary"
 endpoint = "http://localhost:4318"
 ```
 
@@ -110,7 +110,7 @@ Full options under `[otel]`:
 | `log_agent_responses` | `true` / `false` | `false` | Capture response text in events |
 | `log_guardian_assessments` | `true` / `false` | `false` | Capture guardian decisions |
 
-The exporter is configured under `[otel.exporter]` with `protocol` (`"otlp-http"` or `"otlp-grpc"`) and `endpoint`. Omit `[otel.exporter]` to disable export.
+The exporter is configured under `[otel.exporter.<transport>]` where transport is `otlp-http` or `otlp-grpc`. Each takes `protocol` (`"binary"` or `"json"`) and `endpoint`. Omit `[otel.exporter.*]` to disable export.
 
 > **Note**: `[otel]` can only be set in the user config (`~/.codex/config.toml`),
 > not in project-level configs.
