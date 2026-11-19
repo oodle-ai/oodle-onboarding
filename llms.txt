@@ -15,6 +15,7 @@ Pick by your current stack and what you want to send:
 | OpenSearch | Logs | Dual-write (keep OS + add Oodle) | [opensearch-alternative/dual-write](opensearch-alternative/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Dual-write (keep DD + add Oodle) | [datadog/dual-write](datadog/dual-write/README.md) |
 | Datadog | Metrics, traces, logs | Single-write baseline (DD only) | [datadog/single-write](datadog/single-write/README.md) |
+| None (mobile tutorial) | RUM, Session Replay, traces, logs | Synthetic React Native observability workload; not business operations software | [datadog/fieldwork-mobile-demo](datadog/fieldwork-mobile-demo/README.md) |
 | Datadog | Metrics, traces, logs | Oodle only via Datadog Agent (redirect primary endpoints) | [datadog/oodle-single-write](datadog/oodle-single-write/README.md) |
 | Datadog (OTel) | Traces, metrics, logs | Dual-write from OTel Collector to Datadog + Oodle | [datadog/otel-dual-write](datadog/otel-dual-write/README.md) |
 | Datadog | Database monitoring | DBM for PostgreSQL — query samples, explain plans, schemas (Oodle only) | [datadog/dbm](datadog/dbm/README.md) |

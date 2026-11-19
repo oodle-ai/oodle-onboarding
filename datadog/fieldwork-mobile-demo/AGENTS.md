@@ -1,0 +1,22 @@
+# Fieldwork mobile demo
+
+- Keep all names, records, service identifiers, assets, and examples synthetic. Do not copy customer telemetry, screenshots, application IDs, hostnames, or credentials into this public demo.
+- Present this sample as an observability teaching workload. Do not add customer comparisons, feature-parity claims, migration claims, or commercial operations marketing. Keep the demo scope visible in the UI and docs.
+- Native RUM and Session Replay require a compiled development or release build. A web replay cannot validate native replay. Keep the native and browser telemetry adapters separate.
+- Keep the native Datadog core, replay, and Babel plugin versions aligned. Rebuild the native project after changes to plugins, permissions, or native dependencies.
+- Keep builds local. Use the Android SDK/JDK and Xcode/CocoaPods, with credentials in the ignored `.env` file. Do not add hosted build services, account setup, or environment uploads.
+- Prefer Android Studio's bundled JDK for Android. Validate the Java version and pass the selected home to Gradle. Keep the version guard aligned with the Expo-generated Gradle wrapper. A successful `java -version` check alone does not prove compatibility.
+- Keep machine-specific variables such as `JAVA_HOME` in `.env.local`. Expo rejects these variables in `.env`. Device helpers must load the local overrides before toolchain checks.
+- Refresh the Android JavaScript bundle on each device build. Gradle does not track Expo environment values, so an incremental build can retain old credentials or endpoints.
+- Keep the phone install guide short and put toolchain details in the build reference. Native refreshes must preserve the signing team selected in Xcode. Remote push must stay optional for personal-device signing.
+- The QR install server must expose only the install page, QR image, and APK. A project-directory file server can expose credentials from `.env`.
+- Start the QR server only after a successful build when using `install:android`. Keep `serve:android` available for an existing APK so testers do not need the build toolchain.
+- File-store mode must have one process. Use PostgreSQL for a separate worker or multiple processes so retries and invoice events remain atomic.
+- Keep request IDs stable across offline retries. A failed response can occur after the server commits a change.
+- Keep native snapshots and photo queues in SQLite. Android AsyncStorage row limits can reject queued photos. Keep credentials in SecureStore.
+- Client configuration can use `EXPO_PUBLIC_*`. API keys, signing material, session secrets, and symbol-upload keys must not use that prefix.
+- Use Node 22.20.0 for the included Expo SDK. Run API behavior tests and bundle all three platforms after changes to shared code.
+- The fingerprint dependency has a scoped matcher override to avoid unsafe pattern expansion. Check fingerprint generation before changing that override.
+- Keep replay SVG illustrations static. The native replay Babel plugin cannot serialize JavaScript loops inside SVG markup.
+- Keep the original SVG element names in JSX. The replay serializer derives SVG tags from these names and does not resolve import aliases.
+- Write new prose and comments in Simplified Technical English. Add a reason when a code comment is needed.
