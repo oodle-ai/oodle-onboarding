@@ -11,6 +11,7 @@ Working examples showing how to integrate with the [Oodle](https://oodle.ai) obs
 | [opensearch-alternative/dual-write](./opensearch-alternative/dual-write) | Logs | Migrate from OpenSearch — dual-write to OS + Oodle via Fluent Bit, Vector, or OTel Collector |
 | [datadog/dual-write](./datadog/dual-write) | Metrics, traces, logs | Dual-ship from Datadog Agent to both Datadog and Oodle using native `DD_ADDITIONAL_ENDPOINTS` |
 | [datadog/single-write](./datadog/single-write) | Metrics, traces, logs | Baseline Datadog-only setup (no Oodle) |
+| [datadog/fieldwork-mobile-demo](./datadog/fieldwork-mobile-demo) | Mobile RUM, Session Replay, traces, logs | React Native observability tutorial with synthetic workflows and sample services; not for live business operations |
 | [datadog/oodle-single-write](./datadog/oodle-single-write) | Metrics, traces, logs | Send from Datadog Agent to Oodle only — redirect primary endpoints, no data to Datadog |
 | [datadog/otel-dual-write](./datadog/otel-dual-write) | Traces, metrics, logs | Dual-write from OTel Collector to both Datadog and Oodle — mirrors a Cloud Run sidecar pattern |
 | [datadog/dbm](./datadog/dbm) | Database monitoring | Datadog Agent with Database Monitoring (DBM) for PostgreSQL — query samples, explain plans, schema info — shipping only to Oodle |
