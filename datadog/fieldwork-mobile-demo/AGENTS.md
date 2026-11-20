@@ -4,6 +4,7 @@
 - Present this sample as an observability teaching workload. Do not add customer comparisons, feature-parity claims, migration claims, or commercial operations marketing. Keep the demo scope visible in the UI and docs.
 - Native RUM and Session Replay require a compiled development or release build. A web replay cannot validate native replay. Keep the native and browser telemetry adapters separate.
 - Keep the native Datadog core, replay, and Babel plugin versions aligned. Rebuild the native project after changes to plugins, permissions, or native dependencies.
+- `EXPO_PUBLIC_TELEMETRY_PROVIDER` selects the native adapter (`datadog.native.ts` or `oodle.native.ts`). Both SDKs are in every build; only the selected one is initialized, because two SDKs that both patch XHR and the global error handler would record each event twice.
 - Keep builds local. Use the Android SDK/JDK and Xcode/CocoaPods, with credentials in the ignored `.env` file. Do not add hosted build services, account setup, or environment uploads.
 - Prefer Android Studio's bundled JDK for Android. Validate the Java version and pass the selected home to Gradle. Keep the version guard aligned with the Expo-generated Gradle wrapper. A successful `java -version` check alone does not prove compatibility.
 - Keep machine-specific variables such as `JAVA_HOME` in `.env.local`. Expo rejects these variables in `.env`. Device helpers must load the local overrides before toolchain checks.

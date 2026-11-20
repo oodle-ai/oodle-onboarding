@@ -40,6 +40,7 @@ import {
   QueueScreen,
 } from "./src/screens/More";
 import { telemetry } from "./src/telemetry";
+import { TelemetryProvider } from "./src/telemetry/provider";
 
 const Stack = createNativeStackNavigator<StackParams>();
 const Tabs = createBottomTabNavigator<TabParams>();
@@ -364,10 +365,12 @@ function Root() {
 }
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AppProvider>
-        <Root />
-      </AppProvider>
-    </SafeAreaProvider>
+    <TelemetryProvider>
+      <SafeAreaProvider>
+        <AppProvider>
+          <Root />
+        </AppProvider>
+      </SafeAreaProvider>
+    </TelemetryProvider>
   );
 }

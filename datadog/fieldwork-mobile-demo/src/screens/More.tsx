@@ -4,7 +4,7 @@ import { useApp } from "../state";
 import { useNav } from "../navigation";
 import { apiUrl } from "../config";
 import { client } from "../api";
-import { telemetry } from "../telemetry";
+import { telemetry, telemetryName } from "../telemetry";
 import { label } from "../shared/model";
 import {
   Badge,
@@ -230,7 +230,7 @@ export function DiagnosticsScreen() {
       <Card style={{ gap: 13 }}>
         <Row style={{ gap: 10 }}>
           <Icon name="activity" />
-          <Txt style={{ fontWeight: "700" }}>Datadog RUM + Session Replay</Txt>
+          <Txt style={{ fontWeight: "700" }}>{telemetryName}</Txt>
         </Row>
         <Badge text={telemetryStatus} tone="blue" />
         <Txt muted style={{ lineHeight: 21 }}>
@@ -258,7 +258,7 @@ export function DiagnosticsScreen() {
         />
         <Txt muted style={{ fontSize: 12, lineHeight: 19 }}>
           Inputs and evidence images are masked in native replay. Collection
-          stays disabled until the environment contains Datadog credentials.
+          stays disabled until the environment contains telemetry credentials.
         </Txt>
         <Button
           title="Get current RUM session ID"
