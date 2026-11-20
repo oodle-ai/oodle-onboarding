@@ -17,8 +17,17 @@ import {
   TextAndInputPrivacyLevel,
   TouchPrivacyLevel,
 } from "@datadog/mobile-react-native-session-replay";
-import { apiUrl, ddConfig } from "../config";
+import { apiUrl, ddConfig, oodleConfig } from "../config";
 import { Telemetry } from "./types";
+
+// With both providers on, Datadog's XHR tracking also sees the Oodle SDK's
+// uploads. They are SDK traffic, not app requests. Failed uploads have no
+// responseURL, so the SDK's own request flag is checked too.
+const isOodleUpload = (xhr: XMLHttpRequest | undefined) =>
+  !!xhr &&
+  (!!(xhr as unknown as Record<string, unknown>).__oodleInternalRequest ||
+    (!!oodleConfig.endpoint &&
+      !!xhr.responseURL?.startsWith(oodleConfig.endpoint)));
 
 let enabled = false;
 let replayEnabled = false;
@@ -52,6 +61,8 @@ export const telemetry: Telemetry = {
           useAccessibilityLabel: true,
           trackResources: true,
           trackFetchResources: true,
+          resourceEventMapper: (event) =>
+            isOodleUpload(event.resourceContext) ? null : event,
           trackErrors: true,
           sessionSampleRate: ddConfig.sessionRate,
           resourceTraceSampleRate: ddConfig.traceRate,

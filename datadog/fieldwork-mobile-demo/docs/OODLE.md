@@ -1,8 +1,8 @@
 # Oodle RUM and Session Replay
 
-The app can send its native RUM and replay to Oodle instead of Datadog.
-The provider is a build setting; one build sends to one provider. The
-backend tracing in [DATADOG.md](DATADOG.md) is not affected by it.
+The app can send its native RUM and replay to Oodle, either instead of
+Datadog or alongside it. The provider is a build setting. The backend
+tracing in [DATADOG.md](DATADOG.md) is not affected by it.
 
 ## Native client configuration
 
@@ -30,6 +30,23 @@ The adapter is `src/telemetry/oodle.native.ts`. It uses the
 `@oodle-ai/mobile-sdk-reactnative` package and the same `Telemetry`
 interface as the Datadog adapter, so no screen changes. `OodleProvider`
 wraps the app root and records taps.
+
+## Send to Datadog and Oodle together
+
+Set `EXPO_PUBLIC_TELEMETRY_PROVIDER=both` and fill in both the Datadog
+values from [DATADOG.md](DATADOG.md) and the Oodle values above. Each
+event is then sent once to each backend.
+
+- Oodle starts before Datadog. Datadog adds its trace headers to the API
+  request first, and Oodle reuses that `traceparent`. The RUM resource
+  in both tools links to the same backend trace.
+- Datadog drops the Oodle SDK's uploads from its resources, so they do
+  not appear as app requests.
+- Each SDK keeps its own session. **Get current RUM session ID** shows
+  both IDs.
+- Two replay recorders run, so replay costs about twice the CPU, memory
+  and upload traffic. The performance numbers in each tool include the
+  other SDK's work. Use one provider when you compare performance.
 
 ## Native events and privacy
 
