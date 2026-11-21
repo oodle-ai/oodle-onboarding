@@ -1,0 +1,46 @@
+name: lambda-exphist-demo
+
+services:
+  gateway:
+    image: ${COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.155.0}
+    command: ["--config=/etc/otelcol/config.yaml"]
+    user: "0:0"  # write /out on the bind mount
+    environment:
+      OODLE_INSTANCE: ${OODLE_INSTANCE:?set OODLE_INSTANCE}
+      OODLE_API_KEY: ${OODLE_API_KEY:?set OODLE_API_KEY}
+    volumes:
+      - ./gateway-config.yaml:/etc/otelcol/config.yaml:ro
+      - ./out:/out
+
+  # One container == one Lambda execution environment. verify.py scales it to
+  # LAMBDA_ENVS replicas so several environments fan in to the gateway.
+  lambda:
+    build:
+      context: .
+      dockerfile: Dockerfile.lambda
+    environment:
+      GATEWAY_OTLP_ENDPOINT: http://gateway:4318
+      AWS_REGION: us-east-1
+      # The emulator has no Telemetry API, and in on-demand mode the collector
+      # extension waits for its platform.runtimeDone event before it lets an
+      # invocation finish, so every invoke would hang. In managed-instances
+      # mode the extension skips that wait. The metric path (SDK -> otlp
+      # receiver -> otlp_http exporter) is the same; only decouple is left
+      # out, see function/collector.emulator.yaml.
+      AWS_LAMBDA_INITIALIZATION_TYPE: lambda-managed-instances
+      OPENTELEMETRY_COLLECTOR_CONFIG_URI: /var/task/collector.emulator.yaml
+    # Lambda resolves sandbox.localdomain to the environment itself; the
+    # collector extension binds its Telemetry API listener there.
+    extra_hosts:
+      - "sandbox.localdomain:127.0.0.1"
+    depends_on: [gateway]
+
+  # Invokes the lambdas with known latencies and writes the truth to /out.
+  driver:
+    image: python:3.13-slim
+    profiles: [driver]
+    working_dir: /app
+    volumes:
+      - ./driver.py:/app/driver.py:ro
+      - ./out:/out
+    entrypoint: ["python", "-I", "driver.py"]
