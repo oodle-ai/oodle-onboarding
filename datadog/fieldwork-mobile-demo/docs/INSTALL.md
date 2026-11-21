@@ -58,6 +58,8 @@ npm run install:ios
 
 The command builds the app for the connected iPhone, then installs and opens it. It stops if the build fails. If more than one iPhone is available, add `-- --device "NAME"`. Enable Developer Mode if iOS requests it.
 
+To install over Wi-Fi without a cable, pair the iPhone over USB once. In Xcode, open **Window → Devices and Simulators**, select the iPhone, and enable **Connect via network**. Then keep both devices on the same Wi-Fi, unlock the iPhone, and run `npm run install:ios`.
+
 A free Personal Team can test on its own devices, but its provisioning expires after seven days. [Apple signing limits](https://developer.apple.com/help/account/basics/about-your-developer-account)
 
 Keep the API running. Rebuild after changes to credentials or the API address. Testers who receive an APK only need the install step. iPhone installation still requires valid signing for that device.
