@@ -53,10 +53,10 @@ npm run prepare:ios
 In Xcode, select the **FieldworkOne** target. Under **Signing & Capabilities**, enable automatic signing and select your Apple team. Then run:
 
 ```sh
-npm run build:ios
+npm run install:ios
 ```
 
-Select the connected iPhone when prompted. The command builds and installs locally with the JavaScript bundle included. Enable Developer Mode if iOS requests it.
+The command builds the app for the connected iPhone, then installs and opens it. It stops if the build fails. If more than one iPhone is available, add `-- --device "NAME"`. Enable Developer Mode if iOS requests it.
 
 A free Personal Team can test on its own devices, but its provisioning expires after seven days. [Apple signing limits](https://developer.apple.com/help/account/basics/about-your-developer-account)
 

@@ -36,7 +36,7 @@ The native app stores offline snapshots and photo queues in SQLite. It stores th
 
 ## Install on a phone
 
-Use the [short installation guide](docs/INSTALL.md). Run `npm run setup:device`, start `npm run api:device`, then run `npm run install:android` or `npm run build:ios`. For iPhone, use `npm run prepare:ios` once to select your signing team in Xcode.
+Use the [short installation guide](docs/INSTALL.md). Run `npm run setup:device`, start `npm run api:device`, then run `npm run install:android` or `npm run install:ios`. For iPhone, use `npm run prepare:ios` once to select your signing team in Xcode.
 
 For Android, the command builds the APK and starts the QR server. Scan the QR code with the phone camera to download the APK. Use `npm run serve:android` to share an existing APK without rebuilding.
 

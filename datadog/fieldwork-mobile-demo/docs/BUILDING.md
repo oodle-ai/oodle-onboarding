@@ -69,7 +69,9 @@ For an API over USB, use `adb reverse tcp:4310 tcp:4310` with `EXPO_PUBLIC_API_U
 
 `npm run prepare:ios` generates the native project, installs Pods, and opens the workspace. Sign in to your Apple account in Xcode. Select the app target, enable automatic signing, and choose your team. Connect and trust the phone.
 
-`npm run build:ios` refreshes the project, installs Pods, and runs the local device build with the Release configuration. It includes the JavaScript bundle and does not start Metro. Choose the physical iPhone when prompted.
+`npm run install:ios` selects the connected iPhone, refreshes the project, installs Pods, and builds the Release configuration for that device. Then it installs and opens the app with `devicectl`. A failed build prevents the install. The app includes the JavaScript bundle and does not need Metro. If more than one iPhone is available, use `npm run install:ios -- --device "NAME"` with the device name or UDID.
+
+`npm run build:ios` builds without a device and copies the app to `artifacts/fieldwork-one.app`. Install it on a phone that the provisioning profile includes with `xcrun devicectl device install app --device NAME artifacts/fieldwork-one.app`. A Personal Team profile includes only registered devices, so run `install:ios` once per phone. There is no QR installer for iPhone. Over-the-air installation requires an ad hoc or enterprise profile and an HTTPS manifest.
 
 Native refreshes use `--no-clean` to preserve the Xcode signing selection. You can also set `IOS_APPLE_TEAM_ID` in `.env` to retain the team when native directories are recreated. Change the bundle identifier in `app.config.ts` if your team cannot register the default identifier.
 
@@ -109,6 +111,7 @@ For native token registration, set `EXPO_PUBLIC_NATIVE_PUSH_ENABLED=true`, confi
 | Android SDK or Java is missing                    | Install the SDK and JDK; check `ANDROID_HOME` and `JAVA_HOME`             |
 | Xcode check fails                                 | Install full Xcode and select its command-line tools                      |
 | CocoaPods check fails                             | Install CocoaPods and ensure `pod` is on `PATH`                           |
+| No iPhone found                                   | Connect, unlock, and trust the iPhone; run `xcrun devicectl list devices` |
 | No signing certificate                            | Open the workspace with `prepare:ios` and select your Apple team          |
 | iPhone app expires                                | Rebuild and reinstall with a valid provisioning profile                   |
 | New Datadog values have no effect                 | Edit `.env`, rebuild, and reinstall; restart Metro for debug builds       |

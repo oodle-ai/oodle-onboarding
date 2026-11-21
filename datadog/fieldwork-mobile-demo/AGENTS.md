@@ -12,6 +12,7 @@
 - Keep the phone install guide short and put toolchain details in the build reference. Native refreshes must preserve the signing team selected in Xcode. Remote push must stay optional for personal-device signing.
 - The QR install server must expose only the install page, QR image, and APK. A project-directory file server can expose credentials from `.env`.
 - Start the QR server only after a successful build when using `install:android`. Keep `serve:android` available for an existing APK so testers do not need the build toolchain.
+- `install:ios` selects the iPhone before the build. Automatic signing registers that device, and a long build must not fail at the install step. Keep `build:ios` build-only.
 - File-store mode must have one process. Use PostgreSQL for a separate worker or multiple processes so retries and invoice events remain atomic.
 - Keep request IDs stable across offline retries. A failed response can occur after the server commits a change.
 - Keep native snapshots and photo queues in SQLite. Android AsyncStorage row limits can reject queued photos. Keep credentials in SecureStore.

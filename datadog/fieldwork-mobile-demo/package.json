@@ -13,6 +13,7 @@
     "install:android": "npm run build:android && node scripts/install-android.mjs",
     "serve:android": "node scripts/install-android.mjs",
     "build:ios": "node scripts/device-demo.mjs ios",
+    "install:ios": "node scripts/device-demo.mjs install-ios",
     "prepare:ios": "node scripts/device-demo.mjs prepare-ios",
     "start": "expo start --dev-client",
     "web": "expo start --web --port 8081",
