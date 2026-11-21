@@ -1,201 +1,59 @@
-import {
-  CoreConfiguration,
-  DdSdkReactNative,
-  DdRum,
-  DdLogs,
-  ErrorSource,
-  FeatureOperationFailure,
-  PropagatorType,
-  RumActionType,
-  SdkVerbosity,
-  TrackingConsent,
-  VitalsUpdateFrequency,
-} from "@datadog/mobile-react-native";
-import {
-  SessionReplay,
-  ImagePrivacyLevel,
-  TextAndInputPrivacyLevel,
-  TouchPrivacyLevel,
-} from "@datadog/mobile-react-native-session-replay";
-import { apiUrl, ddConfig } from "../config";
+import { telemetryProvider } from "../config";
+import { telemetry as datadog } from "./datadog.native";
+import { telemetry as oodle } from "./oodle.native";
 import { Telemetry } from "./types";
 
-let enabled = false;
-let replayEnabled = false;
-let replayWanted = true;
-let consentGranted = true;
-let currentView: string | undefined;
-let transitions = Promise.resolve();
-let viewReady = false;
-let displayed = false;
-const quietly = (promise: Promise<unknown>) => {
-  void promise.catch(() => undefined);
-};
-
-export const telemetry: Telemetry = {
+// Sends every call to both adapters. Oodle starts first, so Datadog's
+// XHR wrapper sits outside Oodle's. Datadog then adds its trace headers
+// before Oodle sees the request, and Oodle reuses that traceparent. In
+// the other order, the request would carry two traceparent values.
+const both: Telemetry = {
   async initialize(consent) {
-    consentGranted = consent;
-    if (!ddConfig.enabled || !ddConfig.applicationId || !ddConfig.clientToken)
-      return "Not configured";
-    const config = new CoreConfiguration(
-      ddConfig.clientToken,
-      ddConfig.env,
-      consent ? TrackingConsent.GRANTED : TrackingConsent.NOT_GRANTED,
-      {
-        site: ddConfig.site,
-        service: "fieldwork-one-mobile",
-        version: "1.0.0",
-        verbosity: SdkVerbosity.WARN,
-        rumConfiguration: {
-          applicationId: ddConfig.applicationId,
-          trackInteractions: true,
-          useAccessibilityLabel: true,
-          trackResources: true,
-          trackFetchResources: true,
-          trackErrors: true,
-          sessionSampleRate: ddConfig.sessionRate,
-          resourceTraceSampleRate: ddConfig.traceRate,
-          firstPartyHosts: [
-            {
-              match: new URL(apiUrl).hostname,
-              propagatorTypes: [
-                PropagatorType.DATADOG,
-                PropagatorType.TRACECONTEXT,
-              ],
-            },
-          ],
-          nativeCrashReportEnabled: true,
-          nativeViewTracking: false,
-          nativeIosResourceTracking: false,
-          trackNonFatalAnrs: true,
-          trackWatchdogTerminations: true,
-          trackMemoryWarnings: true,
-          trackFrustrations: true,
-          longTaskThresholdMs: 200,
-          nativeLongTaskThresholdMs: 200,
-          vitalsUpdateFrequency: VitalsUpdateFrequency.AVERAGE,
-        },
-        logsConfiguration: {},
-        traceConfiguration: {},
-      },
-    );
-    await DdSdkReactNative.initialize(config);
-    enabled = true;
-    await DdSdkReactNative.addAttributes({
-      "demo.name": "fieldwork-one",
-      "data.synthetic": true,
-    });
-    await DdSdkReactNative.setAccountInfo({
-      id: "demo-harbor",
-      name: "Harbor Environmental · Demo",
-    });
-    await SessionReplay.enable({
-      replaySampleRate: ddConfig.replayRate,
-      textAndInputPrivacyLevel: TextAndInputPrivacyLevel.MASK_ALL_INPUTS,
-      imagePrivacyLevel: ImagePrivacyLevel.MASK_ALL,
-      touchPrivacyLevel: TouchPrivacyLevel.SHOW,
-      startRecordingImmediately: consent,
-    });
-    replayEnabled = true;
-    return consent ? "Native RUM + Replay enabled" : "Collection paused";
+    const oodleStatus = await oodle.initialize(consent);
+    const datadogStatus = await datadog.initialize(consent);
+    return `Oodle: ${oodleStatus} · Datadog: ${datadogStatus}`;
   },
   view(key, name) {
-    if (!enabled || currentView === key) return;
-    const previous = currentView;
-    currentView = key;
-    viewReady = false;
-    // Serialize view changes so fast navigation cannot stop the new view.
-    transitions = transitions
-      .then(async () => {
-        if (previous) await DdRum.stopView(previous);
-        await DdRum.startView(key, name);
-        await DdRum.addFeatureFlagEvaluation("unified_workspace", true);
-      })
-      .catch(() => undefined);
+    oodle.view(key, name);
+    datadog.view(key, name);
   },
-  action(name, attributes = {}) {
-    if (enabled)
-      quietly(DdRum.addAction(RumActionType.CUSTOM, name, attributes));
+  action(name, attributes) {
+    oodle.action(name, attributes);
+    datadog.action(name, attributes);
   },
-  error(error, attributes = {}) {
-    if (!enabled) return;
-    const value = error instanceof Error ? error : new Error(String(error));
-    quietly(
-      DdRum.addError(
-        value.message,
-        ErrorSource.CUSTOM,
-        value.stack || "",
-        attributes,
-      ),
-    );
-    quietly(DdLogs.error(value.message, attributes));
+  error(error, attributes) {
+    oodle.error(error, attributes);
+    datadog.error(error, attributes);
   },
   async user(user) {
-    if (!enabled) return;
-    await DdRum.stopSession();
-    currentView = undefined;
-    if (user)
-      await DdSdkReactNative.setUserInfo({
-        id: user.id,
-        name: user.name,
-        extraInfo: { "business.role": user.role },
-      });
-    else await DdSdkReactNative.clearUserInfo();
+    await Promise.all([oodle.user(user), datadog.user(user)]);
   },
   async consent(granted) {
-    consentGranted = granted;
-    if (!enabled) return;
-    await DdSdkReactNative.setTrackingConsent(
-      granted ? TrackingConsent.GRANTED : TrackingConsent.NOT_GRANTED,
-    );
-    if (replayEnabled)
-      await (granted && replayWanted
-        ? SessionReplay.startRecording()
-        : SessionReplay.stopRecording());
+    await Promise.all([oodle.consent(granted), datadog.consent(granted)]);
   },
   async replay(record) {
-    replayWanted = record;
-    if (replayEnabled)
-      await (record && consentGranted
-        ? SessionReplay.startRecording()
-        : SessionReplay.stopRecording());
+    await Promise.all([oodle.replay(record), datadog.replay(record)]);
   },
   ready() {
-    if (enabled && currentView && !viewReady) {
-      viewReady = true;
-      quietly(
-        transitions.then(async () => {
-          await DdRum.addTiming("content_ready");
-          await DdRum.addViewLoadingTime(false);
-          if (!displayed) {
-            displayed = true;
-            await DdRum.reportAppFullyDisplayed();
-          }
-        }),
-      );
-    }
+    oodle.ready();
+    datadog.ready();
   },
   async sessionId() {
-    return enabled ? DdRum.getCurrentSessionId() : undefined;
+    const [o, d] = await Promise.all([oodle.sessionId(), datadog.sessionId()]);
+    const ids = [o && `Oodle ${o}`, d && `Datadog ${d}`].filter(Boolean);
+    return ids.length ? ids.join(" · ") : undefined;
   },
-  async operation(name, key, action) {
-    if (enabled)
-      await DdRum.startFeatureOperation(name, key, {}).catch(() => undefined);
-    try {
-      const result = await action();
-      if (enabled) quietly(DdRum.succeedFeatureOperation(name, key, {}));
-      return result;
-    } catch (error) {
-      if (enabled)
-        quietly(
-          DdRum.failFeatureOperation(
-            name,
-            key,
-            FeatureOperationFailure.ERROR,
-            {},
-          ),
-        );
-      throw error;
-    }
+  operation(name, key, action) {
+    return oodle.operation(name, key, () =>
+      datadog.operation(name, key, action),
+    );
   },
 };
+
+const adapters = {
+  datadog: { name: "Datadog RUM + Session Replay", telemetry: datadog },
+  oodle: { name: "Oodle RUM + Session Replay", telemetry: oodle },
+  both: { name: "Datadog + Oodle RUM + Session Replay", telemetry: both },
+};
+export const telemetryName = adapters[telemetryProvider].name;
+export const telemetry = adapters[telemetryProvider].telemetry;

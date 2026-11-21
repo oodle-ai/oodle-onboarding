@@ -1,1 +1,1 @@
-export { telemetry } from "./index.native";
+export { telemetry, telemetryName } from "./index.native";

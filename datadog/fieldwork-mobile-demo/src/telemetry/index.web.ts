@@ -16,6 +16,7 @@ const sites: Record<string, string> = {
   AP2: "ap2.datadoghq.com",
   US1_FED: "ddog-gov.com",
 };
+export const telemetryName = "Datadog Browser RUM + Session Replay";
 export const telemetry: Telemetry = {
   async initialize(consent) {
     consentGranted = consent;

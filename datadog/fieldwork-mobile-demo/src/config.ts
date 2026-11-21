@@ -20,3 +20,18 @@ export const ddConfig = {
   replayRate: sampleRate(process.env.EXPO_PUBLIC_DD_REPLAY_SAMPLE_RATE),
   traceRate: sampleRate(process.env.EXPO_PUBLIC_DD_TRACE_SAMPLE_RATE),
 };
+
+// Selects the native telemetry adapters: datadog, oodle, or both. Both
+// SDKs are in every build; only the selected ones are initialized.
+const provider = process.env.EXPO_PUBLIC_TELEMETRY_PROVIDER;
+export const telemetryProvider: "datadog" | "oodle" | "both" =
+  provider === "oodle" || provider === "both" ? provider : "datadog";
+export const oodleConfig = {
+  instanceId: process.env.EXPO_PUBLIC_OODLE_INSTANCE_ID || "",
+  apiKey: process.env.EXPO_PUBLIC_OODLE_RUM_API_KEY || "",
+  endpoint: process.env.EXPO_PUBLIC_OODLE_RUM_ENDPOINT || "",
+  env: process.env.EXPO_PUBLIC_OODLE_ENV || "demo",
+  sessionRate: sampleRate(process.env.EXPO_PUBLIC_OODLE_SESSION_SAMPLE_RATE),
+  replayRate: sampleRate(process.env.EXPO_PUBLIC_OODLE_REPLAY_SAMPLE_RATE),
+  traceRate: sampleRate(process.env.EXPO_PUBLIC_OODLE_TRACE_SAMPLE_RATE),
+};

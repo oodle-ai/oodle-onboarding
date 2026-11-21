@@ -36,7 +36,7 @@ The native app stores offline snapshots and photo queues in SQLite. It stores th
 
 ## Install on a phone
 
-Use the [short installation guide](docs/INSTALL.md). Run `npm run setup:device`, start `npm run api:device`, then run `npm run install:android` or `npm run build:ios`. For iPhone, use `npm run prepare:ios` once to select your signing team in Xcode.
+Use the [short installation guide](docs/INSTALL.md). Run `npm run setup:device`, start `npm run api:device`, then run `npm run install:android` or `npm run install:ios`. For iPhone, use `npm run prepare:ios` once to select your signing team in Xcode.
 
 For Android, the command builds the APK and starts the QR server. Scan the QR code with the phone camera to download the APK. Use `npm run serve:android` to share an existing APK without rebuilding.
 
@@ -101,6 +101,8 @@ The file-store mode has one process. Do not point multiple API or worker process
 ## Connect Datadog later
 
 See [DATADOG.md](docs/DATADOG.md). The native client needs a React Native RUM application ID and a client token. The backend Agent and symbol upload need a Datadog API key. Keep API keys out of all `EXPO_PUBLIC_*` variables.
+
+To send native RUM and replay to Oodle, instead of or alongside Datadog, see [OODLE.md](docs/OODLE.md).
 
 The app starts with collection disabled. The demo settings screen can pause consent, pause replay, show the RUM session ID, and create healthy, slow, and failed request scenarios. It also captures a handled JavaScript error without crashing the app.
 

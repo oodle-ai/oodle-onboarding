@@ -4,6 +4,7 @@
 - Present this sample as an observability teaching workload. Do not add customer comparisons, feature-parity claims, migration claims, or commercial operations marketing. Keep the demo scope visible in the UI and docs.
 - Native RUM and Session Replay require a compiled development or release build. A web replay cannot validate native replay. Keep the native and browser telemetry adapters separate.
 - Keep the native Datadog core, replay, and Babel plugin versions aligned. Rebuild the native project after changes to plugins, permissions, or native dependencies.
+- `EXPO_PUBLIC_TELEMETRY_PROVIDER` selects the native adapters: `datadog`, `oodle`, or `both`. Both SDKs are in every build; only the selected ones are initialized. With `both`, Oodle must start before Datadog so that Oodle reuses Datadog's `traceparent` instead of adding a second one, and Datadog's `resourceEventMapper` must keep dropping the Oodle SDK's uploads.
 - Keep builds local. Use the Android SDK/JDK and Xcode/CocoaPods, with credentials in the ignored `.env` file. Do not add hosted build services, account setup, or environment uploads.
 - Prefer Android Studio's bundled JDK for Android. Validate the Java version and pass the selected home to Gradle. Keep the version guard aligned with the Expo-generated Gradle wrapper. A successful `java -version` check alone does not prove compatibility.
 - Keep machine-specific variables such as `JAVA_HOME` in `.env.local`. Expo rejects these variables in `.env`. Device helpers must load the local overrides before toolchain checks.
@@ -11,6 +12,7 @@
 - Keep the phone install guide short and put toolchain details in the build reference. Native refreshes must preserve the signing team selected in Xcode. Remote push must stay optional for personal-device signing.
 - The QR install server must expose only the install page, QR image, and APK. A project-directory file server can expose credentials from `.env`.
 - Start the QR server only after a successful build when using `install:android`. Keep `serve:android` available for an existing APK so testers do not need the build toolchain.
+- `install:ios` selects the iPhone before the build. Automatic signing registers that device, and a long build must not fail at the install step. Keep `build:ios` build-only.
 - File-store mode must have one process. Use PostgreSQL for a separate worker or multiple processes so retries and invoice events remain atomic.
 - Keep request IDs stable across offline retries. A failed response can occur after the server commits a change.
 - Keep native snapshots and photo queues in SQLite. Android AsyncStorage row limits can reject queued photos. Keep credentials in SecureStore.

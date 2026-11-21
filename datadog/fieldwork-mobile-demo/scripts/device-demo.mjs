@@ -6,15 +6,18 @@ import {
   mkdir,
   readFile,
   rename,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { homedir, networkInterfaces } from "node:os";
 import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const command = process.argv[2];
+let flags = {};
 const envPath = join(root, ".env");
 const npmCli = process.env.npm_execpath;
 let values = {};
@@ -159,6 +162,61 @@ function iosTools() {
     );
 }
 
+function iosDevice(selector) {
+  const result = spawnSync(
+    "xcrun",
+    ["devicectl", "list", "devices", "--quiet", "--json-output", "-"],
+    { encoding: "utf8" },
+  );
+  let devices;
+  try {
+    devices = JSON.parse(result.stdout).result.devices;
+  } catch {
+    throw new Error(
+      "Xcode could not list devices. Open Xcode once to finish its setup.",
+    );
+  }
+  const phones = devices
+    .filter(
+      (item) =>
+        item.hardwareProperties?.platform === "iOS" &&
+        item.hardwareProperties?.reality === "physical" &&
+        item.hardwareProperties?.udid,
+    )
+    .map((item) => ({
+      name: item.deviceProperties?.name || item.hardwareProperties.udid,
+      udid: item.hardwareProperties.udid,
+      identifier: item.identifier,
+      paired: item.connectionProperties?.pairingState === "paired",
+      available: item.connectionProperties?.tunnelState !== "unavailable",
+    }));
+  const names = (items) => items.map((item) => item.name).join(", ");
+  const matches = selector
+    ? phones.filter(
+        (item) =>
+          [item.udid, item.identifier].includes(selector) ||
+          item.name.toLowerCase() === selector.toLowerCase(),
+      )
+    : phones.filter((item) => item.available);
+  if (selector && matches.length === 0)
+    throw new Error(
+      `No iPhone matches "${selector}". Known iPhones: ${names(phones) || "none"}.`,
+    );
+  if (matches.length === 0)
+    throw new Error(
+      "Connect and trust an iPhone, then retry. Enable Developer Mode if iOS requests it.",
+    );
+  if (matches.length > 1)
+    throw new Error(
+      `More than one iPhone is available: ${names(matches)}. Use npm run install:ios -- --device "NAME".`,
+    );
+  if (!matches[0].paired)
+    throw new Error(
+      `Unlock ${matches[0].name} and trust this computer, then retry.`,
+    );
+  return matches[0];
+}
+
 function apiUrl(value) {
   const url = new URL(value);
   if (
@@ -238,6 +296,10 @@ async function setup() {
 }
 
 async function main() {
+  flags = parseArgs({
+    args: process.argv.slice(3),
+    options: { device: { type: "string" } },
+  }).values;
   if (!npmCli)
     throw new Error("Use the npm scripts listed in docs/INSTALL.md.");
   const [major, minor] = process.versions.node.split(".").map(Number);
@@ -253,8 +315,14 @@ async function main() {
     parseEnv = (await import("dotenv")).parse;
     return setup();
   }
-  if (!["api", "android", "ios", "prepare-ios"].includes(command))
-    throw new Error("Choose setup, api, android, ios, or prepare-ios.");
+  if (
+    !["api", "android", "ios", "install-ios", "prepare-ios"].includes(command)
+  )
+    throw new Error(
+      "Choose setup, api, android, ios, install-ios, or prepare-ios.",
+    );
+  if (flags.device && command !== "install-ios")
+    throw new Error("Use --device with npm run install:ios.");
   try {
     parseEnv = (await import("dotenv")).parse;
     values = parseEnv(await readFile(envPath, "utf8"));
@@ -296,6 +364,10 @@ async function main() {
     );
   if (command === "android") await androidTools();
   else iosTools();
+  // Select the phone before the build. Automatic signing registers this
+  // device, and a slow build must not fail at the install step.
+  const device =
+    command === "install-ios" ? iosDevice(flags.device) : undefined;
   if (command !== "prepare-ios") {
     const healthy = await fetch(`${api}/health`, {
       signal: AbortSignal.timeout(5000),
@@ -354,18 +426,93 @@ async function main() {
   if (command === "prepare-ios") {
     runTool("open", [join(root, "ios/FieldworkOne.xcworkspace")]);
     console.log(
-      "In Xcode, select the app target and your signing team. Connect and trust the iPhone, then run npm run build:ios.",
+      "In Xcode, select the app target and your signing team. Connect and trust the iPhone, then run npm run install:ios.",
     );
     return;
   }
-  expo([
-    "run:ios",
-    "--device",
-    "--configuration",
+  // xcodebuild reports a missing team only after a long build, so check first.
+  const project = await readFile(
+    join(root, "ios/FieldworkOne.xcodeproj/project.pbxproj"),
+    "utf8",
+  );
+  if (!/DEVELOPMENT_TEAM = "?[A-Z0-9]{10}"?;/.test(project))
+    throw new Error(
+      "Select a signing team. Run npm run prepare:ios and choose your team in Xcode, or set IOS_APPLE_TEAM_ID in .env.",
+    );
+  console.log(
+    `Building for ${device ? device.name : "iPhone"}. This can take several minutes.`,
+  );
+  runTool("xcodebuild", [
+    "-workspace",
+    "ios/FieldworkOne.xcworkspace",
+    "-scheme",
+    "FieldworkOne",
+    "-configuration",
     "Release",
-    "--no-bundler",
-    "--no-install",
+    "-destination",
+    device ? `id=${device.udid}` : "generic/platform=iOS",
+    "-derivedDataPath",
+    "ios/build",
+    "-allowProvisioningUpdates",
+    ...(device ? ["-allowProvisioningDeviceRegistration"] : []),
+    "-quiet",
+    "build",
   ]);
+  const artifact = join(root, "artifacts/fieldwork-one.app");
+  await rm(artifact, { recursive: true, force: true });
+  await mkdir(join(root, "artifacts"), { recursive: true });
+  // ditto keeps the bundle's signature metadata intact.
+  runTool("ditto", [
+    join(root, "ios/build/Build/Products/Release-iphoneos/FieldworkOne.app"),
+    artifact,
+  ]);
+  if (!device) {
+    console.log(
+      `Demo app: ${artifact}\nInstall on a connected iPhone: npm run install:ios`,
+    );
+    return;
+  }
+  runTool("xcrun", [
+    "devicectl",
+    "device",
+    "install",
+    "app",
+    "--device",
+    device.udid,
+    artifact,
+  ]);
+  const bundleId = spawnSync(
+    "plutil",
+    [
+      "-extract",
+      "CFBundleIdentifier",
+      "raw",
+      "-o",
+      "-",
+      join(artifact, "Info.plist"),
+    ],
+    { encoding: "utf8" },
+  ).stdout?.trim();
+  const launched =
+    bundleId &&
+    runTool(
+      "xcrun",
+      [
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        device.udid,
+        bundleId,
+      ],
+      { quiet: true },
+    ) === 0;
+  console.log(
+    launched
+      ? `Installed and opened Fieldwork One on ${device.name}.`
+      : `Installed Fieldwork One on ${device.name}. Unlock the iPhone and open the app.`,
+  );
 }
 
 main().catch((error) => {
