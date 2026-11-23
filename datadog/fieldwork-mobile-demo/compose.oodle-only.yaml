@@ -1,0 +1,20 @@
+# Sends the backend traces and Agent metrics to Oodle only, with no
+# Datadog account: `make up-oodle-only`. The Oodle API key replaces the
+# Datadog API key. See docs/OODLE.md.
+services:
+  api:
+    environment:
+      DD_TRACE_ENABLED: "true"
+  worker:
+    environment:
+      DD_TRACE_ENABLED: "true"
+  datadog:
+    environment:
+      DD_API_KEY: ${OODLE_API_KEY:?set OODLE_API_KEY in .env}
+      DD_DD_URL: ${OODLE_COLLECTOR_URL:?set OODLE_COLLECTOR_URL in .env}/v1/datadog/${OODLE_INSTANCE_ID:?set OODLE_INSTANCE_ID in .env}
+      DD_USE_V3_API_SERIES_ENABLED: "false"
+      DD_APM_DD_URL: ${OODLE_COLLECTOR_URL}/v1/datadog_traces/${OODLE_INSTANCE_ID}
+      # Container logs need the Oodle logs collector, which this sample
+      # does not configure. Without it, the Agent sends them to Datadog,
+      # which rejects the Oodle key.
+      DD_LOGS_ENABLED: "false"

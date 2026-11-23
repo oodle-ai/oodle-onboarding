@@ -102,7 +102,7 @@ The file-store mode has one process. Do not point multiple API or worker process
 
 See [DATADOG.md](docs/DATADOG.md). The native client needs a React Native RUM application ID and a client token. The backend Agent and symbol upload need a Datadog API key. Keep API keys out of all `EXPO_PUBLIC_*` variables.
 
-To send native RUM and replay to Oodle, instead of or alongside Datadog, see [OODLE.md](docs/OODLE.md).
+To send native RUM, replay and backend traces to Oodle, instead of or alongside Datadog, see [OODLE.md](docs/OODLE.md).
 
 The app starts with collection disabled. The demo settings screen can pause consent, pause replay, show the RUM session ID, and create healthy, slow, and failed request scenarios. It also captures a handled JavaScript error without crashing the app.
 
