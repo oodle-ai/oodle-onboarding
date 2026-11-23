@@ -2,7 +2,8 @@
 
 The app can send its native RUM and replay to Oodle, either instead of
 Datadog or alongside it. The provider is a build setting. The backend
-tracing in [DATADOG.md](DATADOG.md) is not affected by it.
+traces go through the Datadog Agent; see
+[Backend traces](#backend-traces) to send them to Oodle too.
 
 ## Native client configuration
 
@@ -39,7 +40,9 @@ event is then sent once to each backend.
 
 - Oodle starts before Datadog. Datadog adds its trace headers to the API
   request first, and Oodle reuses that `traceparent`. The RUM resource
-  in both tools links to the same backend trace.
+  in both tools links to the same backend trace. Oodle sends its client
+  span with Datadog's span ID, so the trace in Oodle also starts at the
+  app.
 - Datadog drops the Oodle SDK's uploads from its resources, so they do
   not appear as app requests.
 - Each SDK keeps its own session. **Get current RUM session ID** shows
@@ -63,6 +66,42 @@ event is then sent once to each backend.
 
 The API host gets W3C `traceparent` and Datadog trace headers, so the
 backend traces in this sample link to the RUM resource events.
+
+## Backend traces
+
+The SDK sends a client span for each traced API request. In Oodle APM,
+the app is the `fieldwork-one-mobile` service, and each span is the
+parent of the API spans of the same request. The API spans come from
+`dd-trace` through the Datadog Agent.
+
+In Oodle, open **Settings > API Keys** and create an ingestion key. The
+Agent cannot use the RUM key. Copy the instance ID and the collector URL
+from the **Datadog** integration card into `.env`. These are backend
+values. Do not use the `EXPO_PUBLIC_` prefix:
+
+```dotenv
+OODLE_INSTANCE_ID=YOUR_INSTANCE_ID
+OODLE_COLLECTOR_URL=https://YOUR_COLLECTOR_DOMAIN
+OODLE_API_KEY=YOUR_INGESTION_API_KEY
+```
+
+Then start the stack with the Agent in one of two modes:
+
+| Command              | Traces go to      | Needs                             |
+| -------------------- | ----------------- | --------------------------------- |
+| `make up-oodle`      | Datadog and Oodle | `DD_API_KEY` and the values above |
+| `make up-oodle-only` | Oodle             | the values above                  |
+
+Both modes set `DD_TRACE_ENABLED=true` for the API and the worker. In
+`up-oodle-only`, the Oodle key replaces the Datadog key, the Agent
+metrics go to Oodle, and the Agent does not collect container logs.
+The Agent log then shows periodic 403 errors for Datadog products that
+have no Oodle endpoint. Traces and metrics are not affected.
+
+To verify, run a healthy request in **Demo & observability**. Open
+Oodle APM and find the `fieldwork-one-mobile` service. Open a trace of a
+request: the app's client span is the root, and the
+`fieldwork-demo-api` spans are below it.
 
 Open **More > Demo & observability** to pause collection or replay.
 With the Oodle values missing from the environment, the controls do not

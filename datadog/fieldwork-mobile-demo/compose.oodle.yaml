@@ -1,0 +1,13 @@
+# Sends the backend traces to Oodle and to Datadog: `make up-oodle`.
+# The Datadog Agent sends a copy of each trace to the Oodle endpoint.
+# See docs/OODLE.md.
+services:
+  api:
+    environment:
+      DD_TRACE_ENABLED: "true"
+  worker:
+    environment:
+      DD_TRACE_ENABLED: "true"
+  datadog:
+    environment:
+      DD_APM_ADDITIONAL_ENDPOINTS: '{"${OODLE_COLLECTOR_URL:?set OODLE_COLLECTOR_URL in .env}/v1/datadog_traces/${OODLE_INSTANCE_ID:?set OODLE_INSTANCE_ID in .env}": ["${OODLE_API_KEY:?set OODLE_API_KEY in .env}"]}'
