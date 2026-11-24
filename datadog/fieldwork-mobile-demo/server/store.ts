@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { Pool } from "pg";
 import { State } from "../src/shared/model";
 import { seedState } from "./seed";
+import { tracer } from "./telemetry";
 
 export interface Store {
   read(): Promise<State>;
@@ -51,14 +52,18 @@ export class PostgresStore implements Store {
     this.pool = new Pool({ connectionString, max: 5 });
     this.ready = this.initialize();
   }
-  private async initialize() {
-    await this.pool.query(
-      "CREATE TABLE IF NOT EXISTS fieldwork_demo (id integer PRIMARY KEY, state jsonb NOT NULL)",
-    );
-    await this.pool.query(
-      "INSERT INTO fieldwork_demo (id, state) VALUES (1, $1) ON CONFLICT (id) DO NOTHING",
-      [JSON.stringify(seedState())],
-    );
+  private initialize() {
+    // These queries run before any request. The startup span keeps them in
+    // one trace, not in one-span traces with no request.
+    return tracer.trace("store.initialize", async () => {
+      await this.pool.query(
+        "CREATE TABLE IF NOT EXISTS fieldwork_demo (id integer PRIMARY KEY, state jsonb NOT NULL)",
+      );
+      await this.pool.query(
+        "INSERT INTO fieldwork_demo (id, state) VALUES (1, $1) ON CONFLICT (id) DO NOTHING",
+        [JSON.stringify(seedState())],
+      );
+    });
   }
   async read(): Promise<State> {
     await this.ready;
