@@ -101,7 +101,15 @@ have no Oodle endpoint. Traces and metrics are not affected.
 To verify, run a healthy request in **Demo & observability**. Open
 Oodle APM and find the `fieldwork-one-mobile` service. Open a trace of a
 request: the app's client span is the root, and the
-`fieldwork-demo-api` spans are below it.
+`fieldwork-demo-api` spans, including its PostgreSQL queries, are below
+it. The app's spans also have `session.id`, which links the trace to
+the RUM session.
+
+The app must send its requests to this stack. Set
+`EXPO_PUBLIC_API_URL` to the address of the Compose API and rebuild the
+app. A request made with `curl` and a copied `traceparent` does not
+test the app: the trace then has no request from the app's network
+stack.
 
 Open **More > Demo & observability** to pause collection or replay.
 With the Oodle values missing from the environment, the controls do not
