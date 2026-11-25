@@ -42,7 +42,9 @@ event is then sent once to each backend.
   request first, and Oodle reuses that `traceparent`. The RUM resource
   in both tools links to the same backend trace. Oodle sends its client
   span with Datadog's span ID, so the trace in Oodle also starts at the
-  app.
+  app. For `fetch` requests, this needs SDK 0.1.6 or later: with an
+  earlier SDK, Oodle sent no client span when Datadog's fetch tracking
+  added the headers.
 - Datadog drops the Oodle SDK's uploads from its resources, so they do
   not appear as app requests.
 - Each SDK keeps its own session. **Get current RUM session ID** shows
