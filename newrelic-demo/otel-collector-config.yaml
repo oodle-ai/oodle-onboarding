@@ -1,0 +1,72 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:4318"
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+  # the OTel SDK also traces this process's own telemetry uploads (its OTLP exporter and the New Relic
+  # agent's collector calls) because both agents patch `http`; drop those so they don't count as transactions
+  filter/self-telemetry:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["server.address"] == "otel-collector" or attributes["net.peer.name"] == "otel-collector"'
+        - 'attributes["server.address"] == "collector.newrelic.com" or attributes["net.peer.name"] == "collector.newrelic.com"'
+    metrics:
+      datapoint:
+        - 'attributes["server.address"] == "otel-collector" or attributes["net.peer.name"] == "otel-collector"'
+        - 'attributes["server.address"] == "collector.newrelic.com" or attributes["net.peer.name"] == "collector.newrelic.com"'
+
+  # APM reads the request, RPC and database duration histograms and
+  # nothing else. The runtime metrics the SDKs emit by default
+  # (nodejs.*, v8js.*, process.runtime.*) are dropped until a runtime
+  # page needs them. A metric is dropped when the condition is true.
+  #
+  # The names are listed rather than matched with a regex: OTTL takes
+  # the pattern through two levels of escaping (YAML, then its own
+  # string literal), and `error_mode: ignore` turns a wrong pattern
+  # into a filter that silently keeps everything.
+  filter/apm-metrics:
+    error_mode: ignore
+    metrics:
+      metric:
+        - 'name != "http.server.request.duration"
+           and name != "http.server.duration"
+           and name != "http.client.request.duration"
+           and name != "http.client.duration"
+           and name != "rpc.server.duration"
+           and name != "rpc.client.duration"
+           and name != "db.client.operation.duration"
+           and name != "db.client.duration"'
+
+exporters:
+  otlphttp/newrelic:
+    endpoint: "https://otlp.nr-data.net"   # US region; EU is https://otlp.eu01.nr-data.net
+    headers:
+      "api-key": "${NEW_RELIC_LICENSE_KEY}"
+    compression: gzip
+  # Second destination. Only the OTel-instrumented services reach Oodle;
+  # the New Relic agent path stays New Relic only, which is the comparison.
+  otlphttp/oodle:
+    endpoint: "${OODLE_OTLP_ENDPOINT}"
+    headers:
+      "X-OODLE-INSTANCE": "${OODLE_INSTANCE}"
+      "X-API-KEY": "${OODLE_API_KEY}"
+    compression: gzip
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter/self-telemetry, batch]
+      exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [filter/self-telemetry, filter/apm-metrics, batch]
+      exporters: [otlphttp/newrelic, otlphttp/oodle, debug]
