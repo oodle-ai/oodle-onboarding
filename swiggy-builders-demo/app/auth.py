@@ -31,6 +31,7 @@ SCOPES = "mcp:tools mcp:resources mcp:prompts"
 
 _auth_code = None  # type: Optional[str]
 _auth_error = None  # type: Optional[str]
+_expected_state = None  # type: Optional[str]
 _server_done = threading.Event()
 
 
@@ -76,6 +77,17 @@ class _CallbackHandler(http.server.BaseHTTPRequestHandler):
         global _auth_code, _auth_error
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
+
+        state = params.get("state", [None])[0]
+        if (
+            _expected_state is None
+            or state is None
+            or not secrets.compare_digest(
+                state.encode("utf-8"), _expected_state.encode("utf-8")
+            )
+        ):
+            self._respond("Invalid OAuth callback state.", status=400)
+            return
 
         if "code" in params:
             _auth_code = params["code"][0]
@@ -177,7 +189,7 @@ def _write_token_to_env(token: str):
 
 def authenticate():
     """Run the full OAuth 2.1 + PKCE flow."""
-    global _auth_code, _auth_error
+    global _auth_code, _auth_error, _expected_state
 
     endpoints = _discover_oauth_endpoints()
 
@@ -192,6 +204,7 @@ def authenticate():
     verifier, challenge = _generate_pkce()
 
     state = secrets.token_urlsafe(32)
+    _expected_state = state
 
     auth_params = urllib.parse.urlencode({
         "response_type": "code",
