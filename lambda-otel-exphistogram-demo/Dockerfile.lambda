@@ -1,0 +1,41 @@
+# A Lambda execution environment that runs locally: the AWS Lambda Python base
+# image (it ships the Runtime Interface Emulator) plus the two public
+# OpenTelemetry Lambda layers, unpacked into /opt exactly as Lambda does.
+#   - collector layer: /opt/extensions/collector runs as a Lambda extension
+#   - python layer:    /opt/otel-instrument wraps the handler and flushes the
+#                      SDK at the end of every invocation
+ARG COLLECTOR_LAYER=0.23.0
+ARG PYTHON_LAYER=0.21.0
+
+FROM python:3.13-slim AS layers
+ARG COLLECTOR_LAYER
+ARG PYTHON_LAYER
+# Set by BuildKit: amd64 or arm64, the same names the collector layer uses.
+ARG TARGETARCH
+RUN python - <<PY
+import io, urllib.request, zipfile
+base = "https://github.com/open-telemetry/opentelemetry-lambda/releases/download"
+for url in (
+    f"{base}/layer-collector/${COLLECTOR_LAYER}/opentelemetry-collector-layer-${TARGETARCH}.zip",
+    f"{base}/layer-python/${PYTHON_LAYER}/opentelemetry-python-layer.zip",
+):
+    print("fetching", url, flush=True)
+    data = urllib.request.urlopen(url).read()
+    zipfile.ZipFile(io.BytesIO(data)).extractall("/opt")
+PY
+# zipfile does not keep the executable bit.
+RUN chmod +x /opt/extensions/collector /opt/otel-instrument /opt/otel-handler \
+    && chmod -R +x /opt/python/bin
+
+FROM public.ecr.aws/lambda/python:3.13
+COPY --from=layers /opt /opt
+COPY function/ ${LAMBDA_TASK_ROOT}/
+ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument \
+    OPENTELEMETRY_COLLECTOR_CONFIG_URI=/var/task/collector.yaml \
+    AWS_LAMBDA_FUNCTION_NAME=oodle-exphist-demo \
+    OTEL_SERVICE_NAME=oodle-exphist-demo \
+    OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta \
+    OTEL_TRACES_EXPORTER=none \
+    OTEL_LOGS_EXPORTER=none \
+    OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=aiobotocore,aiohttp-client,asyncpg,boto3,botocore,celery,django,falcon,fastapi,flask,grpc_aio_client,grpc_aio_server,grpc_client,grpc_server,jinja2,mysql,psycopg2,pymemcache,pymongo,pymysql,pyramid,redis,requests,sqlalchemy,sqlite3,starlette,tornado,urllib,urllib3
+CMD ["app.handler"]
